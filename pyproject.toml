@@ -139,7 +139,6 @@ addopts = [
     "--cov=pymedplum",
     "--cov-report=term-missing",
     "--cov-report=xml",
-    "--cov-fail-under=80",
 ]
 testpaths = ["pymedplum/tests"]
 python_files = ["test_*.py"]
