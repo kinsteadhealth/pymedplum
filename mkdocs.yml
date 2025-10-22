@@ -1,0 +1,65 @@
+site_name: PyMedplum Documentation
+site_url: https://pymedplum.readthedocs.io
+site_author: PyMedplum Contributors
+site_description: >-
+  A modern, Pythonic SDK for the Medplum FHIR platform with support for both
+  synchronous and asynchronous operations, multi-tenancy, and comprehensive
+  FHIR resource management.
+
+repo_url: https://github.com/yourusername/pymedplum
+repo_name: pymedplum
+
+theme:
+  name: readthedocs
+  highlightjs: true
+  hljs_languages:
+    - python
+    - yaml
+    - bash
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: installation.md
+      - Quick Start: quickstart.md
+  - User Guide:
+      - Basic Usage: usage/basic.md
+      - Async Client: usage/async.md
+      - Multi-Tenancy: usage/multi-tenancy.md
+      - On-Behalf-Of: usage/on-behalf-of.md
+      - GraphQL: usage/graphql.md
+      - Batch Operations: usage/batch.md
+  - API Reference:
+      - Client: api/client.md
+      - Async Client: api/async-client.md
+      - Helper Functions: api/helpers.md
+      - Types: api/types.md
+      - Exceptions: api/exceptions.md
+  - Advanced Topics:
+      - Project Administration: advanced/admin.md
+      - Access Policies: advanced/access-policies.md
+      - Bot Execution: advanced/bots.md
+  - Contributing: contributing.md
+  - Changelog: changelog.md
+
+markdown_extensions:
+  - admonition
+  - codehilite:
+      guess_lang: false
+  - toc:
+      permalink: true
+  - footnotes
+  - smarty
+  - pymdownx.extra
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.snippets
+  - pymdownx.keys
+
+plugins:
+  - search
+
+extra:
+  version:
+    provider: mike

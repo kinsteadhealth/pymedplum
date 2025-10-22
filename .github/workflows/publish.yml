@@ -1,0 +1,71 @@
+name: Publish to CodeArtifact
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to AWS CodeArtifact
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build package
+        run: python -m build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsPyMedplumRole
+          aws-region: us-east-1
+
+      - name: Get CodeArtifact token
+        id: codeartifact
+        run: |
+          export CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token \
+            --domain pymedplum \
+            --query authorizationToken \
+            --output text)
+          echo "::add-mask::$CODEARTIFACT_AUTH_TOKEN"
+          echo "token=$CODEARTIFACT_AUTH_TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Get CodeArtifact repository endpoint
+        id: repository
+        run: |
+          REPO_ENDPOINT=$(aws codeartifact get-repository-endpoint \
+            --domain pymedplum \
+            --repository pymedplum \
+            --format pypi \
+            --query repositoryEndpoint \
+            --output text)
+          echo "endpoint=$REPO_ENDPOINT" >> $GITHUB_OUTPUT
+
+      - name: Publish to CodeArtifact
+        env:
+          TWINE_USERNAME: aws
+          TWINE_PASSWORD: ${{ steps.codeartifact.outputs.token }}
+          TWINE_REPOSITORY_URL: ${{ steps.repository.outputs.endpoint }}
+        run: |
+          python -m twine upload dist/*
