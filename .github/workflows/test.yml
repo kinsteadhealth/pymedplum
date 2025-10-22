@@ -1,0 +1,103 @@
+name: Tests
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit Tests (Python 3.12)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install tox
+
+      - name: Run unit tests
+        run: tox -e py312
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          flags: unit
+          fail_ci_if_error: false
+        continue-on-error: true
+
+  static-analysis:
+    name: Static Analysis (Linting & Type Checking)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install tox
+
+      - name: Run linting (ruff check)
+        run: tox -e static -- ruff check .
+
+      - name: Run formatting check (ruff format)
+        run: tox -e static -- ruff format --check .
+
+      - name: Run type checking (mypy)
+        run: tox -e static -- mypy pymedplum/
+
+  integration-tests:
+    name: Integration Tests (Python 3.12)
+    runs-on: ubuntu-latest
+    # Only run integration tests if secrets are available (not on forks)
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install tox
+
+      - name: Run integration tests
+        env:
+          MEDPLUM_PROJECT_ID: ${{ secrets.MEDPLUM_PROJECT_ID }}
+          MEDPLUM_CLIENT_ID: ${{ secrets.MEDPLUM_CLIENT_ID }}
+          MEDPLUM_CLIENT_SECRET: ${{ secrets.MEDPLUM_CLIENT_SECRET }}
+        run: tox -e integration

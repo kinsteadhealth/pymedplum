@@ -1,0 +1,203 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pymedplum"
+dynamic = ["version", "readme"]
+description = "A basic Medplum REST API client."
+authors = [{ name = "Nick Catalano", email = "nickcatal@gmail.com" }]
+license = "Apache-2.0"
+requires-python = ">=3.9"
+dependencies = ["httpx>=0.27.0", "fhir.resources>=8.0.0", "pydantic>=2.0.0"]
+keywords = ["python", "medplum", "fhir", "healthcare", "API", "REST"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Healthcare Industry",
+    "Operating System :: OS Independent",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.23.0",
+    "coverage>=7.0.0",
+    "responses>=0.23.0",
+    "respx>=0.20.0",
+    "python-dotenv>=1.0.0",
+]
+lint = ["ruff>=0.8.0", "mypy>=1.11.0"]
+dev = ["pymedplum[test,lint]", "pre-commit>=4.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/nickcatal/pymedplum"
+Repository = "https://github.com/nickcatal/pymedplum.git"
+"Bug Tracker" = "https://github.com/nickcatal/pymedplum/issues"
+
+[tool.setuptools]
+packages = ["pymedplum", "pymedplum.helpers", "pymedplum.models"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+pymedplum = ["py.typed"]
+
+[tool.setuptools.dynamic]
+version = { attr = "pymedplum.__version__.__version__" }
+readme = { file = "README.md", content-type = "text/markdown" }
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+src = ["pymedplum"]
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "B",     # flake8-bugbear
+    "C4",    # flake8-comprehensions
+    "UP",    # pyupgrade
+    "ARG",   # flake8-unused-arguments
+    "SIM",   # flake8-simplify
+    "TCH",   # flake8-type-checking
+    "PTH",   # flake8-use-pathlib
+    "N",     # pep8-naming
+    "D",     # pydocstyle
+    "RUF",   # Ruff-specific rules
+    "TRY",   # tryceratops
+    "PL",    # pylint
+    "PERF",  # perflint
+    "ASYNC", # flake8-async
+]
+ignore = [
+    "D100",    # Missing docstring in public module
+    "D104",    # Missing docstring in public package
+    "D105",    # Missing docstring in magic method
+    "D107",    # Missing docstring in __init__
+    "D203",    # 1 blank line required before class docstring
+    "D205",    # 1 blank line required between summary and description
+    "D213",    # Multi-line docstring summary should start at the second line
+    "D415",    # First line should end with a period, question mark, or exclamation point
+    "E501",    # Line too long (some verbosity is acceptable)
+    "N815",    # mixedCase variable names (intentional for TypeScript compat)
+    "TC002",   # Move third-party import into type-checking block
+    "UP007",   # Use X | Y instead of Union (prefer explicit)
+    "UP045",   # Use X | None instead of Optional (prefer explicit)
+    "TRY003",  # Avoid specifying long messages outside the exception class
+    "PLR0912", # Too many branches
+    "PLR0913", # Too many arguments to function call
+    "PLR2004", # Magic value used in comparison
+    "PLC0415", # import should be at top-level (allow contextual imports)
+    "PERF203", # try-except in loop (acceptable for cleanup code)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"] # Unused imports in __init__.py
+"tests/**/*.py" = [
+    "D",       # No docstrings required in tests
+    "ARG",     # Unused function arguments in tests (fixtures)
+    "PLR2004", # Magic values OK in tests
+    "PLC0415", # import at top-level (tests can import in functions)
+    "TRY003",  # Long exception messages OK in tests
+    "E501",    # Line length (tests can be verbose)
+    "B017",    # Blind except OK for testing error conditions
+]
+"pymedplum/tests/**/*.py" = [
+    "D",       # No docstrings required in tests
+    "ARG",     # Unused function arguments in tests (fixtures)
+    "PLR2004", # Magic values OK in tests
+    "PLC0415", # import at top-level (tests can import in functions)
+    "TRY003",  # Long exception messages OK in tests
+    "E501",    # Line length (tests can be verbose)
+    "B017",    # Blind except OK for testing error conditions
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["pymedplum"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--disable-warnings",
+    "--tb=short",
+    "--cov=pymedplum",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+]
+testpaths = ["pymedplum/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = ["asyncio: marks tests as async (deselect with '-m \"not asyncio\"')"]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["pymedplum"]
+branch = true
+omit = ["*/tests/*", "*/test_*", "setup.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+show_missing = true
+precision = 2
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.mypy]
+packages = ["pymedplum"]
+exclude = ["tests/.*"]
+python_version = "3.9"
+
+# Basic type checking - catches common bugs without being overly strict
+# Appropriate for an SDK that deals heavily with JSON data
+
+# Enable useful warnings
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = false  # Allow unused ignores for cross-version compatibility
+
+# Basic strictness - focus on catching real bugs
+check_untyped_defs = false  # Don't require all function definitions to be typed
+disallow_untyped_defs = false  # Allow untyped function definitions
+disallow_incomplete_defs = false  # Allow partial type annotations
+disallow_untyped_calls = false  # Allow calling untyped functions
+
+# Disabled strict checks for SDK flexibility
+strict_optional = false  # Don't require explicit None checks
+warn_return_any = false  # Allow returning Any (common in JSON handling)
+warn_unreachable = false  # Allow potentially unreachable code
+no_implicit_optional = false  # Allow implicit Optional
+
+# Allow flexibility for JSON-heavy SDK
+disallow_any_generics = false
+disallow_any_unimported = false
+disallow_subclassing_any = false
+no_implicit_reexport = false
