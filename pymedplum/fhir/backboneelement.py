@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class BackboneElement(MedplumFHIRBase):
     """Base definition for all elements that are defined inside a resource -
     but not those in a data type.
@@ -25,6 +26,6 @@ class BackboneElement(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("BackboneElement", BackboneElement)

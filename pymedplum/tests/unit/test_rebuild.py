@@ -95,8 +95,9 @@ def test_model_has_proper_fields_after_rebuild():
 
 def test_pydantic_validation_works():
     """Verify Pydantic validation works correctly after rebuild."""
-    from pymedplum.fhir.patient import Patient
     from pydantic import ValidationError
+
+    from pymedplum.fhir.patient import Patient
 
     # Valid data should work
     patient = Patient(resourceType="Patient", id="test", active=True)
@@ -157,8 +158,8 @@ def test_codeable_concept_and_coding():
 
 def test_multiple_resource_types_coexist():
     """Test that multiple resource types can be used together."""
-    from pymedplum.fhir.patient import Patient
     from pymedplum.fhir.observation import Observation
+    from pymedplum.fhir.patient import Patient
 
     # Create both types - this tests that the namespace has all types
     patient = Patient(resourceType="Patient", id="p1")

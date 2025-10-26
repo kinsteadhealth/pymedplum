@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class ChargeItem(MedplumFHIRBase):
     """The resource ChargeItem describes the provision of healthcare provider
     products for a certain patient, therefore referring not only to the
@@ -78,7 +79,7 @@ class ChargeItemPerformer(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("ChargeItem", ChargeItem)
     register_model("ChargeItemPerformer", ChargeItemPerformer)

@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class ChargeItemDefinition(MedplumFHIRBase):
     """The ChargeItemDefinition resource provides the properties that apply to
     the (billing) codes necessary to calculate costs and prices. The
@@ -103,7 +104,7 @@ class ChargeItemDefinitionPropertyGroupPriceComponent(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("ChargeItemDefinition", ChargeItemDefinition)
     register_model("ChargeItemDefinitionApplicability", ChargeItemDefinitionApplicability)

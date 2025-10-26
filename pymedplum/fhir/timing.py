@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Timing(MedplumFHIRBase):
     """Specifies an event that may occur multiple times. Timing schedules are
     used to record when things are planned, expected or requested to occur.
@@ -56,7 +57,7 @@ class TimingRepeat(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Timing", Timing)
     register_model("TimingRepeat", TimingRepeat)

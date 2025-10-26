@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Provenance(MedplumFHIRBase):
     """Provenance of a resource is a record that describes entities and
     processes involved in producing and delivering or otherwise influencing
@@ -80,7 +81,7 @@ class ProvenanceEntity(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Provenance", Provenance)
     register_model("ProvenanceAgent", ProvenanceAgent)

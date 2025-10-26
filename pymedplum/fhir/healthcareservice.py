@@ -5,11 +5,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
 
 class HealthcareService(MedplumFHIRBase):
     """The details of a healthcare service available at a location."""
@@ -93,7 +94,7 @@ class HealthcareServiceNotAvailable(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("HealthcareService", HealthcareService)
     register_model("HealthcareServiceAvailableTime", HealthcareServiceAvailableTime)

@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Composition(MedplumFHIRBase):
     """A set of healthcare-related information that is assembled together into
     a single logical package that provides a single coherent statement of
@@ -111,7 +112,7 @@ class CompositionSection(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Composition", Composition)
     register_model("CompositionAttester", CompositionAttester)

@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class EnrollmentRequest(MedplumFHIRBase):
     """This resource provides the insurance enrollment details to the insurer
     regarding a specified coverage.
@@ -42,6 +43,6 @@ class EnrollmentRequest(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("EnrollmentRequest", EnrollmentRequest)

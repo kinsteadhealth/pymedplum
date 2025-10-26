@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class CareTeam(MedplumFHIRBase):
     """The Care Team includes all the people and organizations who plan to
     participate in the coordination and delivery of care for a patient.
@@ -62,7 +63,7 @@ class CareTeamParticipant(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("CareTeam", CareTeam)
     register_model("CareTeamParticipant", CareTeamParticipant)

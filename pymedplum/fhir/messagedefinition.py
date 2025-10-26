@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class MessageDefinition(MedplumFHIRBase):
     """Defines the characteristics of a message that can be shared between
     systems, including the type of event that initiates the message, the
@@ -88,7 +89,7 @@ class MessageDefinitionFocus(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("MessageDefinition", MessageDefinition)
     register_model("MessageDefinitionAllowedResponse", MessageDefinitionAllowedResponse)

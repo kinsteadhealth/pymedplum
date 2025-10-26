@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Medication(MedplumFHIRBase):
     """This resource is primarily used for the identification and definition of
     a medication for the purposes of prescribing, dispensing, and
@@ -67,7 +68,7 @@ class MedicationIngredient(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Medication", Medication)
     register_model("MedicationBatch", MedicationBatch)

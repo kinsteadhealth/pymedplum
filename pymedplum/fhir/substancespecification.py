@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class SubstanceSpecification(MedplumFHIRBase):
     """The detailed description of a substance, typically at a level beyond
     what is used for prescribing.
@@ -202,7 +203,7 @@ class SubstanceSpecificationStructureRepresentation(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("SubstanceSpecification", SubstanceSpecification)
     register_model("SubstanceSpecificationCode", SubstanceSpecificationCode)

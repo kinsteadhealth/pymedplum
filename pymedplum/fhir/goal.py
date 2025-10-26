@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Goal(MedplumFHIRBase):
     """Describes the intended objective(s) for a patient, group or organization
     care, for example, weight loss, restoring an activity of daily living,
@@ -72,7 +73,7 @@ class GoalTarget(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Goal", Goal)
     register_model("GoalTarget", GoalTarget)

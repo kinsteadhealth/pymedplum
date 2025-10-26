@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class NamingSystem(MedplumFHIRBase):
     """A curated namespace that issues unique symbols within that namespace for
     the identification of concepts, people, devices, etc. Represents a
@@ -62,7 +63,7 @@ class NamingSystemUniqueId(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("NamingSystem", NamingSystem)
     register_model("NamingSystemUniqueId", NamingSystemUniqueId)

@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class RiskAssessment(MedplumFHIRBase):
     """An assessment of the likely outcome(s) for a patient or other subject as
     well as the likelihood of each outcome.
@@ -69,7 +70,7 @@ class RiskAssessmentPrediction(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("RiskAssessment", RiskAssessment)
     register_model("RiskAssessmentPrediction", RiskAssessmentPrediction)

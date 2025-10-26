@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Endpoint(MedplumFHIRBase):
     """The technical details of an endpoint that can be used for electronic
     services, such as for web services providing XDS.b or a REST endpoint
@@ -48,6 +49,6 @@ class Endpoint(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Endpoint", Endpoint)

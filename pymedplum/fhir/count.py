@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Count(MedplumFHIRBase):
     """A measured amount (or an amount that can potentially be measured). Note
     that measured amounts include amounts that are not precisely quantified,
@@ -30,6 +31,6 @@ class Count(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Count", Count)

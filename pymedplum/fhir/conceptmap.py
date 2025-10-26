@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class ConceptMap(MedplumFHIRBase):
     """A statement of relationships from one set of concepts to one or more
     other concepts - either concepts in code systems, or data element/data
@@ -128,7 +129,7 @@ class ConceptMapGroupUnmapped(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("ConceptMap", ConceptMap)
     register_model("ConceptMapGroup", ConceptMapGroup)

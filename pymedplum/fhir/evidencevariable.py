@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class EvidenceVariable(MedplumFHIRBase):
     """The EvidenceVariable resource describes a &quot;PICO&quot; element that
     knowledge (evidence, assertion, recommendation) is about.
@@ -133,7 +134,7 @@ class EvidenceVariableCharacteristicTimeFromEvent(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("EvidenceVariable", EvidenceVariable)
     register_model("EvidenceVariableCharacteristic", EvidenceVariableCharacteristic)

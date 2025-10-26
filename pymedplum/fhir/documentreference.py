@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class DocumentReference(MedplumFHIRBase):
     """A reference to a document of any kind for any purpose. Provides metadata
     about the document so that the document can be discovered and managed.
@@ -93,7 +94,7 @@ class DocumentReferenceRelatesTo(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("DocumentReference", DocumentReference)
     register_model("DocumentReferenceContent", DocumentReferenceContent)

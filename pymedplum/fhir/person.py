@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Person(MedplumFHIRBase):
     """Demographics and administrative information about a person independent
     of a specific health-related context.
@@ -55,7 +56,7 @@ class PersonLink(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Person", Person)
     register_model("PersonLink", PersonLink)

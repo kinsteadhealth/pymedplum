@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class DocumentManifest(MedplumFHIRBase):
     """A collection of documents compiled for a purpose together with metadata
     that applies to the collection.
@@ -57,7 +58,7 @@ class DocumentManifestRelated(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("DocumentManifest", DocumentManifest)
     register_model("DocumentManifestRelated", DocumentManifestRelated)

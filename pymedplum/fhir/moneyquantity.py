@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class MoneyQuantity(MedplumFHIRBase):
     """An amount of money. With regard to precision, see [Decimal
     Precision](datatypes.html#precision)
@@ -29,6 +30,6 @@ class MoneyQuantity(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("MoneyQuantity", MoneyQuantity)

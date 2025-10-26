@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class CommunicationRequest(MedplumFHIRBase):
     """A request to convey information; e.g. the CDS system proposes that an
     alert be sent to a responsible provider, the CDS system proposes that
@@ -70,7 +71,7 @@ class CommunicationRequestPayload(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("CommunicationRequest", CommunicationRequest)
     register_model("CommunicationRequestPayload", CommunicationRequestPayload)

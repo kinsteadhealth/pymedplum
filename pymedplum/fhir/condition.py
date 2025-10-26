@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Condition(MedplumFHIRBase):
     """A clinical condition, problem, diagnosis, or other event, situation,
     issue, or clinical concept that has risen to a level of concern.
@@ -84,7 +85,7 @@ class ConditionStage(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Condition", Condition)
     register_model("ConditionEvidence", ConditionEvidence)

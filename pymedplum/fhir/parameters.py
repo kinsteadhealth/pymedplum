@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Parameters(MedplumFHIRBase):
     """This resource is a non-persisted resource used to pass information into
     and back from an [operation](operations.html). It has no other use, and
@@ -94,7 +95,7 @@ class ParametersParameter(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Parameters", Parameters)
     register_model("ParametersParameter", ParametersParameter)

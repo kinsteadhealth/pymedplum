@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Dosage(MedplumFHIRBase):
     """Indicates how the medication is/was taken or should be taken by the patient."""
 
@@ -50,7 +51,7 @@ class DosageDoseAndRate(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Dosage", Dosage)
     register_model("DosageDoseAndRate", DosageDoseAndRate)

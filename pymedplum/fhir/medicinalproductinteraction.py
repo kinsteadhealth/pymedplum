@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class MedicinalProductInteraction(MedplumFHIRBase):
     """The interactions of the medicinal product with other medicinal products,
     or other forms of interactions.
@@ -52,7 +53,7 @@ class MedicinalProductInteractionInteractant(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("MedicinalProductInteraction", MedicinalProductInteraction)
     register_model("MedicinalProductInteractionInteractant", MedicinalProductInteractionInteractant)

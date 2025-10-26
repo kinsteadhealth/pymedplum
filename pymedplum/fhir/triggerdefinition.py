@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class TriggerDefinition(MedplumFHIRBase):
     """A description of a triggering event. Triggering events can be named
     events, data events, or periodic, as determined by the type element.
@@ -32,6 +33,6 @@ class TriggerDefinition(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("TriggerDefinition", TriggerDefinition)

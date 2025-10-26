@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class SubstanceAmount(MedplumFHIRBase):
     """Chemical substances are a single substance type whose primary defining
     element is the molecular structure. Chemical substances shall be defined
@@ -45,7 +46,7 @@ class SubstanceAmountReferenceRange(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("SubstanceAmount", SubstanceAmount)
     register_model("SubstanceAmountReferenceRange", SubstanceAmountReferenceRange)

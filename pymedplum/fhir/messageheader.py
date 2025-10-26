@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class MessageHeader(MedplumFHIRBase):
     """The header for a message exchange that is either requesting or
     responding to an action. The reference(s) that are the subject of the
@@ -38,7 +39,7 @@ class MessageHeader(MedplumFHIRBase):
     sender: Optional[Reference] = Field(default=None, description="Identifies the sending system to allow the use of a trust relationship.")
     enterer: Optional[Reference] = Field(default=None, description="The person or device that performed the data entry leading to this message. When there is more than one candidate, pick the most proximal to the message. Can provide other enterers in extensions.")
     author: Optional[Reference] = Field(default=None, description="The logical author of the message - the person or device that decided the described event should happen. When there is more than one candidate, pick the most proximal to the MessageHeader. Can provide other authors in extensions.")
-    source: MessageHeaderSource = Field(default=..., description="The source application from which this message originated.")  # noqa: F821
+    source: MessageHeaderSource = Field(default=..., description="The source application from which this message originated.")
     responsible: Optional[Reference] = Field(default=None, description="The person or organization that accepts overall responsibility for the contents of the message. The implication is that the message event happened under the policies of the responsible party.")
     reason: Optional[CodeableConcept] = Field(default=None, description="Coded indication of the cause for the event - indicates a reason for the occurrence of the event that is a focus of this message.")
     response: Optional[MessageHeaderResponse] = Field(default=None, description="Information about the message that this message is a response to. Only present if this message is a response.")
@@ -88,7 +89,7 @@ class MessageHeaderSource(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("MessageHeader", MessageHeader)
     register_model("MessageHeaderDestination", MessageHeaderDestination)

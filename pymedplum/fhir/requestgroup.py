@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class RequestGroup(MedplumFHIRBase):
     """A group of related requests that can be used to capture intended
     activities that have inter-dependencies such as &quot;give this
@@ -112,7 +113,7 @@ class RequestGroupActionRelatedAction(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("RequestGroup", RequestGroup)
     register_model("RequestGroupAction", RequestGroupAction)

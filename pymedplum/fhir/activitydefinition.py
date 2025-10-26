@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class ActivityDefinition(MedplumFHIRBase):
     """This resource allows for the definition of some activity to be
     performed, independent of a particular patient, practitioner, or other
@@ -114,7 +115,7 @@ class ActivityDefinitionParticipant(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("ActivityDefinition", ActivityDefinition)
     register_model("ActivityDefinitionDynamicValue", ActivityDefinitionDynamicValue)

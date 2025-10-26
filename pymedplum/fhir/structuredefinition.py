@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class StructureDefinition(MedplumFHIRBase):
     """A definition of a FHIR structure. This resource is used to describe the
     underlying resources, data types defined in FHIR, and also for
@@ -109,7 +110,7 @@ class StructureDefinitionSnapshot(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("StructureDefinition", StructureDefinition)
     register_model("StructureDefinitionContext", StructureDefinitionContext)

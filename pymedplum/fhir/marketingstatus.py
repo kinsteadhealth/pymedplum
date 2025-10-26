@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class MarketingStatus(MedplumFHIRBase):
     """The marketing status describes the date when a medicinal product is
     actually put on the market or the date as of which it is no longer
@@ -31,6 +32,6 @@ class MarketingStatus(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("MarketingStatus", MarketingStatus)

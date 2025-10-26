@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class AdverseEvent(MedplumFHIRBase):
     """Actual or potential/avoided event causing unintended physical injury
     resulting from or contributed to by medical care, a research study or
@@ -79,7 +80,7 @@ class AdverseEventSuspectEntityCausality(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("AdverseEvent", AdverseEvent)
     register_model("AdverseEventSuspectEntity", AdverseEventSuspectEntity)

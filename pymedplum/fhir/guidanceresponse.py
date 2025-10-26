@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class GuidanceResponse(MedplumFHIRBase):
     """A guidance response is the formal response to a guidance request,
     including any output parameters returned by the evaluation, as well as
@@ -53,6 +54,6 @@ class GuidanceResponse(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("GuidanceResponse", GuidanceResponse)

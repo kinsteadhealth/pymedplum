@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Practitioner(MedplumFHIRBase):
     """A person who is directly or indirectly involved in the provisioning of healthcare."""
 
@@ -59,7 +60,7 @@ class PractitionerQualification(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Practitioner", Practitioner)
     register_model("PractitionerQualification", PractitionerQualification)

@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class RiskEvidenceSynthesis(MedplumFHIRBase):
     """The RiskEvidenceSynthesis resource describes the likelihood of an
     outcome in a population plus exposure state where the risk estimate is
@@ -127,7 +128,7 @@ class RiskEvidenceSynthesisSampleSize(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("RiskEvidenceSynthesis", RiskEvidenceSynthesis)
     register_model("RiskEvidenceSynthesisCertainty", RiskEvidenceSynthesisCertainty)

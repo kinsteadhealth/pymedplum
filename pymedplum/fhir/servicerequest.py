@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class ServiceRequest(MedplumFHIRBase):
     """A record of a request for service such as diagnostic investigations,
     treatments, or operations to be performed.
@@ -73,6 +74,6 @@ class ServiceRequest(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("ServiceRequest", ServiceRequest)

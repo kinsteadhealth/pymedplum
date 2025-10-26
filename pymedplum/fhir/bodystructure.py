@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class BodyStructure(MedplumFHIRBase):
     """Record details about an anatomical structure. This resource may be used
     when a coded concept does not provide the necessary detail needed for
@@ -44,6 +45,6 @@ class BodyStructure(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("BodyStructure", BodyStructure)

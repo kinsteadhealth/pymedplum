@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class ContactDetail(MedplumFHIRBase):
     """Specifies contact information for a person or organization."""
 
@@ -24,6 +25,6 @@ class ContactDetail(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("ContactDetail", ContactDetail)

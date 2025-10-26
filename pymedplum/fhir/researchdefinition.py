@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class ResearchDefinition(MedplumFHIRBase):
     """The ResearchDefinition resource describes the conditional state
     (population and any exposures being compared within the population) and
@@ -72,6 +73,6 @@ class ResearchDefinition(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("ResearchDefinition", ResearchDefinition)

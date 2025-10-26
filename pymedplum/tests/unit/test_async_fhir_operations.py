@@ -3,7 +3,6 @@
 Tests the async client implementation with mocked HTTP responses.
 """
 
-import base64
 
 import httpx
 import pytest

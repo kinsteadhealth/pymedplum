@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class PlanDefinition(MedplumFHIRBase):
     """This resource allows for the definition of various types of plans as a
     sharable, consumable, and executable artifact. The resource is general
@@ -194,7 +195,7 @@ class PlanDefinitionGoalTarget(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("PlanDefinition", PlanDefinition)
     register_model("PlanDefinitionAction", PlanDefinitionAction)

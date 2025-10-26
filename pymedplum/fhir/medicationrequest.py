@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class MedicationRequest(MedplumFHIRBase):
     """An order or request for both supply of the medication and the
     instructions for administration of the medication to a patient. The
@@ -119,7 +120,7 @@ class MedicationRequestSubstitution(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("MedicationRequest", MedicationRequest)
     register_model("MedicationRequestDispenseRequest", MedicationRequestDispenseRequest)

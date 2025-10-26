@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class ObservationDefinition(MedplumFHIRBase):
     """Set of definitional characteristics for a kind of observation or
     measurement produced or consumed by an orderable health care service.
@@ -79,7 +80,7 @@ class ObservationDefinitionQuantitativeDetails(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("ObservationDefinition", ObservationDefinition)
     register_model("ObservationDefinitionQualifiedInterval", ObservationDefinitionQualifiedInterval)

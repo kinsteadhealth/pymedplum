@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Linkage(MedplumFHIRBase):
     """Identifies two or more records (resource instances) that refer to the
     same real-world &quot;occurrence&quot;.
@@ -51,7 +52,7 @@ class LinkageItem(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Linkage", Linkage)
     register_model("LinkageItem", LinkageItem)

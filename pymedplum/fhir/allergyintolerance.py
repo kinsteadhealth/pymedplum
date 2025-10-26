@@ -5,11 +5,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
 
 class AllergyIntolerance(MedplumFHIRBase):
     """Risk of harmful or undesirable, physiological response which is unique
@@ -72,7 +73,7 @@ class AllergyIntoleranceReaction(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("AllergyIntolerance", AllergyIntolerance)
     register_model("AllergyIntoleranceReaction", AllergyIntoleranceReaction)

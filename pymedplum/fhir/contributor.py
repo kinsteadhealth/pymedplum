@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Contributor(MedplumFHIRBase):
     """A contributor to the content of a knowledge asset, including authors,
     editors, reviewers, and endorsers.
@@ -27,6 +28,6 @@ class Contributor(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Contributor", Contributor)

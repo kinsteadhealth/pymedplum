@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Appointment(MedplumFHIRBase):
     """A booking of a healthcare event among patient(s), practitioner(s),
     related person(s) and/or device(s) for a specific date/time. This may
@@ -71,7 +72,7 @@ class AppointmentParticipant(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Appointment", Appointment)
     register_model("AppointmentParticipant", AppointmentParticipant)

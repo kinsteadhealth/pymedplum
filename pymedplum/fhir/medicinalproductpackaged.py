@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class MedicinalProductPackaged(MedplumFHIRBase):
     """A medicinal product in a container or package."""
 
@@ -74,7 +75,7 @@ class MedicinalProductPackagedPackageItem(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("MedicinalProductPackaged", MedicinalProductPackaged)
     register_model("MedicinalProductPackagedBatchIdentifier", MedicinalProductPackagedBatchIdentifier)

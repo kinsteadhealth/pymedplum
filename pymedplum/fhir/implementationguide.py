@@ -5,11 +5,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
 
 class ImplementationGuide(MedplumFHIRBase):
     """A set of rules of how a particular interoperability or standards problem
@@ -205,7 +206,7 @@ class ImplementationGuideManifestResource(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("ImplementationGuide", ImplementationGuide)
     register_model("ImplementationGuideDefinition", ImplementationGuideDefinition)

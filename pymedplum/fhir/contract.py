@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Contract(MedplumFHIRBase):
     """Legally enforceable, formally recorded unilateral or bilateral directive
     i.e., a policy or agreement.
@@ -152,7 +153,7 @@ class ContractTerm(MedplumFHIRBase):
     sub_type: Optional[CodeableConcept] = Field(default=None, alias="subType", description="A specialized legal clause or condition based on overarching contract type.")
     text: Optional[str] = Field(default=None, description="Statement of a provision in a policy or a contract.")
     security_label: Optional[list[ContractTermSecurityLabel]] = Field(default=None, alias="securityLabel", description="Security labels that protect the handling of information about the term and its elements, which may be specifically identified..")
-    offer: ContractTermOffer = Field(default=..., description="The matter of concern in the context of this provision of the agrement.")  # noqa: F821
+    offer: ContractTermOffer = Field(default=..., description="The matter of concern in the context of this provision of the agrement.")
     asset: Optional[list[ContractTermAsset]] = Field(default=None, description="Contract Term Asset List.")
     action: Optional[list[ContractTermAction]] = Field(default=None, description="An actor taking a role in an activity for which it can be assigned some degree of responsibility for the activity taking place.")
     group: Optional[list[ContractTerm]] = Field(default=None, description="Nested group of Contract Provisions.")
@@ -324,7 +325,7 @@ class ContractTermSecurityLabel(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Contract", Contract)
     register_model("ContractContentDefinition", ContractContentDefinition)

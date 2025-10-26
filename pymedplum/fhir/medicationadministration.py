@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class MedicationAdministration(MedplumFHIRBase):
     """Describes the event of a patient consuming or otherwise being
     administered a medication. This may be as simple as swallowing a tablet
@@ -88,7 +89,7 @@ class MedicationAdministrationPerformer(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("MedicationAdministration", MedicationAdministration)
     register_model("MedicationAdministrationDosage", MedicationAdministrationDosage)

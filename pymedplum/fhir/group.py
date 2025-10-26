@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Group(MedplumFHIRBase):
     """Represents a defined collection of entities that may be discussed or
     acted upon collectively but which are not expected to act collectively,
@@ -74,7 +75,7 @@ class GroupMember(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Group", Group)
     register_model("GroupCharacteristic", GroupCharacteristic)

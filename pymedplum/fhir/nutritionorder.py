@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class NutritionOrder(MedplumFHIRBase):
     """A request to supply a diet, formula feeding (enteral) or oral
     nutritional supplement to a patient/resident.
@@ -140,7 +141,7 @@ class NutritionOrderSupplement(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("NutritionOrder", NutritionOrder)
     register_model("NutritionOrderEnteralFormula", NutritionOrderEnteralFormula)

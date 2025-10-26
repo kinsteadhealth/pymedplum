@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Signature(MedplumFHIRBase):
     """A signature along with supporting context. The signature may be a
     digital signature that is cryptographic in nature, or some other
@@ -35,6 +36,6 @@ class Signature(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Signature", Signature)

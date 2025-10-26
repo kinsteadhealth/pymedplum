@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class CodeSystem(MedplumFHIRBase):
     """The CodeSystem resource is used to declare the existence of and describe
     a code system or code system supplement and its key properties, and
@@ -136,7 +137,7 @@ class CodeSystemProperty(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("CodeSystem", CodeSystem)
     register_model("CodeSystemConcept", CodeSystemConcept)

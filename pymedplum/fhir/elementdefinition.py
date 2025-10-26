@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class ElementDefinition(MedplumFHIRBase):
     """Captures constraints on each element within the resource, profile, or extension."""
 
@@ -384,7 +385,7 @@ class ElementDefinitionType(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("ElementDefinition", ElementDefinition)
     register_model("ElementDefinitionBase", ElementDefinitionBase)

@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class SpecimenDefinition(MedplumFHIRBase):
     """A kind of specimen with associated set of requirements."""
 
@@ -98,7 +99,7 @@ class SpecimenDefinitionTypeTestedHandling(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("SpecimenDefinition", SpecimenDefinition)
     register_model("SpecimenDefinitionTypeTested", SpecimenDefinitionTypeTested)

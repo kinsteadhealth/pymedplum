@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class CapabilityStatement(MedplumFHIRBase):
     """A Capability Statement documents a set of capabilities (behaviors) of a
     FHIR Server for a particular version of FHIR that may be used as a
@@ -241,7 +242,7 @@ class CapabilityStatementSoftware(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("CapabilityStatement", CapabilityStatement)
     register_model("CapabilityStatementDocument", CapabilityStatementDocument)

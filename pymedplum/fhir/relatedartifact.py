@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class RelatedArtifact(MedplumFHIRBase):
     """Related artifacts such as additional documentation, justification, or
     bibliographic references.
@@ -31,6 +32,6 @@ class RelatedArtifact(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("RelatedArtifact", RelatedArtifact)

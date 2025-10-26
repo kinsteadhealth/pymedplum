@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class OperationOutcome(MedplumFHIRBase):
     """A collection of error, warning, or information messages that result from
     a system action.
@@ -50,7 +51,7 @@ class OperationOutcomeIssue(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("OperationOutcome", OperationOutcome)
     register_model("OperationOutcomeIssue", OperationOutcomeIssue)

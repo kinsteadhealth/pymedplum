@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class AuditEvent(MedplumFHIRBase):
     """A record of an event made for purposes of maintaining a security log.
     Typical uses include detection of intrusion attempts and monitoring for
@@ -39,7 +40,7 @@ class AuditEvent(MedplumFHIRBase):
     outcome_desc: Optional[str] = Field(default=None, alias="outcomeDesc", description="A free text description of the outcome of the event.")
     purpose_of_event: Optional[list[CodeableConcept]] = Field(default=None, alias="purposeOfEvent", description="The purposeOfUse (reason) that was used during the event being recorded.")
     agent: list[AuditEventAgent] = Field(default=..., description="An actor taking an active role in the event or activity that is logged.")
-    source: AuditEventSource = Field(default=..., description="The system that is reporting the event.")  # noqa: F821
+    source: AuditEventSource = Field(default=..., description="The system that is reporting the event.")
     entity: Optional[list[AuditEventEntity]] = Field(default=None, description="Specific instances of data or objects that have been accessed.")
 
 
@@ -117,7 +118,7 @@ class AuditEventSource(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("AuditEvent", AuditEvent)
     register_model("AuditEventAgent", AuditEventAgent)

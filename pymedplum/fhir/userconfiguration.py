@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class UserConfiguration(MedplumFHIRBase):
     """User specific configuration for the Medplum application."""
 
@@ -69,7 +70,7 @@ class UserConfigurationSearch(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("UserConfiguration", UserConfiguration)
     register_model("UserConfigurationMenu", UserConfigurationMenu)

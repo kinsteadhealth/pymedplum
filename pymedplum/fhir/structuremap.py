@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class StructureMap(MedplumFHIRBase):
     """A Map of relationships between 2 structures that can be used to transform data."""
 
@@ -215,7 +216,7 @@ class StructureMapStructure(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("StructureMap", StructureMap)
     register_model("StructureMapGroup", StructureMapGroup)

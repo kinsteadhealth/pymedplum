@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Subscription(MedplumFHIRBase):
     """The subscription resource is used to define a push-based subscription
     from a server to another system. Once a subscription is registered with
@@ -39,7 +40,7 @@ class Subscription(MedplumFHIRBase):
     reason: str = Field(default=..., description="A description of why this subscription is defined.")
     criteria: str = Field(default=..., description="The rules that the server should use to determine when to generate notifications for this subscription.")
     error: Optional[str] = Field(default=None, description="A record of the last error that occurred when the server processed a notification.")
-    channel: SubscriptionChannel = Field(default=..., description="Details where to send notifications when resources are received that meet the criteria.")  # noqa: F821
+    channel: SubscriptionChannel = Field(default=..., description="Details where to send notifications when resources are received that meet the criteria.")
 
 
 class SubscriptionChannel(MedplumFHIRBase):
@@ -60,7 +61,7 @@ class SubscriptionChannel(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Subscription", Subscription)
     register_model("SubscriptionChannel", SubscriptionChannel)

@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Identifier(MedplumFHIRBase):
     """An identifier - identifies some entity uniquely and unambiguously.
     Typically this is used for business identifiers.
@@ -30,6 +31,6 @@ class Identifier(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Identifier", Identifier)

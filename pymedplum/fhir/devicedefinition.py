@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class DeviceDefinition(MedplumFHIRBase):
     """The characteristics, operational status and capabilities of a
     medical-related component of a medical device.
@@ -142,7 +143,7 @@ class DeviceDefinitionUdiDeviceIdentifier(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("DeviceDefinition", DeviceDefinition)
     register_model("DeviceDefinitionCapability", DeviceDefinitionCapability)

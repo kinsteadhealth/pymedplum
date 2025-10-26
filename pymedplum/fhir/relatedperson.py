@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class RelatedPerson(MedplumFHIRBase):
     """Information about a person that is involved in the care for a patient,
     but who is not the target of healthcare, nor has a formal responsibility
@@ -58,7 +59,7 @@ class RelatedPersonCommunication(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("RelatedPerson", RelatedPerson)
     register_model("RelatedPersonCommunication", RelatedPersonCommunication)

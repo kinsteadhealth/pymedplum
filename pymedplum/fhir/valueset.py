@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class ValueSet(MedplumFHIRBase):
     """A ValueSet resource instance specifies a set of codes drawn from one or
     more code systems, intended for use in a particular context. Value sets
@@ -176,7 +177,7 @@ class ValueSetExpansionParameter(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("ValueSet", ValueSet)
     register_model("ValueSetCompose", ValueSetCompose)

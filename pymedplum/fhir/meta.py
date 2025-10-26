@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Meta(MedplumFHIRBase):
     """The metadata about a resource. This is content in the resource that is
     maintained by the infrastructure. Changes to the content might not
@@ -37,6 +38,6 @@ class Meta(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Meta", Meta)

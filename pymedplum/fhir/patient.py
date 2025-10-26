@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Patient(MedplumFHIRBase):
     """Demographics and other administrative information about an individual or
     animal receiving care or other health-related services.
@@ -90,7 +91,7 @@ class PatientLink(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Patient", Patient)
     register_model("PatientCommunication", PatientCommunication)

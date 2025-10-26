@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Account(MedplumFHIRBase):
     """A financial tool for tracking value accrued for a particular purpose. In
     the healthcare field, used to track charges for a patient, cost centers,
@@ -72,7 +73,7 @@ class AccountGuarantor(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Account", Account)
     register_model("AccountCoverage", AccountCoverage)

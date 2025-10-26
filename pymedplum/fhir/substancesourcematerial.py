@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class SubstanceSourceMaterial(MedplumFHIRBase):
     """Source material shall capture information on the taxonomic and
     anatomical origins as well as the fraction of a material that can result
@@ -145,7 +146,7 @@ class SubstanceSourceMaterialPartDescription(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("SubstanceSourceMaterial", SubstanceSourceMaterial)
     register_model("SubstanceSourceMaterialFractionDescription", SubstanceSourceMaterialFractionDescription)

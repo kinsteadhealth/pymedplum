@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class CarePlan(MedplumFHIRBase):
     """Describes the intention of how one or more practitioners intend to
     deliver care for a particular patient, group or community for a period
@@ -107,7 +108,7 @@ class CarePlanActivityDetail(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("CarePlan", CarePlan)
     register_model("CarePlanActivity", CarePlanActivity)

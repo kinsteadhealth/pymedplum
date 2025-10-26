@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class DetectedIssue(MedplumFHIRBase):
     """Indicates an actual or potential clinical issue with or between one or
     more active or proposed clinical actions for a patient; e.g. Drug-drug
@@ -78,7 +79,7 @@ class DetectedIssueMitigation(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("DetectedIssue", DetectedIssue)
     register_model("DetectedIssueEvidence", DetectedIssueEvidence)

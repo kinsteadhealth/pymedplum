@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class GraphDefinition(MedplumFHIRBase):
     """A formal computable definition of a graph of resources - that is, a
     coherent set of resources that form a graph by following references. The
@@ -91,7 +92,7 @@ class GraphDefinitionLinkTargetCompartment(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("GraphDefinition", GraphDefinition)
     register_model("GraphDefinitionLink", GraphDefinitionLink)

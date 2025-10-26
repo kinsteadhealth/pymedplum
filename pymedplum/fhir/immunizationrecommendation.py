@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class ImmunizationRecommendation(MedplumFHIRBase):
     """A patient's point-in-time set of recommendations (i.e. forecasting)
     according to a published schedule with optional supporting
@@ -75,7 +76,7 @@ class ImmunizationRecommendationRecommendationDateCriterion(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("ImmunizationRecommendation", ImmunizationRecommendation)
     register_model("ImmunizationRecommendationRecommendation", ImmunizationRecommendationRecommendation)

@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class EpisodeOfCare(MedplumFHIRBase):
     """An association between a patient and an organization / healthcare
     provider(s) during which time encounters may occur. The managing
@@ -72,7 +73,7 @@ class EpisodeOfCareStatusHistory(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("EpisodeOfCare", EpisodeOfCare)
     register_model("EpisodeOfCareDiagnosis", EpisodeOfCareDiagnosis)

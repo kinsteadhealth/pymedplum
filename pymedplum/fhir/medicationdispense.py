@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class MedicationDispense(MedplumFHIRBase):
     """Indicates that a medication product is to be or has been dispensed for a
     named person/patient. This includes a description of the medication
@@ -91,7 +92,7 @@ class MedicationDispenseSubstitution(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("MedicationDispense", MedicationDispense)
     register_model("MedicationDispensePerformer", MedicationDispensePerformer)

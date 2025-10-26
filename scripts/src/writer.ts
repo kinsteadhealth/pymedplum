@@ -517,7 +517,8 @@ export function generateInitFile(
     "# from pymedplum.fhir.patient import Patient",
     "# from pymedplum.fhir.organization import Organization",
     "",
-    "from typing import Any, Literal, TYPE_CHECKING",
+    "import importlib",
+    "from typing import TYPE_CHECKING, Any, Literal",
     "",
   ];
 
@@ -561,8 +562,6 @@ export function generateInitFile(
   lines.push("__all__ = [\"Resource\", \"ResourceType\"]");
   lines.push("");
   lines.push("# Import all modules to trigger model registration");
-  lines.push("import importlib");
-  lines.push("");
   
   // Import all modules at runtime to register models
   const fileNames = Array.from(fileToClasses.keys()).sort();

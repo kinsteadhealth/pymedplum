@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class UsageContext(MedplumFHIRBase):
     """Specifies clinical/business/etc. metadata that can be used to retrieve,
     index and/or categorize an artifact. This metadata can either be
@@ -31,6 +32,6 @@ class UsageContext(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("UsageContext", UsageContext)

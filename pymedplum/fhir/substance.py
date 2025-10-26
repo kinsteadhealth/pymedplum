@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class Substance(MedplumFHIRBase):
     """A homogeneous material with a definite composition."""
 
@@ -64,7 +65,7 @@ class SubstanceInstance(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("Substance", Substance)
     register_model("SubstanceIngredient", SubstanceIngredient)

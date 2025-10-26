@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class SupplyRequest(MedplumFHIRBase):
     """A record of a request for a medication, substance or device used in the
     healthcare setting.
@@ -68,7 +69,7 @@ class SupplyRequestParameter(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("SupplyRequest", SupplyRequest)
     register_model("SupplyRequestParameter", SupplyRequestParameter)

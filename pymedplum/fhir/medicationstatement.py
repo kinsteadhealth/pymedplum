@@ -11,6 +11,7 @@ from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
+
 class MedicationStatement(MedplumFHIRBase):
     """A record of a medication that is being consumed by a patient. A
     MedicationStatement may indicate that the patient may be taking the
@@ -75,6 +76,6 @@ class MedicationStatement(MedplumFHIRBase):
 from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model  # noqa: E402
+    from pymedplum.fhir._rebuild import register_model
 
     register_model("MedicationStatement", MedicationStatement)

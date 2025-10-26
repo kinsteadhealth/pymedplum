@@ -90,17 +90,20 @@ def test_sync_patch_resource(medplum_client):
 
 def test_sync_search_resources(medplum_client):
     """Test sync client search_resources method."""
-    # Create a patient with unique name
+    import uuid
+
+    # Create a patient with a truly unique identifier
+    unique_id = str(uuid.uuid4())
     patient = Patient(
-        name=[{"family": "SyncSearchTest", "given": ["Coverage"]}],
+        name=[{"family": f"SyncSearchTest-{unique_id}", "given": ["Coverage"]}],
         gender="female",
     )
     created = medplum_client.create_resource(patient)
 
-    # Search for it
+    # Search for the patient using the unique family name
     results = medplum_client.search_resources(
         "Patient",
-        {"family": "SyncSearchTest"},
+        {"family": f"SyncSearchTest-{unique_id}"},
     )
 
     assert results["resourceType"] == "Bundle"
