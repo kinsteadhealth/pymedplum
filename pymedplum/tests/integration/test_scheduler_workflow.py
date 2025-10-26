@@ -17,18 +17,20 @@ from typing import Any
 import pytest
 
 from pymedplum.client import MedplumClient
-from pymedplum.fhir.appointment import Appointment
-from pymedplum.fhir.codeableconcept import CodeableConcept
-from pymedplum.fhir.coding import Coding
-from pymedplum.fhir.contactpoint import ContactPoint
-from pymedplum.fhir.humanname import HumanName
-from pymedplum.fhir.identifier import Identifier
-from pymedplum.fhir.patient import Patient
-from pymedplum.fhir.period import Period
-from pymedplum.fhir.practitioner import Practitioner
-from pymedplum.fhir.reference import Reference
-from pymedplum.fhir.schedule import Schedule
-from pymedplum.fhir.slot import Slot
+from pymedplum.fhir import (
+    Appointment,
+    CodeableConcept,
+    Coding,
+    ContactPoint,
+    HumanName,
+    Identifier,
+    Patient,
+    Period,
+    Practitioner,
+    Reference,
+    Schedule,
+    Slot,
+)
 from pymedplum.helpers import to_fhir_json
 
 # Visit Type Definitions (based on primary care research)

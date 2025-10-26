@@ -16,43 +16,52 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from pymedplum import to_fhir_json
-from pymedplum.fhir.address import Address
-from pymedplum.fhir.appointment import Appointment, AppointmentParticipant
-from pymedplum.fhir.attachment import Attachment
-from pymedplum.fhir.careplan import CarePlan, CarePlanActivity
-from pymedplum.fhir.claim import Claim, ClaimDiagnosis, ClaimInsurance, ClaimItem
-from pymedplum.fhir.codeableconcept import CodeableConcept
-from pymedplum.fhir.coding import Coding
-from pymedplum.fhir.condition import Condition
-from pymedplum.fhir.consent import Consent, ConsentProvision
-from pymedplum.fhir.contactpoint import ContactPoint
-from pymedplum.fhir.coverage import Coverage, CoverageClass
-from pymedplum.fhir.documentreference import (
+from pymedplum.fhir import (
+    Address,
+    Appointment,
+    AppointmentParticipant,
+    Attachment,
+    CarePlan,
+    CarePlanActivity,
+    Claim,
+    ClaimDiagnosis,
+    ClaimInsurance,
+    ClaimItem,
+    CodeableConcept,
+    Coding,
+    Condition,
+    Consent,
+    ConsentProvision,
+    ContactPoint,
+    Coverage,
+    CoverageClass,
     DocumentReference,
     DocumentReferenceContent,
-)
-from pymedplum.fhir.dosage import Dosage
-from pymedplum.fhir.duration import Duration
-from pymedplum.fhir.encounter import Encounter, EncounterParticipant
-from pymedplum.fhir.goal import Goal, GoalTarget
-from pymedplum.fhir.humanname import HumanName
-from pymedplum.fhir.identifier import Identifier
-from pymedplum.fhir.medicationrequest import (
+    Dosage,
+    Duration,
+    Encounter,
+    EncounterParticipant,
+    Goal,
+    GoalTarget,
+    HumanName,
+    Identifier,
     MedicationRequest,
     MedicationRequestDispenseRequest,
+    Money,
+    Observation,
+    Organization,
+    Patient,
+    Period,
+    Practitioner,
+    Procedure,
+    Provenance,
+    ProvenanceAgent,
+    Quantity,
+    Reference,
+    ServiceRequest,
+    Timing,
+    TimingRepeat,
 )
-from pymedplum.fhir.money import Money
-from pymedplum.fhir.observation import Observation
-from pymedplum.fhir.organization import Organization
-from pymedplum.fhir.patient import Patient
-from pymedplum.fhir.period import Period
-from pymedplum.fhir.practitioner import Practitioner
-from pymedplum.fhir.procedure import Procedure
-from pymedplum.fhir.provenance import Provenance, ProvenanceAgent
-from pymedplum.fhir.quantity import Quantity
-from pymedplum.fhir.reference import Reference
-from pymedplum.fhir.servicerequest import ServiceRequest
-from pymedplum.fhir.timing import Timing, TimingRepeat
 
 
 @pytest.fixture

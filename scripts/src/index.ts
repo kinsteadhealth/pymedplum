@@ -7,7 +7,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { parseTypeScriptFile } from "./parser";
-import { generatePydanticFile, generateInitFile, generateRebuildModule } from "./writer";
+import { generatePydanticFile, generateInitFile, generateStubFile } from "./writer";
 
 // ============================================================================
 // Configuration
@@ -109,7 +109,7 @@ function processDefinitionFile(
 }
 
 /**
- * Generates the __init__.py and _rebuild.py files for the module.
+ * Generates the __init__.py file and IDE support files for the module.
  */
 function generateModuleInit(
   resourceNames: string[],
@@ -118,13 +118,19 @@ function generateModuleInit(
 ): void {
   console.log("\n📦 Generating module exports...");
   
-  // Generate _rebuild.py for centralized model rebuilding
-  const rebuildCode = generateRebuildModule();
-  fs.writeFileSync(path.join(outputDir, "_rebuild.py"), rebuildCode, "utf-8");
-  
   // Generate __init__.py
   const initCode = generateInitFile(resourceNames, classesToFiles);
   fs.writeFileSync(path.join(outputDir, "__init__.py"), initCode, "utf-8");
+  
+  // Generate __init__.pyi stub file for IDE/type checker support
+  console.log("📝 Generating type stub file (__init__.pyi)...");
+  const stubCode = generateStubFile(resourceNames, classesToFiles);
+  fs.writeFileSync(path.join(outputDir, "__init__.pyi"), stubCode, "utf-8");
+  
+  // Create py.typed marker file
+  console.log("🏷️  Creating py.typed marker...");
+  const pyTypedPath = path.resolve(outputDir, "../py.typed");
+  fs.writeFileSync(pyTypedPath, "", "utf-8");
 }
 
 /**

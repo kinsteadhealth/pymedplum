@@ -9,7 +9,7 @@ All helpers are now in conftest.py for reuse across test files.
 import pytest
 
 from pymedplum import to_fhir_json, to_portable
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import Patient
 
 
 @pytest.fixture

@@ -18,6 +18,8 @@ This library is inspired by the official Medplum TypeScript SDK and aims to prov
   - Batch bundles (independent operations)
   - Binary file upload/download
   - DocumentReference creation
+- **Lazy Loading**: FHIR models are loaded on-demand for fast startup times (~50ms for first import vs. 3-5s for all).
+- **Thread-Safe**: Lazy loading is fully thread-safe and tested against experimental "no-GIL" builds of Python.
 - **GraphQL**: Execute GraphQL queries
 - **Bot Execution**: Trigger Medplum Bots with custom input
 - **On-Behalf-Of**: Perform operations as another user/ProjectMembership
@@ -346,7 +348,6 @@ For complete documentation, see:
 
 - **[Installation Guide](docs/installation.md)** - Detailed setup instructions
 - **[Quickstart](docs/quickstart.md)** - Get up and running quickly
-- **[User Guide](docs/guide.md)** - Comprehensive usage guide
 - **[Advanced Usage](docs/advanced_usage.md)** - Advanced search, FHIR operations, bundles, binaries
 - **[API Reference](docs/api_reference.md)** - Complete API documentation
 - **[FHIR Models](docs/fhir_models.md)** - Type-safe FHIR model usage

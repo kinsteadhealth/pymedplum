@@ -16,28 +16,32 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from pymedplum import to_fhir_json
-from pymedplum.fhir.appointment import Appointment, AppointmentParticipant
-from pymedplum.fhir.attachment import Attachment
-from pymedplum.fhir.codeableconcept import CodeableConcept
-from pymedplum.fhir.coding import Coding
-from pymedplum.fhir.communication import Communication, CommunicationPayload
-from pymedplum.fhir.condition import Condition
-from pymedplum.fhir.diagnosticreport import DiagnosticReport
-from pymedplum.fhir.documentreference import (
+from pymedplum.fhir import (
+    Appointment,
+    AppointmentParticipant,
+    Attachment,
+    CodeableConcept,
+    Coding,
+    Communication,
+    CommunicationPayload,
+    Condition,
+    DiagnosticReport,
     DocumentReference,
     DocumentReferenceContent,
+    HumanName,
+    Identifier,
+    MedicationStatement,
+    Observation,
+    ObservationReferenceRange,
+    Patient,
+    Period,
+    Practitioner,
+    Quantity,
+    Reference,
+    ServiceRequest,
+    Task,
+    TaskRestriction,
 )
-from pymedplum.fhir.humanname import HumanName
-from pymedplum.fhir.identifier import Identifier
-from pymedplum.fhir.medicationstatement import MedicationStatement
-from pymedplum.fhir.observation import Observation, ObservationReferenceRange
-from pymedplum.fhir.patient import Patient
-from pymedplum.fhir.period import Period
-from pymedplum.fhir.practitioner import Practitioner
-from pymedplum.fhir.quantity import Quantity
-from pymedplum.fhir.reference import Reference
-from pymedplum.fhir.servicerequest import ServiceRequest
-from pymedplum.fhir.task import Task, TaskRestriction
 
 # =============================================================================
 # Fixtures - Set up morning workflow scenario

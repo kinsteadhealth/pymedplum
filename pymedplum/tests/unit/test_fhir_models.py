@@ -6,17 +6,20 @@ Tests the Pydantic models generated from Medplum TypeScript definitions.
 import pytest
 from pydantic import ValidationError
 
-from pymedplum.fhir.address import Address
-from pymedplum.fhir.bundle import Bundle, BundleEntry
-from pymedplum.fhir.codeableconcept import CodeableConcept
-from pymedplum.fhir.coding import Coding
-from pymedplum.fhir.contactpoint import ContactPoint
-from pymedplum.fhir.humanname import HumanName
-from pymedplum.fhir.identifier import Identifier
-from pymedplum.fhir.organization import Organization
-from pymedplum.fhir.patient import Patient
-from pymedplum.fhir.practitioner import Practitioner
-from pymedplum.fhir.reference import Reference
+from pymedplum.fhir import (
+    Address,
+    Bundle,
+    BundleEntry,
+    CodeableConcept,
+    Coding,
+    ContactPoint,
+    HumanName,
+    Identifier,
+    Organization,
+    Patient,
+    Practitioner,
+    Reference,
+)
 
 # ============================================================================
 # Basic Model Tests

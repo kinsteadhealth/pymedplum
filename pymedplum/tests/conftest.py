@@ -7,12 +7,16 @@ import uuid
 import pytest
 from dotenv import load_dotenv
 
+# Import from pymedplum.fhir first to trigger model rebuilding
+import pymedplum.fhir  # noqa: F401
 from pymedplum import MedplumClient
-from pymedplum.fhir.humanname import HumanName
-from pymedplum.fhir.identifier import Identifier
-from pymedplum.fhir.organization import Organization
-from pymedplum.fhir.patient import Patient
-from pymedplum.fhir.practitioner import Practitioner
+from pymedplum.fhir import (
+    HumanName,
+    Identifier,
+    Organization,
+    Patient,
+    Practitioner,
+)
 
 # Load environment variables
 load_dotenv()

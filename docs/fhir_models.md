@@ -1,6 +1,12 @@
 # Working with FHIR Models
 
-A core feature of `pymedplum` is its set of Pydantic models, which provide fully-typed Python representations of FHIR resources. These models were completely refactored to be based on Pydantic v2, offering robust data validation, serialization, and excellent editor support.
+A core feature of `pymedplum` is its set of Pydantic models, which provide fully-typed Python representations of FHIR resources. The model system is designed for an optimal developer experience, balancing three key goals:
+
+1.  **High Performance**: FHIR models are lazy-loaded to ensure fast application startup times, which is critical for environments like serverless functions.
+2.  **Full Type Safety**: The library is fully compliant with PEP 561, providing comprehensive type hints through stub files (`.pyi`) for use with tools like `mypy`.
+3.  **Excellent Editor Support**: Autocompletion, type-checking, and docstrings work out-of-the-box in modern IDEs like VS Code.
+
+These models are based on Pydantic v2, offering robust data validation and serialization.
 
 ## Key Pydantic Features
 
@@ -138,13 +144,35 @@ for patient in client.search_resource_pages("Patient", {"family": "Smith"}):
 ```
 
 ## For Developers: Model Generation
-The FHIR models are automatically generated from the Medplum TypeScript definitions. This ensures they are always up-to-date with the official FHIR specification as supported by Medplum. The generation logic resides in the `/scripts` directory.
+
+The entire `pymedplum.fhir` module is auto-generated from Medplum's official TypeScript definitions to ensure accuracy and maintainability. The generation logic resides in the `/scripts` directory.
+
+### Generated Architecture
+
+When you run the generator, it creates a sophisticated, multi-file architecture to achieve the goals of performance and type safety:
+
+1.  **`pymedplum/fhir/{resource}.py`** (e.g., `patient.py`)
+    -   Contains the Pydantic model definition for a single FHIR resource.
+    -   Uses `if TYPE_CHECKING:` blocks to import dependencies for static analysis without runtime cost.
+
+2.  **`pymedplum/fhir/__init__.py`**
+    -   The public-facing module for importing FHIR models.
+    -   Implements the **lazy-loading** mechanism using `__getattr__`. When you `from pymedplum.fhir import Patient`, this file intercepts the request and only loads `patient.py` on first access.
+    -   Contains helper functions for dependency resolution.
+
+3.  **`pymedplum/fhir/__init__.pyi`** (Stub File)
+    -   A type stub file that provides an "eager" view of the module for static analysis tools.
+    -   It explicitly imports every single FHIR model so that tools like `mypy` can see the complete module structure.
+    -   This file is **never executed** at runtime.
+
+4.  **`pymedplum/py.typed`**
+    -   A marker file that signals to type checkers that `pymedplum` is a PEP 561-compliant typed package.
 
 ### Regenerating Models
-If the Medplum FHIR definitions change, developers can regenerate the Pydantic models. This is a two-step process.
+If the upstream Medplum FHIR definitions change, you can regenerate all Pydantic models using the following process:
 
 #### Step 1: Run the Code Generator
-The TypeScript-based generator script parses the source files and writes the Python model files.
+The TypeScript-based generator parses the source definitions and writes all the Python files described above.
 
 1.  **Navigate to the scripts directory:**
     ```bash
@@ -158,14 +186,17 @@ The TypeScript-based generator script parses the source files and writes the Pyt
     ```bash
     npm run generate
     ```
-This will overwrite the Python files in `pymedplum/fhir/`.
 
-#### Step 2: Lint and Format the New Files
-The auto-generated code may not be perfectly formatted. Use `ruff` to automatically fix import sorting, formatting, and other linting issues. From the project root directory:
+#### Step 2: Lint and Format (Recommended)
+The generator does its best to produce clean code, but it's always good practice to run the project's formatters to ensure consistency. From the project root directory:
 
 ```bash
-ruff check pymedplum/fhir/ --fix
-ruff format pymedplum/fhir/
+make format
+```
+or
+```bash
+ruff format pymedplum/
+ruff check pymedplum/ --fix
 ```
 
-After these steps, the models will be up-to-date and correctly formatted.
+After these steps, the models will be fully up-to-date with proper formatting and typing.

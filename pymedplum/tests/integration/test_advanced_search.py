@@ -9,19 +9,22 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from pymedplum.fhir.codeableconcept import CodeableConcept
-from pymedplum.fhir.coding import Coding
-from pymedplum.fhir.humanname import HumanName
-from pymedplum.fhir.observation import Observation
-from pymedplum.fhir.organization import Organization
-from pymedplum.fhir.patient import Patient
-from pymedplum.fhir.reference import Reference
 from pymedplum.helpers import to_fhir_json
 
 
 @pytest.fixture
 def test_setup(medplum_client):
     """Create test data for advanced search tests."""
+    from pymedplum.fhir import (
+        CodeableConcept,
+        Coding,
+        HumanName,
+        Observation,
+        Organization,
+        Patient,
+        Reference,
+    )
+
     test_id = str(uuid.uuid4())[:8]
     created_resources = []
 

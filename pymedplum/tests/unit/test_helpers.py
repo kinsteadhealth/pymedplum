@@ -2,8 +2,7 @@
 
 from pydantic import BaseModel
 
-from pymedplum.fhir.humanname import HumanName
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import HumanName, Patient
 from pymedplum.helpers import to_fhir_json, to_portable
 
 

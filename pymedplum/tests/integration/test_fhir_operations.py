@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import Patient
 
 # Path to test data
 TEST_DATA_DIR = Path(__file__).parent / "data"

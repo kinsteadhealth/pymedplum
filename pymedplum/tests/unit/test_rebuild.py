@@ -1,7 +1,7 @@
 """Tests for the FHIR model rebuild functionality.
 
 The rebuild system handles circular dependencies in FHIR models by:
-1. Registering all models in a global namespace during import
+1. Importing all modules to load all class definitions
 2. Rebuilding all models after imports complete to resolve forward references
 3. Allowing models to reference each other (e.g., Patient -> Meta, Observation -> Reference)
 
@@ -10,6 +10,11 @@ attempting to create model instances with forward-referenced types.
 """
 
 import pytest
+from pydantic import ValidationError
+
+from pymedplum.fhir import Observation, Patient
+
+# Import all models at module level after rebuild
 
 
 def test_patient_with_nested_forward_references():
@@ -18,7 +23,6 @@ def test_patient_with_nested_forward_references():
     This verifies the rebuild system successfully resolved forward references like:
     - Meta, Identifier, HumanName, Extension
     """
-    from pymedplum.fhir.patient import Patient
 
     patient = Patient(
         **{
@@ -38,7 +42,6 @@ def test_patient_with_nested_forward_references():
 
 def test_observation_with_references():
     """Test Observation with Reference and Quantity forward references."""
-    from pymedplum.fhir.observation import Observation
 
     obs = Observation(
         **{
@@ -58,7 +61,6 @@ def test_observation_with_references():
 
 def test_deeply_nested_structures():
     """Test deeply nested forward references are resolved."""
-    from pymedplum.fhir.patient import Patient
 
     patient = Patient(
         **{
@@ -81,7 +83,6 @@ def test_deeply_nested_structures():
 
 def test_model_has_proper_fields_after_rebuild():
     """Verify models have all fields properly defined after rebuild."""
-    from pymedplum.fhir.patient import Patient
 
     # Model should have Pydantic fields attribute
     assert hasattr(Patient, "model_fields")
@@ -95,9 +96,6 @@ def test_model_has_proper_fields_after_rebuild():
 
 def test_pydantic_validation_works():
     """Verify Pydantic validation works correctly after rebuild."""
-    from pydantic import ValidationError
-
-    from pymedplum.fhir.patient import Patient
 
     # Valid data should work
     patient = Patient(resourceType="Patient", id="test", active=True)
@@ -110,7 +108,6 @@ def test_pydantic_validation_works():
 
 def test_extension_types_work():
     """Test that Extension forward references work."""
-    from pymedplum.fhir.patient import Patient
 
     patient = Patient(
         **{
@@ -132,7 +129,6 @@ def test_extension_types_work():
 
 def test_codeable_concept_and_coding():
     """Test CodeableConcept and Coding forward references."""
-    from pymedplum.fhir.observation import Observation
 
     obs = Observation(
         **{
@@ -158,8 +154,6 @@ def test_codeable_concept_and_coding():
 
 def test_multiple_resource_types_coexist():
     """Test that multiple resource types can be used together."""
-    from pymedplum.fhir.observation import Observation
-    from pymedplum.fhir.patient import Patient
 
     # Create both types - this tests that the namespace has all types
     patient = Patient(resourceType="Patient", id="p1")
@@ -173,7 +167,6 @@ def test_multiple_resource_types_coexist():
 
 def test_complex_observation_with_many_types():
     """Test complex Observation using many different forward-referenced types."""
-    from pymedplum.fhir.observation import Observation
 
     obs = Observation(
         **{
