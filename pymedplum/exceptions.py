@@ -1,5 +1,4 @@
-"""
-Medplum-specific exceptions for better error handling.
+"""Medplum-specific exceptions for better error handling.
 
 These exceptions map to HTTP status codes and common error scenarios,
 enabling targeted exception handling and clearer debugging.
@@ -9,8 +8,7 @@ from typing import Any, Optional
 
 
 class MedplumError(Exception):
-    """
-    Base exception for all Medplum errors.
+    """Base exception for all Medplum errors.
 
     All Medplum-specific exceptions inherit from this,
     allowing catching all Medplum errors with one except block.
@@ -42,8 +40,7 @@ class OperationOutcomeError(MedplumError):
 
 
 class AuthenticationError(MedplumError):
-    """
-    Authentication failed or token expired.
+    """Authentication failed or token expired.
 
     Raised when:
     - Client credentials are invalid
@@ -60,8 +57,7 @@ class AuthenticationError(MedplumError):
 
 
 class AuthorizationError(MedplumError):
-    """
-    User lacks permission for requested resource.
+    """User lacks permission for requested resource.
 
     Raised when:
     - User doesn't have access to resource
@@ -78,8 +74,7 @@ class AuthorizationError(MedplumError):
 
 
 class NotFoundError(MedplumError):
-    """
-    Requested FHIR resource not found.
+    """Requested FHIR resource not found.
 
     Raised when:
     - Resource ID doesn't exist
@@ -108,8 +103,7 @@ class BadRequestError(MedplumError):
 
 
 class ValidationError(MedplumError):
-    """
-    Resource data failed FHIR validation.
+    """Resource data failed FHIR validation.
 
     Raised when:
     - Creating resource with invalid data
@@ -126,8 +120,7 @@ class ValidationError(MedplumError):
 
 
 class RateLimitError(MedplumError):
-    """
-    Rate limit exceeded.
+    """Rate limit exceeded.
 
     Raised when:
     - Too many requests in time window
@@ -143,8 +136,7 @@ class RateLimitError(MedplumError):
 
 
 class ServerError(MedplumError):
-    """
-    Medplum server error.
+    """Medplum server error.
 
     Raised when:
     - Server returns 500+ status codes
@@ -161,8 +153,7 @@ class ServerError(MedplumError):
 
 
 class NetworkError(MedplumError):
-    """
-    Network communication error.
+    """Network communication error.
 
     Raised when:
     - Connection timeout

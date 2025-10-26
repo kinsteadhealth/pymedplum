@@ -1,25 +1,23 @@
-"""
-FHIR Bundle wrapper with convenience methods.
+"""FHIR Bundle wrapper with convenience methods.
 
 Simplifies working with FHIR search results and batch operations.
 """
 
-from typing import Any, Dict, List, Iterator, Optional, TypeVar, Type
+from collections.abc import Iterator
+from typing import Any, Dict, List, Optional, Type, TypeVar
 
 T = TypeVar("T")
 
 
 class FHIRBundle:
-    """
-    Wrapper for FHIR Bundle resources with helper methods.
+    """Wrapper for FHIR Bundle resources with helper methods.
 
     Provides convenient access to Bundle entries and resources,
     eliminating boilerplate when working with search results.
     """
 
     def __init__(self, data: Dict[str, Any]):
-        """
-        Initialize from raw Bundle data.
+        """Initialize from raw Bundle data.
 
         Args:
             data: Raw Bundle dict from API response
@@ -36,8 +34,7 @@ class FHIRBundle:
         self._data = data
 
     def get_resources(self) -> List[Dict[str, Any]]:
-        """
-        Extract all resources from Bundle entries.
+        """Extract all resources from Bundle entries.
 
         Returns:
             List of resource dicts
@@ -52,8 +49,7 @@ class FHIRBundle:
         return [entry["resource"] for entry in entries if "resource" in entry]
 
     def get_resources_typed(self, resource_class: Type[T]) -> List[T]:
-        """
-        Extract and parse resources to typed Pydantic models.
+        """Extract and parse resources to typed Pydantic models.
 
         Args:
             resource_class: Pydantic model class to parse into
@@ -72,8 +68,7 @@ class FHIRBundle:
         ]
 
     def get_total(self) -> int:
-        """
-        Get total count of resources.
+        """Get total count of resources.
 
         Uses Bundle.total if available, otherwise counts entries.
 
@@ -111,8 +106,7 @@ class FHIRBundle:
         return self._data.get("link", [])
 
     def get_next_link(self) -> Optional[str]:
-        """
-        Get next page URL for pagination.
+        """Get next page URL for pagination.
 
         Returns:
             Next page URL or None if no next page

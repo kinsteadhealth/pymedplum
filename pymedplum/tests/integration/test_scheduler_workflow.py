@@ -282,9 +282,9 @@ def test_02_schedule_with_multiple_providers(
         )
 
         assert "entry" in provider_slots
-        assert (
-            len(provider_slots["entry"]) >= 3
-        ), "Should find at least 3 slots for first provider"
+        assert len(provider_slots["entry"]) >= 3, (
+            "Should find at least 3 slots for first provider"
+        )
 
         print(
             f"""
@@ -657,9 +657,9 @@ def test_05_handle_duplicate_patient_records(
         )
 
         assert "entry" in duplicates_search
-        assert (
-            len(duplicates_search["entry"]) == 2
-        ), "Should find 2 patients with same name/DOB"
+        assert len(duplicates_search["entry"]) == 2, (
+            "Should find 2 patients with same name/DOB"
+        )
 
         # Step 2: Identify which is the duplicate (newer creation date or different identifier)
         # In real scenario, this might involve manual review or more sophisticated matching
@@ -690,9 +690,9 @@ def test_05_handle_duplicate_patient_records(
 
         # Verify appointment now references original patient
         patient_ref = updated_appointment["participant"][0]["actor"]["reference"]
-        assert (
-            patient_ref == f"Patient/{original_result['id']}"
-        ), "Appointment should now reference original patient"
+        assert patient_ref == f"Patient/{original_result['id']}", (
+            "Appointment should now reference original patient"
+        )
 
         # Step 4: Delete duplicate patient (after ensuring no other references)
         medplum_client.delete_resource("Patient", duplicate_result["id"])

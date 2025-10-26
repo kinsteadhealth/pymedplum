@@ -177,9 +177,9 @@ def test_01_review_todays_schedule(
 
         # Verify schedule was retrieved (may be empty if no appointments found)
         appointments_found = schedule_response.get("entry", [])
-        assert (
-            len(appointments_found) == 3
-        ), f"Should find all 3 appointments, found {len(appointments_found)}"
+        assert len(appointments_found) == 3, (
+            f"Should find all 3 appointments, found {len(appointments_found)}"
+        )
 
         # Verify appointment details are accessible
         for entry in appointments_found:

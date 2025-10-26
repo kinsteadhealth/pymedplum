@@ -8,12 +8,11 @@ import pytest
 from dotenv import load_dotenv
 
 from pymedplum import MedplumClient
+from pymedplum.fhir.humanname import HumanName
+from pymedplum.fhir.identifier import Identifier
 from pymedplum.fhir.organization import Organization
 from pymedplum.fhir.patient import Patient
 from pymedplum.fhir.practitioner import Practitioner
-from pymedplum.fhir.humanname import HumanName
-from pymedplum.fhir.identifier import Identifier
-from pymedplum.helpers import to_fhir_json
 
 # Load environment variables
 load_dotenv()

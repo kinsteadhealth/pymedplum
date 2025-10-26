@@ -2,10 +2,9 @@
 
 from pydantic import BaseModel
 
-from pymedplum.helpers import to_fhir_json, to_portable
-from pymedplum.fhir.patient import Patient
 from pymedplum.fhir.humanname import HumanName
-from pymedplum.fhir.identifier import Identifier
+from pymedplum.fhir.patient import Patient
+from pymedplum.helpers import to_fhir_json, to_portable
 
 
 # Test fixtures for to_fhir_json

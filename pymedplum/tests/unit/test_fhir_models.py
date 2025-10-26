@@ -18,7 +18,6 @@ from pymedplum.fhir.patient import Patient
 from pymedplum.fhir.practitioner import Practitioner
 from pymedplum.fhir.reference import Reference
 
-
 # ============================================================================
 # Basic Model Tests
 # ============================================================================
@@ -285,7 +284,8 @@ def test_patient_rejects_invalid_gender():
 def test_model_excludes_none_in_dict():
     """Test that model_dump excludes None values."""
     patient = Patient(
-        name=[HumanName(given=["Test"], family="User")], gender=None  # Explicitly None
+        name=[HumanName(given=["Test"], family="User")],
+        gender=None,  # Explicitly None
     )
 
     data = patient.model_dump(exclude_none=True)

@@ -8,7 +8,7 @@ import base64
 import copy
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 
 def parse_reference(reference: str) -> Tuple[str, str]:
