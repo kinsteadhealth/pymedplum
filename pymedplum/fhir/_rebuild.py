@@ -5,10 +5,10 @@ in Pydantic models with circular dependencies. Models register themselves
 upon module import, and are rebuilt after all modules are loaded.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 # Global namespace that collects all models
-_models_namespace: Dict[str, Any] = {}
+_models_namespace: dict[str, Any] = {}
 
 
 def register_model(name: str, model: Any) -> None:

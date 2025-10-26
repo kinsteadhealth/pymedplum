@@ -1,15 +1,15 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
+# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
-
 
 class MarketingStatus(MedplumFHIRBase):
     """The marketing status describes the date when a medicinal product is
@@ -17,47 +17,20 @@ class MarketingStatus(MedplumFHIRBase):
     available.
     """
 
-    id: Optional[str] = Field(
-        default=None,
-        description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
-    )
-    extension: Optional[List[Extension]] = Field(
-        default=None,
-        description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
-    )
-    modifier_extension: Optional[List[Extension]] = Field(
-        default=None,
-        alias="modifierExtension",
-        description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
-    )
-    country: CodeableConcept = Field(
-        default=...,
-        description="The country in which the marketing authorisation has been granted shall be specified It should be specified using the ISO 3166 - 1 alpha-2 code elements.",
-    )
-    jurisdiction: Optional[CodeableConcept] = Field(
-        default=None,
-        description="Where a Medicines Regulatory Agency has granted a marketing authorisation for which specific provisions within a jurisdiction apply, the jurisdiction can be specified using an appropriate controlled terminology The controlled term and the controlled term identifier shall be specified.",
-    )
-    status: CodeableConcept = Field(
-        default=...,
-        description="This attribute provides information on the status of the marketing of the medicinal product See ISO/TS 20443 for more information and examples.",
-    )
-    date_range: Period = Field(
-        default=...,
-        alias="dateRange",
-        description="The date when the Medicinal Product is placed on the market by the Marketing Authorisation Holder (or where applicable, the manufacturer/distributor) in a country and/or jurisdiction shall be provided A complete date consisting of day, month and year shall be specified using the ISO 8601 date format NOTE &ldquo;Placed on the market&rdquo; refers to the release of the Medicinal Product into the distribution chain.",
-    )
-    restore_date: Optional[str] = Field(
-        default=None,
-        alias="restoreDate",
-        description="The date when the Medicinal Product is placed on the market by the Marketing Authorisation Holder (or where applicable, the manufacturer/distributor) in a country and/or jurisdiction shall be provided A complete date consisting of day, month and year shall be specified using the ISO 8601 date format NOTE &ldquo;Placed on the market&rdquo; refers to the release of the Medicinal Product into the distribution chain.",
-    )
+    id: Optional[str] = Field(default=None, description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.")
+    extension: Optional[list[Extension]] = Field(default=None, description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.")
+    modifier_extension: Optional[list[Extension]] = Field(default=None, alias="modifierExtension", description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).")
+    country: CodeableConcept = Field(default=..., description="The country in which the marketing authorisation has been granted shall be specified It should be specified using the ISO 3166 - 1 alpha-2 code elements.")
+    jurisdiction: Optional[CodeableConcept] = Field(default=None, description="Where a Medicines Regulatory Agency has granted a marketing authorisation for which specific provisions within a jurisdiction apply, the jurisdiction can be specified using an appropriate controlled terminology The controlled term and the controlled term identifier shall be specified.")
+    status: CodeableConcept = Field(default=..., description="This attribute provides information on the status of the marketing of the medicinal product See ISO/TS 20443 for more information and examples.")
+    date_range: Period = Field(default=..., alias="dateRange", description="The date when the Medicinal Product is placed on the market by the Marketing Authorisation Holder (or where applicable, the manufacturer/distributor) in a country and/or jurisdiction shall be provided A complete date consisting of day, month and year shall be specified using the ISO 8601 date format NOTE &ldquo;Placed on the market&rdquo; refers to the release of the Medicinal Product into the distribution chain.")
+    restore_date: Optional[str] = Field(default=None, alias="restoreDate", description="The date when the Medicinal Product is placed on the market by the Marketing Authorisation Holder (or where applicable, the manufacturer/distributor) in a country and/or jurisdiction shall be provided A complete date consisting of day, month and year shall be specified using the ISO 8601 date format NOTE &ldquo;Placed on the market&rdquo; refers to the release of the Medicinal Product into the distribution chain.")
 
 
 # Register models for forward reference resolution
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING  # noqa: E402
 
 if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
+    from pymedplum.fhir._rebuild import register_model  # noqa: E402
 
     register_model("MarketingStatus", MarketingStatus)
