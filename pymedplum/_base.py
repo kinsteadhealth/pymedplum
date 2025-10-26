@@ -13,6 +13,8 @@ from .exceptions import (
     BadRequestError,
     NotFoundError,
     OperationOutcomeError,
+    RateLimitError,
+    ServerError,
 )
 from .types import DEFAULT_ORG_EXTENSION_URL, BeforeRequestCallback, OrgMode
 
@@ -59,13 +61,33 @@ def _raise_or_json(response: httpx.Response) -> Optional[dict[str, Any]]:
         error_text = response.text
 
     if response.status_code == 400:
-        raise BadRequestError(error_text)
+        raise BadRequestError(error_text, status_code=400, response_data=outcome)
     elif response.status_code == 401:
-        raise AuthenticationError(error_text)
+        raise AuthenticationError(
+            "Authentication failed or token expired",
+            status_code=401,
+            response_data=outcome,
+        )
     elif response.status_code == 403:
-        raise AuthorizationError(error_text)
+        raise AuthorizationError(
+            "Access denied - insufficient permissions",
+            status_code=403,
+            response_data=outcome,
+        )
     elif response.status_code == 404:
-        raise NotFoundError(error_text)
+        raise NotFoundError(
+            "Resource not found", status_code=404, response_data=outcome
+        )
+    elif response.status_code == 429:
+        raise RateLimitError(
+            "Rate limit exceeded", status_code=429, response_data=outcome
+        )
+    elif response.status_code >= 500:
+        raise ServerError(
+            error_text,
+            status_code=response.status_code,
+            response_data=outcome,
+        )
     else:
         raise OperationOutcomeError(response.status_code, outcome, error_text)
 
@@ -265,9 +287,9 @@ class BaseClient:
 
 
 class OnBehalfOfContext:
-    """Context manager for on-behalf-of operations using stack.
+    """Context manager for on-behalf-of operations with auto-authentication.
 
-    Supports nested contexts safely.
+    Supports nested contexts safely and auto-authenticates if needed.
     """
 
     def __init__(self, client: MedplumClient, membership: Union[str, Any]):
@@ -275,6 +297,14 @@ class OnBehalfOfContext:
         self.member_ref = client._normalize_membership(membership)
 
     def __enter__(self):
+        # Auto-authenticate if not already authenticated
+        if (
+            (not self.client.access_token or self.client._should_refresh_token())
+            and self.client.client_id
+            and self.client.client_secret
+        ):
+            self.client.authenticate()
+
         self.client._validate_on_behalf_of_usage()
         self.client._obo_stack.append(self.member_ref)
         return self.client
@@ -284,13 +314,21 @@ class OnBehalfOfContext:
 
 
 class AsyncOnBehalfOfContext:
-    """Async version of OnBehalfOfContext."""
+    """Async context manager for on-behalf-of operations with auto-authentication."""
 
     def __init__(self, client: AsyncMedplumClient, membership: Union[str, Any]):
         self.client = client
         self.member_ref = client._normalize_membership(membership)
 
     async def __aenter__(self):
+        # Auto-authenticate if not already authenticated
+        if (
+            (not self.client.access_token or self.client._should_refresh_token())
+            and self.client.client_id
+            and self.client.client_secret
+        ):
+            await self.client.authenticate()
+
         self.client._validate_on_behalf_of_usage()
         self.client._obo_stack.append(self.member_ref)
         return self.client

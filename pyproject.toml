@@ -9,7 +9,7 @@ description = "A basic Medplum REST API client."
 authors = [{ name = "Nick Catalano", email = "nickcatal@gmail.com" }]
 license = "Apache-2.0"
 requires-python = ">=3.9"
-dependencies = ["httpx>=0.27.0", "fhir.resources>=8.0.0", "pydantic>=2.0.0"]
+dependencies = ["httpx>=0.27.0", "pydantic>=2.0.0"]
 keywords = ["python", "medplum", "fhir", "healthcare", "API", "REST"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -43,7 +43,7 @@ Repository = "https://github.com/nickcatal/pymedplum.git"
 "Bug Tracker" = "https://github.com/nickcatal/pymedplum/issues"
 
 [tool.setuptools]
-packages = ["pymedplum", "pymedplum.helpers", "pymedplum.models"]
+packages = ["pymedplum", "pymedplum.fhir"]
 include-package-data = true
 
 [tool.setuptools.package-data]
@@ -173,7 +173,7 @@ output = "coverage.xml"
 
 [tool.mypy]
 packages = ["pymedplum"]
-exclude = ["tests/.*"]
+exclude = ["tests/.*", "pymedplum/fhir/.*"]
 python_version = "3.9"
 
 # Basic type checking - catches common bugs without being overly strict

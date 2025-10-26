@@ -1,15 +1,17 @@
 import random
 import time
 from collections.abc import Iterator
-from typing import Any, Optional, Union
+from typing import Any, Literal, Optional, TypeVar, Union, overload
 
 import httpx
 
 from ._base import BaseClient, OnBehalfOfContext, _raise_or_json
+from .bundle import FHIRBundle
 from .exceptions import MedplumError
-from .helpers.fhir import to_fhir_json
-from .helpers.jwt import decode_jwt_exp
+from .helpers import decode_jwt_exp, to_fhir_json
 from .types import OrgMode, PatchOperation, QueryTypes
+
+T = TypeVar("T")
 
 
 class MedplumClient(BaseClient):
@@ -166,11 +168,46 @@ class MedplumClient(BaseClient):
 
         return self._request("POST", f"{self.fhir_base_url}{resource_type}", json=data)
 
-    def read_resource(self, resource_type: str, resource_id: str) -> dict[str, Any]:
-        """Read a FHIR resource by type and ID"""
-        return self._request(
+    @overload
+    def read_resource(
+        self, resource_type: str, resource_id: str, as_fhir: type[T]
+    ) -> T: ...
+
+    @overload
+    def read_resource(
+        self, resource_type: str, resource_id: str, as_fhir: None = None
+    ) -> dict[str, Any]: ...  # type: ignore[overload-cannot-match]
+
+    def read_resource(
+        self, resource_type: str, resource_id: str, as_fhir: Optional[type[T]] = None
+    ) -> Union[T, dict[str, Any]]:
+        """Read a FHIR resource by type and ID.
+
+        Args:
+            resource_type: FHIR resource type (e.g., "Patient")
+            resource_id: Resource ID
+            as_fhir: Optional FHIR resource class for typed response
+
+        Returns:
+            Typed resource if as_fhir provided, else dict
+
+        Examples:
+            # Dict (backward compatible)
+            patient_dict = client.read_resource("Patient", "123")
+
+            # Typed (new)
+            from pymedplum.fhir import Patient
+            patient = client.read_resource("Patient", "123", as_fhir=Patient)
+            print(patient.name[0].given)  # Full type safety!
+        """
+        response = self._request(
             "GET", f"{self.fhir_base_url}{resource_type}/{resource_id}"
         )
+
+        if as_fhir:
+            return as_fhir(**response)
+
+        return response
 
     def update_resource(
         self,
@@ -214,22 +251,61 @@ class MedplumClient(BaseClient):
         """Delete a FHIR resource"""
         self._request("DELETE", f"{self.fhir_base_url}{resource_type}/{resource_id}")
 
+    @overload
     def search_resources(
-        self, resource_type: str, query: Optional[QueryTypes] = None
-    ) -> dict[str, Any]:
+        self,
+        resource_type: str,
+        query: Optional[QueryTypes] = None,
+        return_bundle: Literal[False] = False,
+    ) -> dict[str, Any]: ...
+
+    @overload
+    def search_resources(
+        self,
+        resource_type: str,
+        query: Optional[QueryTypes] = None,
+        return_bundle: Literal[True] = ...,
+    ) -> FHIRBundle: ...
+
+    def search_resources(
+        self,
+        resource_type: str,
+        query: Optional[QueryTypes] = None,
+        return_bundle: bool = False,
+    ) -> Union[FHIRBundle, dict[str, Any]]:
         """Search for FHIR resources.
 
         Args:
-            resource_type: Type of resource to search
-            query: Search parameters (dict, list of tuples, or query string)
+            resource_type: FHIR resource type
+            query: Search parameters
+            return_bundle: If True, wrap in FHIRBundle helper
 
         Returns:
-            FHIR Bundle of search results
+            FHIRBundle wrapper, or raw dict
+
+        Examples:
+            # Raw dict (backward compatible)
+            bundle_dict = client.search_resources("Patient", {"family": "Smith"})
+
+            # FHIRBundle wrapper
+            bundle = client.search_resources("Patient", {}, return_bundle=True)
+            for patient in bundle:
+                print(patient['name'])
+
+            # With typing
+            from pymedplum.fhir import Patient
+            bundle = client.search_resources("Patient", {}, return_bundle=True)
+            patients = bundle.get_resources_typed(Patient)
         """
         params = self._build_query_params(query)
-        return self._request(
+        response = self._request(
             "GET", f"{self.fhir_base_url}{resource_type}", params=params
         )
+
+        if return_bundle:
+            return FHIRBundle(response)
+
+        return response
 
     def search_one(
         self, resource_type: str, query: Optional[QueryTypes] = None
@@ -449,6 +525,314 @@ class MedplumClient(BaseClient):
                 payload["accessPolicy"] = access_policy
 
         return self.post(f"admin/projects/{project_id}/invite", payload)
+
+    def export_ccda(self, patient_id: str) -> str:
+        """Export a patient's complete history as a C-CDA XML document.
+
+        Args:
+            patient_id: The ID of the patient to export
+
+        Returns:
+            C-CDA XML document as a string
+
+        Example:
+            ccda_xml = client.export_ccda("patient-123")
+            with open("patient-record.xml", "w") as f:
+                f.write(ccda_xml)
+        """
+        response = self._http.get(
+            f"{self.fhir_base_url}Patient/{patient_id}/$ccda-export",
+            headers=self._get_headers(),
+        )
+        if response.status_code >= 400:
+            from ._base import _raise_or_json
+
+            _raise_or_json(response)
+        return response.text
+
+    def validate_valueset_code(
+        self,
+        valueset_url: Optional[str] = None,
+        valueset_id: Optional[str] = None,
+        code: Optional[str] = None,
+        system: Optional[str] = None,
+        coding: Optional[dict] = None,
+        codeable_concept: Optional[dict] = None,
+        display: Optional[str] = None,
+        abstract: Optional[bool] = None,
+    ) -> dict[str, Any]:
+        """Validate if a code is in a ValueSet.
+
+        Must provide either valueset_url or valueset_id, plus one of:
+        - code + system (+ optional display)
+        - coding
+        - codeable_concept
+
+        Args:
+            valueset_url: Canonical URL of the ValueSet
+            valueset_id: ID of a specific ValueSet resource
+            code: Code to validate
+            system: Code system URL
+            coding: Full Coding object to validate
+            codeable_concept: CodeableConcept to validate
+            display: Display text to validate
+            abstract: Include abstract codes
+
+        Returns:
+            Parameters resource with 'result' (bool) and optional 'display' (str)
+
+        Example:
+            result = client.validate_valueset_code(
+                valueset_url="http://hl7.org/fhir/ValueSet/condition-severity",
+                coding={"system": "http://snomed.info/sct", "code": "255604002"}
+            )
+            is_valid = result["parameter"][0]["valueBoolean"]  # True
+        """
+        from ._fhir_ops import build_valueset_validate_params
+
+        # Build parameters using helper
+        params_resource = build_valueset_validate_params(
+            valueset_url=valueset_url,
+            valueset_id=valueset_id,
+            code=code,
+            system=system,
+            coding=coding,
+            codeable_concept=codeable_concept,
+            display=display,
+            abstract=abstract,
+        )
+
+        # Build endpoint
+        if valueset_id:
+            endpoint = f"{self.fhir_base_url}ValueSet/{valueset_id}/$validate-code"
+        else:
+            endpoint = f"{self.fhir_base_url}ValueSet/$validate-code"
+
+        return self._request("POST", endpoint, json=params_resource)
+
+    def validate_codesystem_code(
+        self,
+        codesystem_url: Optional[str] = None,
+        codesystem_id: Optional[str] = None,
+        code: Optional[str] = None,
+        coding: Optional[dict] = None,
+        version: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Validate if a code exists in a CodeSystem.
+
+        Must provide either codesystem_url or codesystem_id, plus one of:
+        - code
+        - coding
+
+        Args:
+            codesystem_url: Canonical URL of the CodeSystem
+            codesystem_id: ID of a specific CodeSystem resource
+            code: Code to validate
+            coding: Full Coding object to validate
+            version: Specific version of the CodeSystem
+
+        Returns:
+            Parameters resource with 'result' (bool) and optional 'display' (str)
+
+        Example:
+            result = client.validate_codesystem_code(
+                codesystem_url="http://snomed.info/sct",
+                code="255604002"
+            )
+            is_valid = result["parameter"][0]["valueBoolean"]  # True
+        """
+        from ._fhir_ops import build_codesystem_validate_params
+
+        # Build parameters using helper
+        params_resource = build_codesystem_validate_params(
+            codesystem_url=codesystem_url,
+            codesystem_id=codesystem_id,
+            code=code,
+            coding=coding,
+            version=version,
+        )
+
+        # Build endpoint
+        if codesystem_id:
+            endpoint = f"{self.fhir_base_url}CodeSystem/{codesystem_id}/$validate-code"
+        else:
+            endpoint = f"{self.fhir_base_url}CodeSystem/$validate-code"
+
+        return self._request("POST", endpoint, json=params_resource)
+
+    def execute_transaction(self, bundle: Union[dict, Any]) -> dict[str, Any]:
+        """Execute a transaction bundle atomically.
+
+        All operations in a transaction bundle succeed or fail together.
+        Use placeholder IDs (urn:uuid:xxx) to reference resources within the bundle.
+
+        Args:
+            bundle: Bundle resource with type="transaction" or dict with entries
+
+        Returns:
+            Bundle with type="transaction-response" containing results
+
+        Example:
+            from pymedplum.fhir.bundle import Bundle
+
+            bundle = {
+                "resourceType": "Bundle",
+                "type": "transaction",
+                "entry": [
+                    {
+                        "fullUrl": "urn:uuid:patient-temp",
+                        "resource": {
+                            "resourceType": "Patient",
+                            "name": [{"family": "Smith", "given": ["John"]}]
+                        },
+                        "request": {"method": "POST", "url": "Patient"}
+                    },
+                    {
+                        "resource": {
+                            "resourceType": "Observation",
+                            "status": "final",
+                            "subject": {"reference": "urn:uuid:patient-temp"},
+                            "code": {"text": "Heart Rate"}
+                        },
+                        "request": {"method": "POST", "url": "Observation"}
+                    }
+                ]
+            }
+            result = client.execute_transaction(bundle)
+        """
+        from .helpers import to_fhir_json
+
+        bundle_data = to_fhir_json(bundle) if hasattr(bundle, "model_dump") else bundle
+
+        # Ensure it's a transaction bundle
+        if bundle_data.get("type") != "transaction":
+            bundle_data["type"] = "transaction"
+
+        # POST to base URL (not /fhir/R4/Bundle, just /fhir/R4/)
+        return self._request("POST", self.fhir_base_url.rstrip("/"), json=bundle_data)
+
+    def upload_binary(
+        self,
+        content: bytes,
+        content_type: str,
+    ) -> dict[str, Any]:
+        """Upload binary content (like documents, images, PDFs).
+
+        Args:
+            content: Binary content as bytes
+            content_type: MIME type (e.g., "application/pdf", "application/xml")
+
+        Returns:
+            Binary resource
+
+        Example:
+            with open("document.pdf", "rb") as f:
+                binary = client.upload_binary(f.read(), "application/pdf")
+            binary_id = binary["id"]
+        """
+        return self._request(
+            "POST",
+            f"{self.fhir_base_url}Binary",
+            data=content,
+            headers={"Content-Type": content_type},
+        )
+
+    def download_binary(self, binary_id: str) -> bytes:
+        """Download binary content.
+
+        Args:
+            binary_id: ID of the Binary resource
+
+        Returns:
+            Binary content as bytes
+
+        Example:
+            content = client.download_binary("binary-123")
+            with open("downloaded.pdf", "wb") as f:
+                f.write(content)
+
+        Note:
+            This implementation uses the FHIR-compliant Accept: */* header to retrieve
+            raw binary content directly. Per FHIR spec (https://hl7.org/fhir/binary.html#rest),
+            when Accept: */* or Accept matches the contentType, the server returns raw bytes.
+            When Accept: application/fhir+json, it returns the FHIR resource with base64 data.
+        """
+        # Request raw binary content using Accept: */*
+        # This is FHIR-compliant and more efficient than fetching the resource
+        # and decoding base64 (Medplum correctly implements this per FHIR spec)
+        response = self._http.get(
+            f"{self.fhir_base_url}Binary/{binary_id}",
+            headers={"Accept": "*/*", "Authorization": f"Bearer {self.access_token}"},
+        )
+        if response.status_code >= 400:
+            from ._base import _raise_or_json
+
+            _raise_or_json(response)
+        return response.content
+
+    def create_document_reference(
+        self,
+        patient_id: str,
+        binary_id: str,
+        content_type: str,
+        title: str,
+        description: Optional[str] = None,
+        doc_type_code: Optional[dict] = None,
+    ) -> dict[str, Any]:
+        """Create a DocumentReference pointing to binary content.
+
+        Args:
+            patient_id: Patient ID
+            binary_id: Binary resource ID
+            content_type: MIME type
+            title: Document title
+            description: Optional description
+            doc_type_code: Optional document type CodeableConcept
+
+        Returns:
+            DocumentReference resource
+
+        Example:
+            # Upload a C-CDA document
+            with open("ccda.xml", "rb") as f:
+                binary = client.upload_binary(f.read(), "application/xml")
+
+            doc_ref = client.create_document_reference(
+                patient_id="patient-123",
+                binary_id=binary["id"],
+                content_type="application/xml",
+                title="Continuity of Care Document",
+                doc_type_code={
+                    "coding": [{
+                        "system": "http://loinc.org",
+                        "code": "34133-9",
+                        "display": "Summary of Episode Note"
+                    }]
+                }
+            )
+        """
+        doc_ref = {
+            "resourceType": "DocumentReference",
+            "status": "current",
+            "subject": {"reference": f"Patient/{patient_id}"},
+            "content": [
+                {
+                    "attachment": {
+                        "contentType": content_type,
+                        "url": f"Binary/{binary_id}",
+                        "title": title,
+                    }
+                }
+            ],
+        }
+
+        if description:
+            doc_ref["description"] = description
+
+        if doc_type_code:
+            doc_ref["type"] = doc_type_code
+
+        return self.create_resource(doc_ref)
 
     # TypeScript-compatible aliases
     createResource = create_resource

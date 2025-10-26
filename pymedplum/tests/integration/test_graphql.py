@@ -4,7 +4,8 @@ Tests the execute_graphql method on both sync and async clients.
 """
 
 import pytest
-from fhir.resources.R4B.patient import Patient
+
+from pymedplum.fhir import Patient
 
 
 def test_sync_graphql_simple_query(medplum_client):

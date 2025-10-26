@@ -6,29 +6,33 @@ This library is inspired by the official Medplum TypeScript SDK and aims to prov
 
 ## Features
 
-- **Authentication**: Authenticate with a Medplum server using client credentials.
-- **CRUD Operations**: Create, read, update, and delete FHIR resources.
-- **Search**: Search for FHIR resources using a simple and intuitive query syntax.
-- **Batch Operations**: Execute batch and transaction bundles.
-- **GraphQL**: Execute GraphQL queries against the Medplum server.
-- **Bot Execution**: Trigger and execute Medplum Bots with custom input data.
-- **On-Behalf-Of Operations**: Perform operations on behalf of another user or a `ProjectMembership`.
-- **Asynchronous Support**: `AsyncMedplumClient` provides an asynchronous interface for use with `asyncio`.
-- **FHIR Resource Models**: Leverages the `fhir.resources` package, which uses `pydantic` for FHIR resource modeling and validation.
+- **Authentication**: Client credentials with automatic token refresh
+- **Auto-Authentication**: On-behalf-of operations automatically authenticate when needed
+- **Type Safety**: 209 generated Pydantic models from Medplum's TypeScript definitions
+- **CRUD Operations**: Create, read, update, delete with optional type-safe responses
+- **Advanced Search**: `_include`, `_revinclude`, chaining, modifiers, pagination
+- **FHIR Operations**: 
+  - C-CDA document export
+  - Terminology validation (ValueSet and CodeSystem)
+  - Transaction bundles (atomic operations)
+  - Batch bundles (independent operations)
+  - Binary file upload/download
+  - DocumentReference creation
+- **Lazy Loading**: FHIR models are loaded on-demand for fast startup times (~50ms for first import vs. 3-5s for all).
+- **Thread-Safe**: Lazy loading is fully thread-safe and tested against experimental "no-GIL" builds of Python.
+- **GraphQL**: Execute GraphQL queries
+- **Bot Execution**: Trigger Medplum Bots with custom input
+- **On-Behalf-Of**: Perform operations as another user/ProjectMembership
+- **Async Support**: `AsyncMedplumClient` for `asyncio` applications
+- **Error Handling**: Specific exceptions (401, 403, 404, 429, 500, etc.)
+- **FHIR Helpers**: Parse references, extract identifiers, get display names
+- **Medplum Extensions**: Full support for Bot, Project, AccessPolicy, etc.
 
 ## Installation
 
-### Installing from PyPI
+### From AWS CodeArtifact (Internal)
 
-```bash
-pip install pymedplum
-```
-
-### Installing from AWS CodeArtifact (Internal)
-
-For Kinstead Health team members, you can install from our private CodeArtifact repository:
-
-#### Manual Installation
+For Kinstead Health team members:
 
 ```bash
 # Configure AWS credentials
@@ -41,9 +45,7 @@ aws codeartifact login --tool pip --domain pymedplum --repository pymedplum --re
 pip install pymedplum
 ```
 
-#### In GitHub Actions (Healthcare Repository)
-
-The healthcare repository's GitHub Actions workflows automatically have read access to CodeArtifact. Use this in your workflow:
+#### In GitHub Actions
 
 ```yaml
 - name: Configure AWS credentials
@@ -58,226 +60,322 @@ The healthcare repository's GitHub Actions workflows automatically have read acc
     pip install pymedplum
 ```
 
-The CodeArtifact repository also proxies public PyPI packages, so all dependencies will be automatically resolved.
-
-## Getting Started
-
-### Authentication
-
-First, you need to authenticate with the Medplum server to obtain an access token. You can do this using your client credentials:
+## Quick Start
 
 ```python
 from pymedplum import MedplumClient
 
+# Create client - authentication happens automatically!
 client = MedplumClient(
     client_id="YOUR_CLIENT_ID",
     client_secret="YOUR_CLIENT_SECRET",
 )
-client.authenticate()
-```
 
-### Creating a Resource
+# Create a patient
+patient = client.create_resource({
+    "resourceType": "Patient",
+    "name": [{"given": ["John"], "family": "Doe"}],
+    "gender": "male",
+    "birthDate": "1990-01-01"
+})
 
-To create a new FHIR resource, you can use the `create_resource` method:
+# Read a resource
+patient = client.read_resource("Patient", "patient-123")
 
-```python
-patient = client.create_resource(
-    {
-        "resourceType": "Patient",
-        "name": [{"given": ["John"], "family": "Doe"}],
-    }
-)
+# Search for resources
+patients = client.search_resources("Patient", {"family": "Doe"})
 
-print(patient)
-```
-
-### Reading a Resource
-
-You can read a FHIR resource by its `resourceType` and `id`:
-
-```python
-patient = client.read_resource("Patient", "your-patient-id")
-
-print(patient)
-```
-
-### Updating a Resource
-
-To update an existing resource, use the `update_resource` method:
-
-```python
+# Update a resource
 patient["active"] = True
-updated_patient = client.update_resource(patient)
-
-print(updated_patient)
+updated = client.update_resource(patient)
 ```
 
-### Deleting a Resource
+## Showcase: What You Can Do
 
-You can delete a resource using the `delete_resource` method:
+### Type-Safe FHIR Models
 
 ```python
-client.delete_resource("Patient", "your-patient-id")
+from pymedplum.fhir import Patient, HumanName
+
+# Create with full type safety and IDE autocomplete
+patient = Patient(
+    name=[HumanName(given=["Alice"], family="Smith")],
+    gender="female"
+)
+
+# Read with type safety
+typed_patient = client.read_resource("Patient", "123", as_fhir=Patient)
+print(typed_patient.name[0].family)  # IDE autocomplete works!
 ```
 
-### Searching for Resources
-
-`pymedplum` provides a flexible way to search for resources. You can search for all resources of a certain type:
+### Advanced Search Features
 
 ```python
-patients = client.search_resources("Patient")
-for patient in patients:
-    print(patient)
+# Include related resources (like SQL joins)
+bundle = client.search_resources("Patient", {
+    "family": "Smith",
+    "_include": "Patient:organization",        # Include the org
+    "_revinclude": "Observation:patient",      # Include all observations
+    "_count": "50"
+})
+
+# Chain through relationships
+observations = client.search_resources("Observation", {
+    "patient.family": "Smith",  # Find obs for patients named Smith
+    "date": "ge2024-01-01"      # After January 1, 2024
+})
+
+# Iterate through all pages automatically
+for patient in client.search_resource_pages("Patient", {"family": "Smith"}):
+    print(patient["name"])
 ```
 
-You can also provide a query to filter the results:
+### Binary Files & Documents
 
 ```python
-patients = client.search_resources("Patient", query={"name": "John Doe"})
-```
+# Upload a PDF
+with open("lab_report.pdf", "rb") as f:
+    binary = client.upload_binary(f.read(), "application/pdf")
 
-For more complex queries, you can use a list of tuples:
+# Download binary
+pdf_bytes = client.download_binary(binary["id"])
 
-```python
-patients = client.search_resources(
-    "Patient", query=[("name", "John"), ("_sort", "-birthDate")]
+# Create DocumentReference linking binary to patient
+doc_ref = client.create_document_reference(
+    patient_id="patient-123",
+    binary_id=binary["id"],
+    content_type="application/pdf",
+    title="Lab Results",
+    description="CBC performed on 2024-01-15"
 )
 ```
 
-### Using `fhir.resources` for Type Hinting and Validation
-
-You can use the `fhir.resources` package to provide type hinting and validation for your FHIR resources. This can help you catch errors early and ensure that your data is compliant with the FHIR specification.
-
-Because the client expects a dictionary, you must use the `to_fhir_json` helper function to convert the pydantic model to a dictionary before sending it to the client.
-
-Here's an example of how to use the `Patient` model from `fhir.resources` when creating a patient:
+### C-CDA Document Export
 
 ```python
-from fhir.resources.R4B.patient import Patient
-from fhir.resources.R4B.humanname import HumanName
-from pymedplum.helpers.fhir import to_fhir_json
+# Export patient data in C-CDA format for interoperability
+ccda_xml = client.export_ccda(patient_id="patient-123")
 
-patient_model = Patient(
-    name=[HumanName(given=["Mary"], family="Johnson", use="official")],
-    birthDate="1960-03-25",
-)
-
-created_patient = client.create_resource(to_fhir_json(patient_model))
-
-print(created_patient)
+# Save to file
+with open("patient_summary.xml", "w") as f:
+    f.write(ccda_xml)
 ```
 
-### Executing Bots
-
-Medplum allows you to create and execute custom automation logic using Bots. You can trigger a Bot using the `execute_bot` method:
+### Terminology Validation
 
 ```python
-# Execute a bot with input data
+# Validate codes against ValueSets
+is_valid = client.validate_valueset_code(
+    url="http://hl7.org/fhir/ValueSet/observation-status",
+    coding={
+        "system": "http://hl7.org/fhir/observation-status",
+        "code": "final"
+    }
+)
+
+# Validate against CodeSystems
+is_valid = client.validate_codesystem_code(
+    url="http://loinc.org",
+    code="15074-8"  # Glucose
+)
+```
+
+### Transaction & Batch Bundles
+
+```python
+# Atomic transaction - all succeed or all fail
+bundle = {
+    "resourceType": "Bundle",
+    "type": "transaction",
+    "entry": [
+        {
+            "request": {"method": "POST", "url": "Patient"},
+            "resource": {"resourceType": "Patient", "name": [...]},
+            "fullUrl": "urn:uuid:patient-temp-id"
+        },
+        {
+            "request": {"method": "POST", "url": "Observation"},
+            "resource": {
+                "resourceType": "Observation",
+                "subject": {"reference": "urn:uuid:patient-temp-id"}  # Refs resolved!
+            }
+        }
+    ]
+}
+
+result = client.execute_transaction(bundle)
+
+# Batch - operations processed independently
+result = client.execute_batch(batch_bundle)
+```
+
+### GraphQL Queries
+
+```python
+query = """
+query GetPatientWithObs($id: ID!) {
+    Patient(id: $id) {
+        name { family given }
+        ObservationList(_reference: patient) {
+            code { text }
+            valueQuantity { value unit }
+        }
+    }
+}
+"""
+
+result = client.execute_graphql(query, {"id": "patient-123"})
+print(result["data"]["Patient"])
+```
+
+### On-Behalf-Of Operations
+
+```python
+# Temporarily act on behalf of a patient's membership
+with client.on_behalf_of("ProjectMembership/membership-123") as patient_client:
+    # This operation has the patient's permissions
+    response = patient_client.create_resource({
+        "resourceType": "QuestionnaireResponse",
+        "status": "completed",
+        # ...
+    })
+
+# Back to original user context
+practitioner_note = client.create_resource({"resourceType": "Observation", ...})
+```
+
+### Bot Execution
+
+```python
+# Execute serverless functions on Medplum
 result = client.execute_bot(
-    bot_id="your-bot-id",
-    input_data={
-        "resourceType": "Patient",
-        "id": "patient-123"
-    }
+    bot_id="send-welcome-email",
+    input_data={"resourceType": "Patient", "id": "patient-123"}
 )
-
-print(result)
 ```
 
-The bot execution feature uses Medplum's custom FHIR operation `Bot/{id}/$execute`, which allows you to run serverless functions that can process data, call external APIs, or perform complex business logic.
-
-### Managing Project Secrets
-
-Medplum provides secure storage for sensitive information like API keys and access credentials through project secrets:
+### Async/Await Support
 
 ```python
-# Set project secrets
-secrets = [
-    {"name": "API_KEY", "valueString": "your-api-key-here"},
-    {"name": "DATABASE_URL", "valueString": "postgresql://..."},
-]
-
-result = client.post(f"admin/projects/{project_id}/secrets", secrets)
-
-# Retrieve project details (including secrets)
-project = client.get(f"admin/projects/{project_id}")
-current_secrets = project.get("project", {}).get("secret", [])
-```
-
-Secrets are stored as `ProjectSetting` objects with `name` and `valueString` fields, making them accessible to your Bots and other server-side code while keeping them secure.
-
-### Managing Project Sites
-
-Configure your Medplum project to run on separate domains using project sites:
-
-```python
-# Configure project sites
-sites = [
-    {
-        "name": "Production Site",
-        "domain": ["app.example.com"],
-        "requireTwoFactorAuth": True
-    },
-    {
-        "name": "Staging Site",
-        "domain": ["staging.example.com"],
-        "requireTwoFactorAuth": False
-    }
-]
-
-result = client.post(f"admin/projects/{project_id}/sites", sites)
-```
-
-Sites are stored as `ProjectSite` objects allowing you to configure domain-specific settings for your project.
-
-### Managing Client Applications
-
-Client applications enable OAuth2 authentication flows for your applications:
-
-```python
-# Client applications are standard FHIR ClientApplication resources
-# List all client applications
-clients_bundle = client.search_resources("ClientApplication")
-
-# Create a new client application
-new_client = client.create_resource({
-    "resourceType": "ClientApplication",
-    "name": "My Healthcare App",
-    "description": "Patient portal application",
-    "redirectUri": "https://myapp.example.com/callback"
-})
-
-# Clients can also be created via the admin API
-client_app = client.post(f"admin/projects/{project_id}/client", {
-    "name": "My App",
-    "description": "Application description",
-    "redirectUri": "https://myapp.example.com/callback"
-})
-```
-
-### Asynchronous Client
-
-For asynchronous applications, `pymedplum` provides an `AsyncMedplumClient`:
-
-```python
-import asyncio
 from pymedplum import AsyncMedplumClient
 
-async def main():
+async def create_patient():
     async with AsyncMedplumClient(
         client_id="YOUR_CLIENT_ID",
         client_secret="YOUR_CLIENT_SECRET",
     ) as client:
-        await client.authenticate()
-
-        patient = await client.create_resource(
-            {
-                "resourceType": "Patient",
-                "name": [{"given": ["Jane"], "family": "Doe"}],
-            }
-        )
-        print(patient)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+        patient = await client.create_resource({
+            "resourceType": "Patient",
+            "name": [{"given": ["Jane"], "family": "Doe"}]
+        })
+        return patient
 ```
+
+### FHIRBundle Wrapper
+
+```python
+# Get wrapper with helper methods
+bundle = client.search_resources("Patient", {"family": "Smith"}, return_bundle=True)
+
+# Iterate directly over resources
+for patient in bundle:
+    print(patient['name'])
+
+# Get typed resources
+from pymedplum.fhir import Patient
+patients = bundle.get_resources_typed(Patient)
+
+# Check if empty, get total, access pagination
+if not bundle.is_empty():
+    print(f"Found {bundle.get_total()} results")
+    next_page = bundle.get_next_link()
+```
+
+### Enhanced Error Handling
+
+```python
+from pymedplum import (
+    ResourceNotFoundError,
+    AuthorizationError,
+    ValidationError,
+    RateLimitError
+)
+
+try:
+    patient = client.read_resource("Patient", "123")
+except ResourceNotFoundError:
+    print("Patient not found")
+except AuthorizationError:
+    print("Access denied")
+except ValidationError as e:
+    print(f"Invalid data: {e.response_data}")
+except RateLimitError:
+    print("Rate limited - slow down!")
+```
+
+### FHIR Helpers
+
+```python
+from pymedplum import (
+    parse_reference,
+    build_reference,
+    get_patient_display_name,
+    extract_identifier,
+    get_code_display
+)
+
+# Parse references
+resource_type, resource_id = parse_reference("Patient/123")
+
+# Build references
+ref = build_reference("Patient", "123")
+
+# Get patient name
+patient = client.read_resource("Patient", "123")
+name = get_patient_display_name(patient)  # "John Doe"
+
+# Extract identifiers
+mrn = extract_identifier(patient, "http://hospital.org/mrn")
+
+# Get code display
+concept = {"coding": [{"display": "Hypertension"}]}
+display = get_code_display(concept)
+```
+
+## Documentation
+
+For complete documentation, see:
+
+- **[Installation Guide](docs/installation.md)** - Detailed setup instructions
+- **[Quickstart](docs/quickstart.md)** - Get up and running quickly
+- **[Advanced Usage](docs/advanced_usage.md)** - Advanced search, FHIR operations, bundles, binaries
+- **[API Reference](docs/api_reference.md)** - Complete API documentation
+- **[FHIR Models](docs/fhir_models.md)** - Type-safe FHIR model usage
+- **[FAQ](docs/faq.md)** - Frequently asked questions
+
+## Contributing
+
+Contributions are welcome! Please see our development guidelines:
+
+```bash
+# Install development dependencies
+make install-dev
+
+# Run all quality checks
+make check
+
+# Run tests
+make test
+make test-unit
+make test-integration
+```
+
+See [AGENTS.md](AGENTS.md) for detailed contributor guidelines.
+
+## License
+
+Copyright 2025 Kinstead Health
+
+## Acknowledgments
+
+This library is inspired by the official [Medplum TypeScript SDK](https://github.com/medplum/medplum) and aims to provide a similar developer experience for Python developers.

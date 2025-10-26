@@ -14,30 +14,34 @@ and that inbox management accounts for 24% of EHR time.
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from fhir.resources.R4B.appointment import Appointment, AppointmentParticipant
-from fhir.resources.R4B.attachment import Attachment
-from fhir.resources.R4B.codeableconcept import CodeableConcept
-from fhir.resources.R4B.coding import Coding
-from fhir.resources.R4B.communication import Communication, CommunicationPayload
-from fhir.resources.R4B.condition import Condition
-from fhir.resources.R4B.diagnosticreport import DiagnosticReport
-from fhir.resources.R4B.documentreference import (
-    DocumentReference,
-    DocumentReferenceContent,
-)
-from fhir.resources.R4B.humanname import HumanName
-from fhir.resources.R4B.identifier import Identifier
-from fhir.resources.R4B.medicationstatement import MedicationStatement
-from fhir.resources.R4B.observation import Observation, ObservationReferenceRange
-from fhir.resources.R4B.patient import Patient
-from fhir.resources.R4B.period import Period
-from fhir.resources.R4B.practitioner import Practitioner
-from fhir.resources.R4B.quantity import Quantity
-from fhir.resources.R4B.reference import Reference
-from fhir.resources.R4B.servicerequest import ServiceRequest
-from fhir.resources.R4B.task import Task, TaskRestriction
 
 from pymedplum import to_fhir_json
+from pymedplum.fhir import (
+    Appointment,
+    AppointmentParticipant,
+    Attachment,
+    CodeableConcept,
+    Coding,
+    Communication,
+    CommunicationPayload,
+    Condition,
+    DiagnosticReport,
+    DocumentReference,
+    DocumentReferenceContent,
+    HumanName,
+    Identifier,
+    MedicationStatement,
+    Observation,
+    ObservationReferenceRange,
+    Patient,
+    Period,
+    Practitioner,
+    Quantity,
+    Reference,
+    ServiceRequest,
+    Task,
+    TaskRestriction,
+)
 
 # =============================================================================
 # Fixtures - Set up morning workflow scenario
@@ -78,7 +82,9 @@ def morning_patients(medplum_client, test_id):
         patient = Patient(
             name=[HumanName(given=[given], family=f"{family}-{test_id}")],
             gender=gender,
-            birthDate=(datetime.now(timezone.utc) - timedelta(days=age * 365)).date(),
+            birthDate=(datetime.now(timezone.utc) - timedelta(days=age * 365))
+            .date()
+            .isoformat(),
             identifier=[
                 Identifier(
                     system="http://example.org/mrn",
@@ -135,8 +141,8 @@ def test_01_review_todays_schedule(
         ):
             appointment = Appointment(
                 status="booked",
-                start=start_time,
-                end=start_time + timedelta(minutes=30),
+                start=start_time.isoformat(),
+                end=(start_time + timedelta(minutes=30)).isoformat(),
                 participant=[
                     AppointmentParticipant(
                         actor=Reference(reference=f"Patient/{patient['id']}"),
@@ -238,8 +244,9 @@ def test_02_prepare_for_diabetic_patient(
                     )
                 ]
             ),
-            recordedDate=datetime.now(timezone.utc)
-            - timedelta(days=730),  # 2 years ago
+            recordedDate=(
+                datetime.now(timezone.utc) - timedelta(days=730)
+            ).isoformat(),  # 2 years ago
         )
         diabetes_result = medplum_client.create_resource(to_fhir_json(diabetes))
         created_resources.append(("Condition", diabetes_result["id"]))
@@ -257,7 +264,9 @@ def test_02_prepare_for_diabetic_patient(
                 ]
             ),
             subject=Reference(reference=f"Patient/{robert['id']}"),
-            effectiveDateTime=datetime.now(timezone.utc) - timedelta(days=30),
+            effectiveDateTime=(
+                datetime.now(timezone.utc) - timedelta(days=30)
+            ).isoformat(),
             valueQuantity=Quantity(
                 value=7.2, unit="%", system="http://unitsofmeasure.org", code="%"
             ),
@@ -287,7 +296,7 @@ def test_02_prepare_for_diabetic_patient(
                 text="Metformin 500mg twice daily",
             ),
             effectivePeriod=Period(
-                start=datetime.now(timezone.utc) - timedelta(days=365),
+                start=(datetime.now(timezone.utc) - timedelta(days=365)).isoformat(),
             ),
         )
         metformin_result = medplum_client.create_resource(to_fhir_json(metformin))
@@ -375,7 +384,9 @@ def test_03_review_critical_lab_results(
                 ]
             ),
             subject=Reference(reference=f"Patient/{maria['id']}"),
-            effectiveDateTime=yesterday.replace(hour=22, minute=0),  # 10 PM yesterday
+            effectiveDateTime=yesterday.replace(
+                hour=22, minute=0
+            ).isoformat(),  # 10 PM yesterday
             valueQuantity=Quantity(
                 value=5.8,
                 unit="mmol/L",
@@ -417,8 +428,8 @@ def test_03_review_critical_lab_results(
                 ]
             ),
             subject=Reference(reference=f"Patient/{maria['id']}"),
-            effectiveDateTime=yesterday.replace(hour=22, minute=0),
-            issued=yesterday.replace(hour=23, minute=0),
+            effectiveDateTime=yesterday.replace(hour=22, minute=0).isoformat(),
+            issued=yesterday.replace(hour=23, minute=0).isoformat(),
             result=[Reference(reference=f"Observation/{potassium_result['id']}")],
             conclusion="Critical: Elevated potassium level requires follow-up",
         )
@@ -499,8 +510,8 @@ def test_04_process_inbox_messages(
             recipient=[
                 Reference(reference=f"Practitioner/{dr_morning_provider['id']}")
             ],
-            sent=datetime.now(timezone.utc) - timedelta(hours=12),
-            received=datetime.now(timezone.utc) - timedelta(hours=12),
+            sent=(datetime.now(timezone.utc) - timedelta(hours=12)).isoformat(),
+            received=(datetime.now(timezone.utc) - timedelta(hours=12)).isoformat(),
             payload=[
                 CommunicationPayload(
                     contentString="I've been experiencing increased thirst and urination over the past week. Should I be concerned before my appointment today?"
@@ -534,8 +545,8 @@ def test_04_process_inbox_messages(
             recipient=[
                 Reference(reference=f"Practitioner/{dr_morning_provider['id']}")
             ],
-            sent=datetime.now(timezone.utc) - timedelta(hours=2),
-            received=datetime.now(timezone.utc) - timedelta(hours=2),
+            sent=(datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
+            received=(datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
             payload=[
                 CommunicationPayload(
                     contentString="FYI: Patient called this morning with BP reading of 158/95 at home. She has appointment at 10am today."
@@ -617,13 +628,13 @@ def test_05_review_pending_tasks(
             intent="order",
             priority="routine",
             description="Follow up on ophthalmology referral - ensure appointment scheduled",
-            for_fhir=Reference(reference=f"Patient/{robert['id']}"),
+            for_=Reference(reference=f"Patient/{robert['id']}"),
             owner=Reference(reference=f"Practitioner/{dr_morning_provider['id']}"),
-            authoredOn=datetime.now(timezone.utc) - timedelta(days=7),
+            authoredOn=(datetime.now(timezone.utc) - timedelta(days=7)).isoformat(),
             restriction=TaskRestriction(
                 period=Period(
-                    start=datetime.now(timezone.utc) - timedelta(days=7),
-                    end=datetime.now(timezone.utc) + timedelta(days=7),
+                    start=(datetime.now(timezone.utc) - timedelta(days=7)).isoformat(),
+                    end=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
                 )
             ),
         )
@@ -636,9 +647,9 @@ def test_05_review_pending_tasks(
             intent="order",
             priority="urgent",
             description="Review lipid panel results before annual physical appointment",
-            for_fhir=Reference(reference=f"Patient/{james['id']}"),
+            for_=Reference(reference=f"Patient/{james['id']}"),
             owner=Reference(reference=f"Practitioner/{dr_morning_provider['id']}"),
-            authoredOn=datetime.now(timezone.utc) - timedelta(hours=16),
+            authoredOn=(datetime.now(timezone.utc) - timedelta(hours=16)).isoformat(),
         )
         task2_result = medplum_client.create_resource(to_fhir_json(lab_review_task))
         created_resources.append(("Task", task2_result["id"]))
@@ -650,7 +661,7 @@ def test_05_review_pending_tasks(
             priority="urgent",
             description="Sign encounter note from yesterday's visit",
             owner=Reference(reference=f"Practitioner/{dr_morning_provider['id']}"),
-            authoredOn=datetime.now(timezone.utc) - timedelta(days=1),
+            authoredOn=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
         )
         task3_result = medplum_client.create_resource(to_fhir_json(signing_task))
         created_resources.append(("Task", task3_result["id"]))
@@ -732,7 +743,7 @@ def test_06_check_preventive_care_gaps(
                 ]
             ),
             subject=Reference(reference=f"Patient/{james['id']}"),
-            authoredOn=datetime.now(timezone.utc),
+            authoredOn=datetime.now(timezone.utc).isoformat(),
             requester=Reference(reference=f"Practitioner/{dr_morning_provider['id']}"),
             reasonCode=[
                 CodeableConcept(
@@ -831,8 +842,9 @@ def test_07_review_overnight_documents(
                 )
             ],
             subject=Reference(reference=f"Patient/{robert['id']}"),
-            date=datetime.now(timezone.utc)
-            - timedelta(hours=8),  # 8 hours ago (midnight)
+            date=(
+                datetime.now(timezone.utc) - timedelta(hours=8)
+            ).isoformat(),  # 8 hours ago (midnight)
             author=[
                 Reference(
                     reference="Practitioner/cardiologist-123",
@@ -845,7 +857,9 @@ def test_07_review_overnight_documents(
                     attachment=Attachment(
                         contentType="application/pdf",
                         title="Cardiology Consultation Report",
-                        creation=datetime.now(timezone.utc) - timedelta(hours=8),
+                        creation=(
+                            datetime.now(timezone.utc) - timedelta(hours=8)
+                        ).isoformat(),
                         size=1024,
                     )
                 )
@@ -928,8 +942,12 @@ def test_08_comprehensive_morning_workflow(
         for i, patient in enumerate(morning_patients):
             appt = Appointment(
                 status="booked",
-                start=today.replace(hour=9 + i, minute=0, second=0, microsecond=0),
-                end=today.replace(hour=9 + i, minute=30, second=0, microsecond=0),
+                start=today.replace(
+                    hour=9 + i, minute=0, second=0, microsecond=0
+                ).isoformat(),
+                end=today.replace(
+                    hour=9 + i, minute=30, second=0, microsecond=0
+                ).isoformat(),
                 participant=[
                     AppointmentParticipant(
                         actor=Reference(reference=f"Patient/{patient['id']}"),
@@ -956,7 +974,9 @@ def test_08_comprehensive_morning_workflow(
                 ]
             ),
             subject=Reference(reference=f"Patient/{robert['id']}"),
-            effectiveDateTime=datetime.now(timezone.utc) - timedelta(hours=10),
+            effectiveDateTime=(
+                datetime.now(timezone.utc) - timedelta(hours=10)
+            ).isoformat(),
             valueQuantity=Quantity(value=250, unit="mg/dL"),
             interpretation=[
                 CodeableConcept(
@@ -982,7 +1002,7 @@ def test_08_comprehensive_morning_workflow(
             recipient=[
                 Reference(reference=f"Practitioner/{dr_morning_provider['id']}")
             ],
-            sent=datetime.now(timezone.utc) - timedelta(hours=6),
+            sent=(datetime.now(timezone.utc) - timedelta(hours=6)).isoformat(),
             payload=[
                 CommunicationPayload(
                     contentString="Question about medication side effects"
@@ -999,9 +1019,9 @@ def test_08_comprehensive_morning_workflow(
             intent="order",
             priority="urgent",
             description="Review pre-visit labs",
-            for_fhir=Reference(reference=f"Patient/{james['id']}"),
+            for_=Reference(reference=f"Patient/{james['id']}"),
             owner=Reference(reference=f"Practitioner/{dr_morning_provider['id']}"),
-            authoredOn=datetime.now(timezone.utc) - timedelta(hours=12),
+            authoredOn=(datetime.now(timezone.utc) - timedelta(hours=12)).isoformat(),
         )
         task_result = medplum_client.create_resource(to_fhir_json(task))
         created_resources.append(("Task", task_result["id"]))

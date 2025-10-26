@@ -382,7 +382,7 @@ def test_token_expiration_from_jwt():
     client.access_token = mock_jwt
 
     # Manually trigger the decoding logic
-    from pymedplum.helpers.jwt import decode_jwt_exp
+    from pymedplum.helpers import decode_jwt_exp
 
     client.token_expires_at = decode_jwt_exp(client.access_token)
 

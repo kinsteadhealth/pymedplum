@@ -7,8 +7,11 @@ import httpx
 import pytest
 from respx import MockRouter
 
+# Import pymedplum.fhir first to trigger model rebuilding
+import pymedplum.fhir  # noqa: F401
 from pymedplum.async_client import AsyncMedplumClient
 from pymedplum.exceptions import AuthenticationError, NotFoundError
+from pymedplum.fhir import Patient
 
 
 @pytest.mark.asyncio
@@ -122,8 +125,6 @@ async def test_async_search_one_no_results(respx_mock: MockRouter):
 @pytest.mark.asyncio
 async def test_async_update_resource_with_pydantic(respx_mock: MockRouter):
     """Test async update_resource with Pydantic model."""
-    from fhir.resources.R4B.patient import Patient
-
     # Mock update response
     respx_mock.put("https://api.medplum.com/fhir/R4/Patient/123").mock(
         return_value=httpx.Response(
