@@ -52,22 +52,30 @@ if patient.birth_date:
 ```
 
 ## Searching for Resources
-The recommended way to search is to use the `search_resource_pages` iterator, which handles pagination for you and yields Pydantic models directly.
+The recommended way to search is to use the `search_resource_pages` iterator, which handles pagination for you. You can get results as dicts or as typed Pydantic models.
 
 ```python
-from pymedplum.fhir.observation import Observation
+from pymedplum.fhir import Observation
 
-# Search for all of a patient's vital signs
+# Type-safe search with Pydantic models
 for observation in client.search_resource_pages(
-    "Observation", 
+    "Observation",
     {"subject": "Patient/some-patient-id", "category": "vital-signs"},
     as_fhir=Observation
 ):
     # Each item is a fully-validated Observation model
     print(f"Found Observation {observation.id} with status: {observation.status}")
+
+# Or iterate over dict resources
+for observation in client.search_resource_pages(
+    "Observation",
+    {"subject": "Patient/some-patient-id", "category": "vital-signs"}
+):
+    # Each item is a dict
+    print(f"Found Observation {observation['id']} with status: {observation['status']}")
 ```
 
-This Pydantic-first approach is the core design philosophy of `pymedplum` and provides the best developer experience.
+The type-safe approach with Pydantic models provides the best developer experience with full IDE autocomplete and validation.
 
 ---
 

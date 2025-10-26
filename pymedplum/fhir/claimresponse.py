@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field
 
@@ -33,40 +33,40 @@ class ClaimResponse(MedplumFHIRBase):
         default="ClaimResponse", alias="resourceType"
     )
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="The logical id of the resource, as used in the URL for the resource. Once assigned, this value never changes.",
     )
-    meta: Optional[Meta] = Field(
+    meta: Meta | None = Field(
         default=None,
         description="The metadata about the resource. This is content that is maintained by the infrastructure. Changes to the content might not always be associated with version changes to the resource.",
     )
-    implicit_rules: Optional[str] = Field(
+    implicit_rules: str | None = Field(
         default=None,
         alias="implicitRules",
         description="A reference to a set of rules that were followed when the resource was constructed, and which must be understood when processing the content. Often, this is a reference to an implementation guide that defines the special rules along with other profiles etc.",
     )
-    language: Optional[str] = Field(
+    language: str | None = Field(
         default=None, description="The base language in which the resource is written."
     )
-    text: Optional[Narrative] = Field(
+    text: Narrative | None = Field(
         default=None,
         description="A human-readable narrative that contains a summary of the resource and can be used to represent the content of the resource to a human. The narrative need not encode all the structured data, but is required to contain sufficient detail to make it &quot;clinically safe&quot; for a human to just read the narrative. Resource definitions may define what content should be represented in the narrative to ensure clinical safety.",
     )
-    contained: Optional[list[dict[str, Any]]] = Field(
+    contained: list[dict[str, Any]] | None = Field(
         default=None,
         description="These resources do not have an independent existence apart from the resource that contains them - they cannot be identified independently, and nor can they have their own independent transaction scope.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the resource. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the resource and that modifies the understanding of the element that contains it and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer is allowed to define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
-    identifier: Optional[list[Identifier]] = Field(
+    identifier: list[Identifier] | None = Field(
         default=None, description="A unique identifier assigned to this claim response."
     )
     status: Literal["active", "cancelled", "draft", "entered-in-error"] = Field(
@@ -76,7 +76,7 @@ class ClaimResponse(MedplumFHIRBase):
         default=...,
         description="A finer grained suite of claim type codes which may convey additional information such as Inpatient vs Outpatient and/or a specialty service.",
     )
-    sub_type: Optional[CodeableConcept] = Field(
+    sub_type: CodeableConcept | None = Field(
         default=None,
         alias="subType",
         description="A finer grained suite of claim type codes which may convey additional information such as Inpatient vs Outpatient and/or a specialty service.",
@@ -94,84 +94,84 @@ class ClaimResponse(MedplumFHIRBase):
         default=...,
         description="The party responsible for authorization, adjudication and reimbursement.",
     )
-    requestor: Optional[Reference] = Field(
+    requestor: Reference | None = Field(
         default=None,
         description="The provider which is responsible for the claim, predetermination or preauthorization.",
     )
-    request: Optional[Reference] = Field(
+    request: Reference | None = Field(
         default=None, description="Original request resource reference."
     )
     outcome: Literal["queued", "complete", "error", "partial"] = Field(
         default=...,
         description="The outcome of the claim, predetermination, or preauthorization processing.",
     )
-    disposition: Optional[str] = Field(
+    disposition: str | None = Field(
         default=None,
         description="A human readable description of the status of the adjudication.",
     )
-    pre_auth_ref: Optional[str] = Field(
+    pre_auth_ref: str | None = Field(
         default=None,
         alias="preAuthRef",
         description="Reference from the Insurer which is used in later communications which refers to this adjudication.",
     )
-    pre_auth_period: Optional[Period] = Field(
+    pre_auth_period: Period | None = Field(
         default=None,
         alias="preAuthPeriod",
         description="The time frame during which this authorization is effective.",
     )
-    payee_type: Optional[CodeableConcept] = Field(
+    payee_type: CodeableConcept | None = Field(
         default=None,
         alias="payeeType",
         description="Type of Party to be reimbursed: subscriber, provider, other.",
     )
-    item: Optional[list[ClaimResponseItem]] = Field(
+    item: list[ClaimResponseItem] | None = Field(
         default=None,
         description="A claim line. Either a simple (a product or service) or a 'group' of details which can also be a simple items or groups of sub-details.",
     )
-    add_item: Optional[list[ClaimResponseAddItem]] = Field(
+    add_item: list[ClaimResponseAddItem] | None = Field(
         default=None,
         alias="addItem",
         description="The first-tier service adjudications for payor added product or service lines.",
     )
-    adjudication: Optional[list[ClaimResponseItemAdjudication]] = Field(
+    adjudication: list[ClaimResponseItemAdjudication] | None = Field(
         default=None,
         description="The adjudication results which are presented at the header level rather than at the line-item or add-item levels.",
     )
-    total: Optional[list[ClaimResponseTotal]] = Field(
+    total: list[ClaimResponseTotal] | None = Field(
         default=None, description="Categorized monetary totals for the adjudication."
     )
-    payment: Optional[ClaimResponsePayment] = Field(
+    payment: ClaimResponsePayment | None = Field(
         default=None, description="Payment details for the adjudication of the claim."
     )
-    funds_reserve: Optional[CodeableConcept] = Field(
+    funds_reserve: CodeableConcept | None = Field(
         default=None,
         alias="fundsReserve",
         description="A code, used only on a response to a preauthorization, to indicate whether the benefits payable have been reserved and for whom.",
     )
-    form_code: Optional[CodeableConcept] = Field(
+    form_code: CodeableConcept | None = Field(
         default=None,
         alias="formCode",
         description="A code for the form to be used for printing the content.",
     )
-    form: Optional[Attachment] = Field(
+    form: Attachment | None = Field(
         default=None,
         description="The actual form, by reference or inclusion, for printing the content or an EOB.",
     )
-    process_note: Optional[list[ClaimResponseProcessNote]] = Field(
+    process_note: list[ClaimResponseProcessNote] | None = Field(
         default=None,
         alias="processNote",
         description="A note that describes or explains adjudication results in a human readable form.",
     )
-    communication_request: Optional[list[Reference]] = Field(
+    communication_request: list[Reference] | None = Field(
         default=None,
         alias="communicationRequest",
         description="Request for additional supporting or authorizing information.",
     )
-    insurance: Optional[list[ClaimResponseInsurance]] = Field(
+    insurance: list[ClaimResponseInsurance] | None = Field(
         default=None,
         description="Financial instruments for reimbursement for the health care products and services specified on the claim.",
     )
-    error: Optional[list[ClaimResponseError]] = Field(
+    error: list[ClaimResponseError] | None = Field(
         default=None,
         description="Errors encountered during the processing of the adjudication.",
     )
@@ -180,35 +180,35 @@ class ClaimResponse(MedplumFHIRBase):
 class ClaimResponseAddItem(MedplumFHIRBase):
     """The first-tier service adjudications for payor added product or service lines."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
-    item_sequence: Optional[list[Union[int, float]]] = Field(
+    item_sequence: list[int | float] | None = Field(
         default=None,
         alias="itemSequence",
         description="Claim items which this service line is intended to replace.",
     )
-    detail_sequence: Optional[list[Union[int, float]]] = Field(
+    detail_sequence: list[int | float] | None = Field(
         default=None,
         alias="detailSequence",
         description="The sequence number of the details within the claim item which this line is intended to replace.",
     )
-    subdetail_sequence: Optional[list[Union[int, float]]] = Field(
+    subdetail_sequence: list[int | float] | None = Field(
         default=None,
         alias="subdetailSequence",
         description="The sequence number of the sub-details within the details within the claim item which this line is intended to replace.",
     )
-    provider: Optional[list[Reference]] = Field(
+    provider: list[Reference] | None = Field(
         default=None,
         description="The providers who are authorized for the services rendered to the patient.",
     )
@@ -217,67 +217,67 @@ class ClaimResponseAddItem(MedplumFHIRBase):
         alias="productOrService",
         description="When the value is a group code then this item collects a set of related claim details, otherwise this contains the product, service, drug or other billing code for the item.",
     )
-    modifier: Optional[list[CodeableConcept]] = Field(
+    modifier: list[CodeableConcept] | None = Field(
         default=None,
         description="Item typification or modifiers codes to convey additional context for the product or service.",
     )
-    program_code: Optional[list[CodeableConcept]] = Field(
+    program_code: list[CodeableConcept] | None = Field(
         default=None,
         alias="programCode",
         description="Identifies the program under which this may be recovered.",
     )
-    serviced_date: Optional[str] = Field(
+    serviced_date: str | None = Field(
         default=None,
         alias="servicedDate",
         description="The date or dates when the service or product was supplied, performed or completed.",
     )
-    serviced_period: Optional[Period] = Field(
+    serviced_period: Period | None = Field(
         default=None,
         alias="servicedPeriod",
         description="The date or dates when the service or product was supplied, performed or completed.",
     )
-    location_codeable_concept: Optional[CodeableConcept] = Field(
+    location_codeable_concept: CodeableConcept | None = Field(
         default=None,
         alias="locationCodeableConcept",
         description="Where the product or service was provided.",
     )
-    location_address: Optional[Address] = Field(
+    location_address: Address | None = Field(
         default=None,
         alias="locationAddress",
         description="Where the product or service was provided.",
     )
-    location_reference: Optional[Reference] = Field(
+    location_reference: Reference | None = Field(
         default=None,
         alias="locationReference",
         description="Where the product or service was provided.",
     )
-    quantity: Optional[Quantity] = Field(
+    quantity: Quantity | None = Field(
         default=None, description="The number of repetitions of a service or product."
     )
-    unit_price: Optional[Money] = Field(
+    unit_price: Money | None = Field(
         default=None,
         alias="unitPrice",
         description="If the item is not a group then this is the fee for the product or service, otherwise this is the total of the fees for the details of the group.",
     )
-    factor: Optional[Union[int, float]] = Field(
+    factor: int | float | None = Field(
         default=None,
         description="A real number that represents a multiplier used in determining the overall value of services delivered and/or goods received. The concept of a Factor allows for a discount or surcharge multiplier to be applied to a monetary amount.",
     )
-    net: Optional[Money] = Field(
+    net: Money | None = Field(
         default=None,
         description="The quantity times the unit price for an additional service or product or charge.",
     )
-    body_site: Optional[CodeableConcept] = Field(
+    body_site: CodeableConcept | None = Field(
         default=None,
         alias="bodySite",
         description="Physical service site on the patient (limb, tooth, etc.).",
     )
-    sub_site: Optional[list[CodeableConcept]] = Field(
+    sub_site: list[CodeableConcept] | None = Field(
         default=None,
         alias="subSite",
         description="A region or surface of the bodySite, e.g. limb region or tooth surface(s).",
     )
-    note_number: Optional[list[Union[int, float]]] = Field(
+    note_number: list[int | float] | None = Field(
         default=None,
         alias="noteNumber",
         description="The numbers associated with notes below which apply to the adjudication of this item.",
@@ -285,7 +285,7 @@ class ClaimResponseAddItem(MedplumFHIRBase):
     adjudication: list[ClaimResponseItemAdjudication] = Field(
         default=..., description="The adjudication results."
     )
-    detail: Optional[list[ClaimResponseAddItemDetail]] = Field(
+    detail: list[ClaimResponseAddItemDetail] | None = Field(
         default=None,
         description="The second-tier service adjudications for payor added services.",
     )
@@ -294,15 +294,15 @@ class ClaimResponseAddItem(MedplumFHIRBase):
 class ClaimResponseAddItemDetail(MedplumFHIRBase):
     """The second-tier service adjudications for payor added services."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
@@ -312,27 +312,27 @@ class ClaimResponseAddItemDetail(MedplumFHIRBase):
         alias="productOrService",
         description="When the value is a group code then this item collects a set of related claim details, otherwise this contains the product, service, drug or other billing code for the item.",
     )
-    modifier: Optional[list[CodeableConcept]] = Field(
+    modifier: list[CodeableConcept] | None = Field(
         default=None,
         description="Item typification or modifiers codes to convey additional context for the product or service.",
     )
-    quantity: Optional[Quantity] = Field(
+    quantity: Quantity | None = Field(
         default=None, description="The number of repetitions of a service or product."
     )
-    unit_price: Optional[Money] = Field(
+    unit_price: Money | None = Field(
         default=None,
         alias="unitPrice",
         description="If the item is not a group then this is the fee for the product or service, otherwise this is the total of the fees for the details of the group.",
     )
-    factor: Optional[Union[int, float]] = Field(
+    factor: int | float | None = Field(
         default=None,
         description="A real number that represents a multiplier used in determining the overall value of services delivered and/or goods received. The concept of a Factor allows for a discount or surcharge multiplier to be applied to a monetary amount.",
     )
-    net: Optional[Money] = Field(
+    net: Money | None = Field(
         default=None,
         description="The quantity times the unit price for an additional service or product or charge.",
     )
-    note_number: Optional[list[Union[int, float]]] = Field(
+    note_number: list[int | float] | None = Field(
         default=None,
         alias="noteNumber",
         description="The numbers associated with notes below which apply to the adjudication of this item.",
@@ -340,7 +340,7 @@ class ClaimResponseAddItemDetail(MedplumFHIRBase):
     adjudication: list[ClaimResponseItemAdjudication] = Field(
         default=..., description="The adjudication results."
     )
-    sub_detail: Optional[list[ClaimResponseAddItemDetailSubDetail]] = Field(
+    sub_detail: list[ClaimResponseAddItemDetailSubDetail] | None = Field(
         default=None,
         alias="subDetail",
         description="The third-tier service adjudications for payor added services.",
@@ -350,15 +350,15 @@ class ClaimResponseAddItemDetail(MedplumFHIRBase):
 class ClaimResponseAddItemDetailSubDetail(MedplumFHIRBase):
     """The third-tier service adjudications for payor added services."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
@@ -368,27 +368,27 @@ class ClaimResponseAddItemDetailSubDetail(MedplumFHIRBase):
         alias="productOrService",
         description="When the value is a group code then this item collects a set of related claim details, otherwise this contains the product, service, drug or other billing code for the item.",
     )
-    modifier: Optional[list[CodeableConcept]] = Field(
+    modifier: list[CodeableConcept] | None = Field(
         default=None,
         description="Item typification or modifiers codes to convey additional context for the product or service.",
     )
-    quantity: Optional[Quantity] = Field(
+    quantity: Quantity | None = Field(
         default=None, description="The number of repetitions of a service or product."
     )
-    unit_price: Optional[Money] = Field(
+    unit_price: Money | None = Field(
         default=None,
         alias="unitPrice",
         description="If the item is not a group then this is the fee for the product or service, otherwise this is the total of the fees for the details of the group.",
     )
-    factor: Optional[Union[int, float]] = Field(
+    factor: int | float | None = Field(
         default=None,
         description="A real number that represents a multiplier used in determining the overall value of services delivered and/or goods received. The concept of a Factor allows for a discount or surcharge multiplier to be applied to a monetary amount.",
     )
-    net: Optional[Money] = Field(
+    net: Money | None = Field(
         default=None,
         description="The quantity times the unit price for an additional service or product or charge.",
     )
-    note_number: Optional[list[Union[int, float]]] = Field(
+    note_number: list[int | float] | None = Field(
         default=None,
         alias="noteNumber",
         description="The numbers associated with notes below which apply to the adjudication of this item.",
@@ -401,30 +401,30 @@ class ClaimResponseAddItemDetailSubDetail(MedplumFHIRBase):
 class ClaimResponseError(MedplumFHIRBase):
     """Errors encountered during the processing of the adjudication."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
-    item_sequence: Optional[Union[int, float]] = Field(
+    item_sequence: int | float | None = Field(
         default=None,
         alias="itemSequence",
         description="The sequence number of the line item submitted which contains the error. This value is omitted when the error occurs outside of the item structure.",
     )
-    detail_sequence: Optional[Union[int, float]] = Field(
+    detail_sequence: int | float | None = Field(
         default=None,
         alias="detailSequence",
         description="The sequence number of the detail within the line item submitted which contains the error. This value is omitted when the error occurs outside of the item structure.",
     )
-    sub_detail_sequence: Optional[Union[int, float]] = Field(
+    sub_detail_sequence: int | float | None = Field(
         default=None,
         alias="subDetailSequence",
         description="The sequence number of the sub-detail within the detail within the line item submitted which contains the error. This value is omitted when the error occurs outside of the item structure.",
@@ -440,20 +440,20 @@ class ClaimResponseInsurance(MedplumFHIRBase):
     services specified on the claim.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
-    sequence: Union[int, float] = Field(
+    sequence: int | float = Field(
         default=...,
         description="A number to uniquely identify insurance entries and provide a sequence of coverages to convey coordination of benefit order.",
     )
@@ -465,12 +465,12 @@ class ClaimResponseInsurance(MedplumFHIRBase):
         default=...,
         description="Reference to the insurance card level information contained in the Coverage resource. The coverage issuing insurer will use these details to locate the patient's actual coverage within the insurer's information system.",
     )
-    business_arrangement: Optional[str] = Field(
+    business_arrangement: str | None = Field(
         default=None,
         alias="businessArrangement",
         description="A business agreement number established between the provider and the insurer for special business processing purposes.",
     )
-    claim_response: Optional[Reference] = Field(
+    claim_response: Reference | None = Field(
         default=None,
         alias="claimResponse",
         description="The result of the adjudication of the line items for the Coverage specified in this insurance.",
@@ -482,25 +482,25 @@ class ClaimResponseItem(MedplumFHIRBase):
     details which can also be a simple items or groups of sub-details.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
-    item_sequence: Union[int, float] = Field(
+    item_sequence: int | float = Field(
         default=...,
         alias="itemSequence",
         description="A number to uniquely reference the claim item entries.",
     )
-    note_number: Optional[list[Union[int, float]]] = Field(
+    note_number: list[int | float] | None = Field(
         default=None,
         alias="noteNumber",
         description="The numbers associated with notes below which apply to the adjudication of this item.",
@@ -509,7 +509,7 @@ class ClaimResponseItem(MedplumFHIRBase):
         default=...,
         description="If this item is a group then the values here are a summary of the adjudication of the detail items. If this item is a simple product or service then this is the result of the adjudication of this item.",
     )
-    detail: Optional[list[ClaimResponseItemDetail]] = Field(
+    detail: list[ClaimResponseItemDetail] | None = Field(
         default=None,
         description="A claim detail. Either a simple (a product or service) or a 'group' of sub-details which are simple items.",
     )
@@ -521,15 +521,15 @@ class ClaimResponseItemAdjudication(MedplumFHIRBase):
     service then this is the result of the adjudication of this item.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
@@ -538,14 +538,14 @@ class ClaimResponseItemAdjudication(MedplumFHIRBase):
         default=...,
         description="A code to indicate the information type of this adjudication record. Information types may include the value submitted, maximum values or percentages allowed or payable under the plan, amounts that: the patient is responsible for in aggregate or pertaining to this item; amounts paid by other coverages; and, the benefit payable for this item.",
     )
-    reason: Optional[CodeableConcept] = Field(
+    reason: CodeableConcept | None = Field(
         default=None,
         description="A code supporting the understanding of the adjudication result and explaining variance from expected amount.",
     )
-    amount: Optional[Money] = Field(
+    amount: Money | None = Field(
         default=None, description="Monetary amount associated with the category."
     )
-    value: Optional[Union[int, float]] = Field(
+    value: int | float | None = Field(
         default=None,
         description="A non-monetary value associated with the category. Mutually exclusive to the amount element above.",
     )
@@ -556,25 +556,25 @@ class ClaimResponseItemDetail(MedplumFHIRBase):
     sub-details which are simple items.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
-    detail_sequence: Union[int, float] = Field(
+    detail_sequence: int | float = Field(
         default=...,
         alias="detailSequence",
         description="A number to uniquely reference the claim detail entry.",
     )
-    note_number: Optional[list[Union[int, float]]] = Field(
+    note_number: list[int | float] | None = Field(
         default=None,
         alias="noteNumber",
         description="The numbers associated with notes below which apply to the adjudication of this item.",
@@ -582,7 +582,7 @@ class ClaimResponseItemDetail(MedplumFHIRBase):
     adjudication: list[ClaimResponseItemAdjudication] = Field(
         default=..., description="The adjudication results."
     )
-    sub_detail: Optional[list[ClaimResponseItemDetailSubDetail]] = Field(
+    sub_detail: list[ClaimResponseItemDetailSubDetail] | None = Field(
         default=None,
         alias="subDetail",
         description="A sub-detail adjudication of a simple product or service.",
@@ -592,30 +592,30 @@ class ClaimResponseItemDetail(MedplumFHIRBase):
 class ClaimResponseItemDetailSubDetail(MedplumFHIRBase):
     """A sub-detail adjudication of a simple product or service."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
-    sub_detail_sequence: Union[int, float] = Field(
+    sub_detail_sequence: int | float = Field(
         default=...,
         alias="subDetailSequence",
         description="A number to uniquely reference the claim sub-detail entry.",
     )
-    note_number: Optional[list[Union[int, float]]] = Field(
+    note_number: list[int | float] | None = Field(
         default=None,
         alias="noteNumber",
         description="The numbers associated with notes below which apply to the adjudication of this item.",
     )
-    adjudication: Optional[list[ClaimResponseItemAdjudication]] = Field(
+    adjudication: list[ClaimResponseItemAdjudication] | None = Field(
         default=None, description="The adjudication results."
     )
 
@@ -623,15 +623,15 @@ class ClaimResponseItemDetailSubDetail(MedplumFHIRBase):
 class ClaimResponsePayment(MedplumFHIRBase):
     """Payment details for the adjudication of the claim."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
@@ -640,23 +640,23 @@ class ClaimResponsePayment(MedplumFHIRBase):
         default=...,
         description="Whether this represents partial or complete payment of the benefits payable.",
     )
-    adjustment: Optional[Money] = Field(
+    adjustment: Money | None = Field(
         default=None,
         description="Total amount of all adjustments to this payment included in this transaction which are not related to this claim's adjudication.",
     )
-    adjustment_reason: Optional[CodeableConcept] = Field(
+    adjustment_reason: CodeableConcept | None = Field(
         default=None,
         alias="adjustmentReason",
         description="Reason for the payment adjustment.",
     )
-    date: Optional[str] = Field(
+    date: str | None = Field(
         default=None,
         description="Estimated date the payment will be issued or the actual issue date of payment.",
     )
     amount: Money = Field(
         default=..., description="Benefits payable less any payment adjustment."
     )
-    identifier: Optional[Identifier] = Field(
+    identifier: Identifier | None = Field(
         default=None,
         description="Issuer's unique identifier for the payment instrument.",
     )
@@ -665,30 +665,30 @@ class ClaimResponsePayment(MedplumFHIRBase):
 class ClaimResponseProcessNote(MedplumFHIRBase):
     """A note that describes or explains adjudication results in a human readable form."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
-    number: Optional[Union[int, float]] = Field(
+    number: int | float | None = Field(
         default=None, description="A number to uniquely identify a note entry."
     )
-    type: Optional[Literal["display", "print", "printoper"]] = Field(
+    type: Literal["display", "print", "printoper"] | None = Field(
         default=None, description="The business purpose of the note text."
     )
     text: str = Field(
         default=...,
         description="The explanation or description associated with the processing.",
     )
-    language: Optional[CodeableConcept] = Field(
+    language: CodeableConcept | None = Field(
         default=None,
         description="A code to define the language used in the text of the note.",
     )
@@ -697,15 +697,15 @@ class ClaimResponseProcessNote(MedplumFHIRBase):
 class ClaimResponseTotal(MedplumFHIRBase):
     """Categorized monetary totals for the adjudication."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",

@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field
 
@@ -32,35 +32,35 @@ class ImplementationGuide(MedplumFHIRBase):
         default="ImplementationGuide", alias="resourceType"
     )
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="The logical id of the resource, as used in the URL for the resource. Once assigned, this value never changes.",
     )
-    meta: Optional[Meta] = Field(
+    meta: Meta | None = Field(
         default=None,
         description="The metadata about the resource. This is content that is maintained by the infrastructure. Changes to the content might not always be associated with version changes to the resource.",
     )
-    implicit_rules: Optional[str] = Field(
+    implicit_rules: str | None = Field(
         default=None,
         alias="implicitRules",
         description="A reference to a set of rules that were followed when the resource was constructed, and which must be understood when processing the content. Often, this is a reference to an implementation guide that defines the special rules along with other profiles etc.",
     )
-    language: Optional[str] = Field(
+    language: str | None = Field(
         default=None, description="The base language in which the resource is written."
     )
-    text: Optional[Narrative] = Field(
+    text: Narrative | None = Field(
         default=None,
         description="A human-readable narrative that contains a summary of the resource and can be used to represent the content of the resource to a human. The narrative need not encode all the structured data, but is required to contain sufficient detail to make it &quot;clinically safe&quot; for a human to just read the narrative. Resource definitions may define what content should be represented in the narrative to ensure clinical safety.",
     )
-    contained: Optional[list[dict[str, Any]]] = Field(
+    contained: list[dict[str, Any]] | None = Field(
         default=None,
         description="These resources do not have an independent existence apart from the resource that contains them - they cannot be identified independently, and nor can they have their own independent transaction scope.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the resource. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the resource and that modifies the understanding of the element that contains it and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer is allowed to define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
@@ -69,7 +69,7 @@ class ImplementationGuide(MedplumFHIRBase):
         default=...,
         description="An absolute URI that is used to identify this implementation guide when it is referenced in a specification, model, design or an instance; also called its canonical identifier. This SHOULD be globally unique and SHOULD be a literal address at which at which an authoritative instance of this implementation guide is (or will be) published. This URL can be the target of a canonical reference. It SHALL remain the same when the implementation guide is stored on different servers.",
     )
-    version: Optional[str] = Field(
+    version: str | None = Field(
         default=None,
         description="The identifier that is used to identify this version of the implementation guide when it is referenced in a specification, model, design or instance. This is an arbitrary value managed by the implementation guide author and is not expected to be globally unique. For example, it might be a timestamp (e.g. yyyymmdd) if a managed version is not available. There is also no expectation that versions can be placed in a lexicographical sequence.",
     )
@@ -77,7 +77,7 @@ class ImplementationGuide(MedplumFHIRBase):
         default=...,
         description="A natural language name identifying the implementation guide. This name should be usable as an identifier for the module by machine processing applications such as code generation.",
     )
-    title: Optional[str] = Field(
+    title: str | None = Field(
         default=None,
         description="A short, descriptive, user-friendly title for the implementation guide.",
     )
@@ -85,36 +85,36 @@ class ImplementationGuide(MedplumFHIRBase):
         default=...,
         description="The status of this implementation guide. Enables tracking the life-cycle of the content.",
     )
-    experimental: Optional[bool] = Field(
+    experimental: bool | None = Field(
         default=None,
         description="A Boolean value to indicate that this implementation guide is authored for testing purposes (or education/evaluation/marketing) and is not intended to be used for genuine usage.",
     )
-    date: Optional[str] = Field(
+    date: str | None = Field(
         default=None,
         description="The date (and optionally time) when the implementation guide was published. The date must change when the business version changes and it must change if the status code changes. In addition, it should change when the substantive content of the implementation guide changes.",
     )
-    publisher: Optional[str] = Field(
+    publisher: str | None = Field(
         default=None,
         description="The name of the organization or individual that published the implementation guide.",
     )
-    contact: Optional[list[ContactDetail]] = Field(
+    contact: list[ContactDetail] | None = Field(
         default=None,
         description="Contact details to assist a user in finding and communicating with the publisher.",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
         description="A free text natural language description of the implementation guide from a consumer's perspective.",
     )
-    use_context: Optional[list[UsageContext]] = Field(
+    use_context: list[UsageContext] | None = Field(
         default=None,
         alias="useContext",
         description="The content was developed with a focus and intent of supporting the contexts that are listed. These contexts may be general categories (gender, age, ...) or may be references to specific programs (insurance plans, studies, ...) and may be used to assist with indexing and searching for appropriate implementation guide instances.",
     )
-    jurisdiction: Optional[list[CodeableConcept]] = Field(
+    jurisdiction: list[CodeableConcept] | None = Field(
         default=None,
         description="A legal or geographic region in which the implementation guide is intended to be used.",
     )
-    copyright: Optional[str] = Field(
+    copyright: str | None = Field(
         default=None,
         description="A copyright statement relating to the implementation guide and/or its contents. Copyright statements are generally legal restrictions on the use and publishing of the implementation guide.",
     )
@@ -123,7 +123,7 @@ class ImplementationGuide(MedplumFHIRBase):
         alias="packageId",
         description="The NPM package name for this Implementation Guide, used in the NPM package distribution, which is the primary mechanism by which FHIR based tooling manages IG dependencies. This value must be globally unique, and should be assigned with care.",
     )
-    license: Optional[
+    license: (
         Literal[
             "not-open-source",
             "0BSD",
@@ -472,7 +472,8 @@ class ImplementationGuide(MedplumFHIRBase):
             "ZPL-2.0",
             "ZPL-2.1",
         ]
-    ] = Field(
+        | None
+    ) = Field(
         default=None,
         description="The license that applies to this Implementation Guide, using an SPDX license code, or 'not-open-source'.",
     )
@@ -506,21 +507,21 @@ class ImplementationGuide(MedplumFHIRBase):
         alias="fhirVersion",
         description="The version(s) of the FHIR specification that this ImplementationGuide targets - e.g. describes how to use. The value of this element is the formal version of the specification, without the revision number, e.g. [publication].[major].[minor], which is 4.0.1. for this version.",
     )
-    depends_on: Optional[list[ImplementationGuideDependsOn]] = Field(
+    depends_on: list[ImplementationGuideDependsOn] | None = Field(
         default=None,
         alias="dependsOn",
         description="Another implementation guide that this implementation depends on. Typically, an implementation guide uses value sets, profiles etc.defined in other implementation guides.",
     )
-    global_: Optional[list[ImplementationGuideGlobal]] = Field(
+    global_: list[ImplementationGuideGlobal] | None = Field(
         default=None,
         alias="global",
         description="A set of profiles that all resources covered by this implementation guide must conform to.",
     )
-    definition: Optional[ImplementationGuideDefinition] = Field(
+    definition: ImplementationGuideDefinition | None = Field(
         default=None,
         description="The information needed by an IG publisher tool to publish the whole implementation guide.",
     )
-    manifest: Optional[ImplementationGuideManifest] = Field(
+    manifest: ImplementationGuideManifest | None = Field(
         default=None,
         description="Information about an assembled implementation guide, created by the publication tooling.",
     )
@@ -531,20 +532,20 @@ class ImplementationGuideDefinition(MedplumFHIRBase):
     implementation guide.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
-    grouping: Optional[list[ImplementationGuideDefinitionGrouping]] = Field(
+    grouping: list[ImplementationGuideDefinitionGrouping] | None = Field(
         default=None,
         description="A logical group of resources. Logical groups can be used when building pages.",
     )
@@ -552,14 +553,14 @@ class ImplementationGuideDefinition(MedplumFHIRBase):
         default=...,
         description="A resource that is part of the implementation guide. Conformance resources (value set, structure definition, capability statements etc.) are obvious candidates for inclusion, but any kind of resource can be included as an example resource.",
     )
-    page: Optional[ImplementationGuideDefinitionPage] = Field(
+    page: ImplementationGuideDefinitionPage | None = Field(
         default=None,
         description="A page / section in the implementation guide. The root page is the implementation guide home page.",
     )
-    parameter: Optional[list[ImplementationGuideDefinitionParameter]] = Field(
+    parameter: list[ImplementationGuideDefinitionParameter] | None = Field(
         default=None, description="Defines how IG is built by tools."
     )
-    template: Optional[list[ImplementationGuideDefinitionTemplate]] = Field(
+    template: list[ImplementationGuideDefinitionTemplate] | None = Field(
         default=None, description="A template for building resources."
     )
 
@@ -567,15 +568,15 @@ class ImplementationGuideDefinition(MedplumFHIRBase):
 class ImplementationGuideDefinitionGrouping(MedplumFHIRBase):
     """A logical group of resources. Logical groups can be used when building pages."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
@@ -584,7 +585,7 @@ class ImplementationGuideDefinitionGrouping(MedplumFHIRBase):
         default=...,
         description="The human-readable title to display for the package of resources when rendering the implementation guide.",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None, description="Human readable text describing the package."
     )
 
@@ -594,23 +595,23 @@ class ImplementationGuideDefinitionPage(MedplumFHIRBase):
     implementation guide home page.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
-    name_url: Optional[str] = Field(
+    name_url: str | None = Field(
         default=None, alias="nameUrl", description="The source address for the page."
     )
-    name_reference: Optional[Reference] = Field(
+    name_reference: Reference | None = Field(
         default=None,
         alias="nameReference",
         description="The source address for the page.",
@@ -622,7 +623,7 @@ class ImplementationGuideDefinitionPage(MedplumFHIRBase):
     generation: Literal["html", "markdown", "xml", "generated"] = Field(
         default=..., description="A code that indicates how the page is generated."
     )
-    page: Optional[list[ImplementationGuideDefinitionPage]] = Field(
+    page: list[ImplementationGuideDefinitionPage] | None = Field(
         default=None, description="Nested Pages/Sections under this page."
     )
 
@@ -630,15 +631,15 @@ class ImplementationGuideDefinitionPage(MedplumFHIRBase):
 class ImplementationGuideDefinitionParameter(MedplumFHIRBase):
     """Defines how IG is built by tools."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
@@ -668,15 +669,15 @@ class ImplementationGuideDefinitionResource(MedplumFHIRBase):
     included as an example resource.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
@@ -684,7 +685,7 @@ class ImplementationGuideDefinitionResource(MedplumFHIRBase):
     reference: Reference = Field(
         default=..., description="Where this resource is found."
     )
-    fhir_version: Optional[
+    fhir_version: (
         list[
             Literal[
                 "0.01",
@@ -711,30 +712,31 @@ class ImplementationGuideDefinitionResource(MedplumFHIRBase):
                 "4.0.1",
             ]
         ]
-    ] = Field(
+        | None
+    ) = Field(
         default=None,
         alias="fhirVersion",
         description="Indicates the FHIR Version(s) this artifact is intended to apply to. If no versions are specified, the resource is assumed to apply to all the versions stated in ImplementationGuide.fhirVersion.",
     )
-    name: Optional[str] = Field(
+    name: str | None = Field(
         default=None,
         description="A human assigned name for the resource. All resources SHOULD have a name, but the name may be extracted from the resource (e.g. ValueSet.name).",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
         description="A description of the reason that a resource has been included in the implementation guide.",
     )
-    example_boolean: Optional[bool] = Field(
+    example_boolean: bool | None = Field(
         default=None,
         alias="exampleBoolean",
         description="If true or a reference, indicates the resource is an example instance. If a reference is present, indicates that the example is an example of the specified profile.",
     )
-    example_canonical: Optional[str] = Field(
+    example_canonical: str | None = Field(
         default=None,
         alias="exampleCanonical",
         description="If true or a reference, indicates the resource is an example instance. If a reference is present, indicates that the example is an example of the specified profile.",
     )
-    grouping_id: Optional[str] = Field(
+    grouping_id: str | None = Field(
         default=None,
         alias="groupingId",
         description="Reference to the id of the grouping this resource appears in.",
@@ -744,15 +746,15 @@ class ImplementationGuideDefinitionResource(MedplumFHIRBase):
 class ImplementationGuideDefinitionTemplate(MedplumFHIRBase):
     """A template for building resources."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
@@ -761,7 +763,7 @@ class ImplementationGuideDefinitionTemplate(MedplumFHIRBase):
     source: str = Field(
         default=..., description="The source location for the template."
     )
-    scope: Optional[str] = Field(
+    scope: str | None = Field(
         default=None, description="The scope in which the template applies."
     )
 
@@ -772,15 +774,15 @@ class ImplementationGuideDependsOn(MedplumFHIRBase):
     in other implementation guides.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
@@ -789,12 +791,12 @@ class ImplementationGuideDependsOn(MedplumFHIRBase):
         default=...,
         description="A canonical reference to the Implementation guide for the dependency.",
     )
-    package_id: Optional[str] = Field(
+    package_id: str | None = Field(
         default=None,
         alias="packageId",
         description="The NPM package name for the Implementation Guide that this IG depends on.",
     )
-    version: Optional[str] = Field(
+    version: str | None = Field(
         default=None,
         description="The version of the IG that is depended on, when the correct version is required to understand the IG correctly.",
     )
@@ -805,15 +807,15 @@ class ImplementationGuideGlobal(MedplumFHIRBase):
     guide must conform to.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
@@ -833,20 +835,20 @@ class ImplementationGuideManifest(MedplumFHIRBase):
     publication tooling.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
-    rendering: Optional[str] = Field(
+    rendering: str | None = Field(
         default=None,
         description="A pointer to official web page, PDF or other rendering of the implementation guide.",
     )
@@ -854,14 +856,14 @@ class ImplementationGuideManifest(MedplumFHIRBase):
         default=...,
         description="A resource that is part of the implementation guide. Conformance resources (value set, structure definition, capability statements etc.) are obvious candidates for inclusion, but any kind of resource can be included as an example resource.",
     )
-    page: Optional[list[ImplementationGuideManifestPage]] = Field(
+    page: list[ImplementationGuideManifestPage] | None = Field(
         default=None, description="Information about a page within the IG."
     )
-    image: Optional[list[str]] = Field(
+    image: list[str] | None = Field(
         default=None,
         description="Indicates a relative path to an image that exists within the IG.",
     )
-    other: Optional[list[str]] = Field(
+    other: list[str] | None = Field(
         default=None,
         description="Indicates the relative path of an additional non-page, non-image file that is part of the IG - e.g. zip, jar and similar files that could be the target of a hyperlink in a derived IG.",
     )
@@ -870,24 +872,24 @@ class ImplementationGuideManifest(MedplumFHIRBase):
 class ImplementationGuideManifestPage(MedplumFHIRBase):
     """Information about a page within the IG."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
     name: str = Field(default=..., description="Relative path to the page.")
-    title: Optional[str] = Field(
+    title: str | None = Field(
         default=None, description="Label for the page intended for human display."
     )
-    anchor: Optional[list[str]] = Field(
+    anchor: list[str] | None = Field(
         default=None, description="The name of an anchor available on the page."
     )
 
@@ -899,15 +901,15 @@ class ImplementationGuideManifestResource(MedplumFHIRBase):
     included as an example resource.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
@@ -915,17 +917,17 @@ class ImplementationGuideManifestResource(MedplumFHIRBase):
     reference: Reference = Field(
         default=..., description="Where this resource is found."
     )
-    example_boolean: Optional[bool] = Field(
+    example_boolean: bool | None = Field(
         default=None,
         alias="exampleBoolean",
         description="If true or a reference, indicates the resource is an example instance. If a reference is present, indicates that the example is an example of the specified profile.",
     )
-    example_canonical: Optional[str] = Field(
+    example_canonical: str | None = Field(
         default=None,
         alias="exampleCanonical",
         description="If true or a reference, indicates the resource is an example instance. If a reference is present, indicates that the example is an example of the specified profile.",
     )
-    relative_path: Optional[str] = Field(
+    relative_path: str | None = Field(
         default=None,
         alias="relativePath",
         description="The relative path for primary page for this resource within the IG.",

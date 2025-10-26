@@ -5,7 +5,6 @@ encapsulating all initialization options in a type-safe dataclass.
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 from .types import DEFAULT_ORG_EXTENSION_URL, BeforeRequestCallback, OrgMode
 
@@ -43,16 +42,16 @@ class MedplumClientConfig:
     """
 
     base_url: str = "https://api.medplum.com/"
-    client_id: Optional[str] = None
-    client_secret: Optional[str] = None
-    access_token: Optional[str] = None
+    client_id: str | None = None
+    client_secret: str | None = None
+    access_token: str | None = None
     fhir_url_path: str = "fhir/R4/"
-    project_id: Optional[str] = None
-    org_mode: Optional[OrgMode] = None
-    org_ref: Optional[str] = None
+    project_id: str | None = None
+    org_mode: OrgMode | None = None
+    org_ref: str | None = None
     org_extension_url: str = DEFAULT_ORG_EXTENSION_URL
-    before_request: Optional[BeforeRequestCallback] = None
-    default_on_behalf_of: Optional[str] = None
+    before_request: BeforeRequestCallback | None = None
+    default_on_behalf_of: str | None = None
 
     def __post_init__(self):
         """Validate configuration after initialization."""

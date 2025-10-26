@@ -139,7 +139,7 @@ client.delete_resource("Patient", "123")
 
 ### Search Operations
 
-#### `search_resources(resource_type, query=None, return_bundle=False) -> dict | FHIRBundle`
+#### `search_resources(resource_type, query=None, return_bundle=False, as_fhir=None) -> dict | FHIRBundle`
 
 Search for FHIR resources.
 
@@ -147,6 +147,7 @@ Search for FHIR resources.
 - `resource_type` (str): FHIR resource type to search
 - `query` (dict | list[tuple], optional): Search parameters
 - `return_bundle` (bool): Return FHIRBundle wrapper if True
+- `as_fhir` (Type[Model], optional): Pydantic model class for typed resources (only applies when return_bundle=True)
 
 **Returns**: dict or FHIRBundle
 
@@ -161,6 +162,11 @@ for entry in results.get("entry", []):
 bundle = client.search_resources("Patient", {"family": "Smith"}, return_bundle=True)
 for patient in bundle:
     print(patient["id"])
+
+# With type safety
+from pymedplum.fhir import Patient
+bundle = client.search_resources("Patient", {"family": "Smith"}, return_bundle=True, as_fhir=Patient)
+patients = bundle.get_resources_typed(Patient)
 ```
 
 #### `search_one(resource_type, query=None) -> dict | None`
@@ -187,17 +193,21 @@ Search resources with automatic pagination.
 **Parameters**:
 - `resource_type` (str): FHIR resource type
 - `query` (dict | list[tuple], optional): Search parameters
-- `as_fhir` (Type[Model], optional): Pydantic model class
+- `as_fhir` (Type[Model], optional): Pydantic model class for typed resources
 
 **Yields**: Individual resources from paginated results
 
 **Example**:
 ```python
-from pymedplum.fhir.observation import Observation
+from pymedplum.fhir import Observation
 
-# Iterate all results across pages
+# Iterate over dict resources
+for obs in client.search_resource_pages("Observation", {"patient": "Patient/123"}):
+    print(f"Observation {obs['id']}: {obs['status']}")
+
+# Type-safe iteration with Pydantic models
 for obs in client.search_resource_pages("Observation", {"patient": "Patient/123"}, as_fhir=Observation):
-    print(f"Observation {obs.id}: {obs.status}")
+    print(f"Observation {obs.id}: {obs.status}")  # Full IDE autocomplete!
 ```
 
 ### GraphQL

@@ -4,12 +4,12 @@ Simplifies working with FHIR search results and batch operations.
 """
 
 from collections.abc import Iterator
-from typing import Any, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
 
 
-class FHIRBundle:
+class FHIRBundle(Generic[T]):
     """Wrapper for FHIR Bundle resources with helper methods.
 
     Provides convenient access to Bundle entries and resources,
@@ -32,6 +32,7 @@ class FHIRBundle:
             raise ValueError(f"Expected Bundle, got {data.get('resourceType')}")
 
         self._data = data
+        self._resource_class: type[T] | None = None
 
     def get_resources(self) -> list[dict[str, Any]]:
         """Extract all resources from Bundle entries.
@@ -63,6 +64,7 @@ class FHIRBundle:
             >>> for patient in patients:
             ...     print(patient.name[0].given)  # Type-safe!
         """
+        self._resource_class = resource_class
         return [
             resource_class(**resource_dict) for resource_dict in self.get_resources()
         ]
@@ -105,7 +107,7 @@ class FHIRBundle:
         """Get Bundle links for pagination."""
         return self._data.get("link", [])
 
-    def get_next_link(self) -> Optional[str]:
+    def get_next_link(self) -> str | None:
         """Get next page URL for pagination.
 
         Returns:

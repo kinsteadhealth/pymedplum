@@ -6,8 +6,6 @@ configured to handle Medplum's server-specific metadata extensions.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, ConfigDict
 
 
@@ -32,7 +30,7 @@ class MedplumFHIRBase(BaseModel):
     )
 
     @property
-    def medplum_author(self) -> Optional[str]:
+    def medplum_author(self) -> str | None:
         """Access Medplum's author metadata field.
 
         The author field identifies who/what created or modified this resource.
@@ -63,7 +61,7 @@ class MedplumFHIRBase(BaseModel):
         return None
 
     @property
-    def medplum_project(self) -> Optional[str]:
+    def medplum_project(self) -> str | None:
         """Access Medplum's project metadata field.
 
         The project field identifies which Medplum project this resource belongs to.
@@ -82,7 +80,7 @@ class MedplumFHIRBase(BaseModel):
         return meta_data.get("project")
 
     @property
-    def medplum_compartment(self) -> Optional[list]:
+    def medplum_compartment(self) -> list | None:
         """Access Medplum's compartment metadata field.
 
         Compartments define access control boundaries for this resource.

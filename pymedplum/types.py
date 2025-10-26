@@ -1,6 +1,7 @@
-from typing import Any, Callable, Literal, Optional, TypedDict, Union
+from collections.abc import Callable
+from typing import Any, Literal, TypedDict
 
-QueryTypes = Union[str, dict[str, Any], list[tuple]]
+QueryTypes = str | dict[str, Any] | list[tuple]
 OrgMode = Literal["accounts", "extension"]
 
 DEFAULT_ORG_EXTENSION_URL = "https://medplum.com/fhir/StructureDefinition/organization"
@@ -9,10 +10,10 @@ DEFAULT_ORG_EXTENSION_URL = "https://medplum.com/fhir/StructureDefinition/organi
 class MedplumRequestOptions(TypedDict, total=False):
     """Request options for Medplum API calls."""
 
-    headers: Optional[dict[str, str]]
-    timeout: Optional[float]
-    org_mode: Optional[OrgMode]
-    org_ref: Optional[str]
+    headers: dict[str, str | None]
+    timeout: float | None
+    org_mode: OrgMode | None
+    org_ref: str | None
 
 
 class PatchOperation(TypedDict):
@@ -20,7 +21,7 @@ class PatchOperation(TypedDict):
 
     op: str  # 'add', 'remove', 'replace', 'copy', 'move', 'test'
     path: str
-    value: Optional[Any]
+    value: Any | None
 
 
 BeforeRequestCallback = Callable[[str, str, dict[str, str], dict[str, Any]], None]
