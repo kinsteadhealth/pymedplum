@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field
 
@@ -24,11 +24,11 @@ class DataRequirement(MedplumFHIRBase):
     data, and optional code or date-based filters of the data.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
@@ -36,40 +36,40 @@ class DataRequirement(MedplumFHIRBase):
         default=...,
         description="The type of the required data, specified as the type name of a resource. For profiles, this value is set to the type of the base resource of the profile.",
     )
-    profile: Optional[list[str]] = Field(
+    profile: list[str] | None = Field(
         default=None,
         description="The profile of the required data, specified as the uri of the profile definition.",
     )
-    subject_codeable_concept: Optional[CodeableConcept] = Field(
+    subject_codeable_concept: CodeableConcept | None = Field(
         default=None,
         alias="subjectCodeableConcept",
         description="The intended subjects of the data requirement. If this element is not provided, a Patient subject is assumed.",
     )
-    subject_reference: Optional[Reference] = Field(
+    subject_reference: Reference | None = Field(
         default=None,
         alias="subjectReference",
         description="The intended subjects of the data requirement. If this element is not provided, a Patient subject is assumed.",
     )
-    must_support: Optional[list[str]] = Field(
+    must_support: list[str] | None = Field(
         default=None,
         alias="mustSupport",
         description="Indicates that specific elements of the type are referenced by the knowledge module and must be supported by the consumer in order to obtain an effective evaluation. This does not mean that a value is required for this element, only that the consuming system must understand the element and be able to provide values for it if they are available. The value of mustSupport SHALL be a FHIRPath resolveable on the type of the DataRequirement. The path SHALL consist only of identifiers, constant indexers, and .resolve() (see the [Simple FHIRPath Profile](fhirpath.html#simple) for full details).",
     )
-    code_filter: Optional[list[DataRequirementCodeFilter]] = Field(
+    code_filter: list[DataRequirementCodeFilter] | None = Field(
         default=None,
         alias="codeFilter",
         description="Code filters specify additional constraints on the data, specifying the value set of interest for a particular element of the data. Each code filter defines an additional constraint on the data, i.e. code filters are AND'ed, not OR'ed.",
     )
-    date_filter: Optional[list[DataRequirementDateFilter]] = Field(
+    date_filter: list[DataRequirementDateFilter] | None = Field(
         default=None,
         alias="dateFilter",
         description="Date filters specify additional constraints on the data in terms of the applicable date range for specific elements. Each date filter specifies an additional constraint on the data, i.e. date filters are AND'ed, not OR'ed.",
     )
-    limit: Optional[Union[int, float]] = Field(
+    limit: int | float | None = Field(
         default=None,
         description="Specifies a maximum number of results that are required (uses the _count search parameter).",
     )
-    sort: Optional[list[DataRequirementSort]] = Field(
+    sort: list[DataRequirementSort] | None = Field(
         default=None, description="Specifies the order of the results to be returned."
     )
 
@@ -81,29 +81,29 @@ class DataRequirementCodeFilter(MedplumFHIRBase):
     are AND'ed, not OR'ed.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    path: Optional[str] = Field(
+    path: str | None = Field(
         default=None,
         description="The code-valued attribute of the filter. The specified path SHALL be a FHIRPath resolveable on the specified type of the DataRequirement, and SHALL consist only of identifiers, constant indexers, and .resolve(). The path is allowed to contain qualifiers (.) to traverse sub-elements, as well as indexers ([x]) to traverse multiple-cardinality sub-elements (see the [Simple FHIRPath Profile](fhirpath.html#simple) for full details). Note that the index must be an integer constant. The path must resolve to an element of type code, Coding, or CodeableConcept.",
     )
-    search_param: Optional[str] = Field(
+    search_param: str | None = Field(
         default=None,
         alias="searchParam",
         description="A token parameter that refers to a search parameter defined on the specified type of the DataRequirement, and which searches on elements of type code, Coding, or CodeableConcept.",
     )
-    value_set: Optional[str] = Field(
+    value_set: str | None = Field(
         default=None,
         alias="valueSet",
         description="The valueset for the code filter. The valueSet and code elements are additive. If valueSet is specified, the filter will return only those data items for which the value of the code-valued element specified in the path is a member of the specified valueset.",
     )
-    code: Optional[list[Coding]] = Field(
+    code: list[Coding] | None = Field(
         default=None,
         description="The codes for the code filter. If values are given, the filter will return only those data items for which the code-valued attribute specified by the path has a value that is one of the specified codes. If codes are specified in addition to a value set, the filter returns items matching a code in the value set or one of the specified codes.",
     )
@@ -116,34 +116,34 @@ class DataRequirementDateFilter(MedplumFHIRBase):
     OR'ed.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    path: Optional[str] = Field(
+    path: str | None = Field(
         default=None,
         description="The date-valued attribute of the filter. The specified path SHALL be a FHIRPath resolveable on the specified type of the DataRequirement, and SHALL consist only of identifiers, constant indexers, and .resolve(). The path is allowed to contain qualifiers (.) to traverse sub-elements, as well as indexers ([x]) to traverse multiple-cardinality sub-elements (see the [Simple FHIRPath Profile](fhirpath.html#simple) for full details). Note that the index must be an integer constant. The path must resolve to an element of type date, dateTime, Period, Schedule, or Timing.",
     )
-    search_param: Optional[str] = Field(
+    search_param: str | None = Field(
         default=None,
         alias="searchParam",
         description="A date parameter that refers to a search parameter defined on the specified type of the DataRequirement, and which searches on elements of type date, dateTime, Period, Schedule, or Timing.",
     )
-    value_date_time: Optional[str] = Field(
+    value_date_time: str | None = Field(
         default=None,
         alias="valueDateTime",
         description="The value of the filter. If period is specified, the filter will return only those data items that fall within the bounds determined by the Period, inclusive of the period boundaries. If dateTime is specified, the filter will return only those data items that are equal to the specified dateTime. If a Duration is specified, the filter will return only those data items that fall within Duration before now.",
     )
-    value_period: Optional[Period] = Field(
+    value_period: Period | None = Field(
         default=None,
         alias="valuePeriod",
         description="The value of the filter. If period is specified, the filter will return only those data items that fall within the bounds determined by the Period, inclusive of the period boundaries. If dateTime is specified, the filter will return only those data items that are equal to the specified dateTime. If a Duration is specified, the filter will return only those data items that fall within Duration before now.",
     )
-    value_duration: Optional[Duration] = Field(
+    value_duration: Duration | None = Field(
         default=None,
         alias="valueDuration",
         description="The value of the filter. If period is specified, the filter will return only those data items that fall within the bounds determined by the Period, inclusive of the period boundaries. If dateTime is specified, the filter will return only those data items that are equal to the specified dateTime. If a Duration is specified, the filter will return only those data items that fall within Duration before now.",
@@ -153,11 +153,11 @@ class DataRequirementDateFilter(MedplumFHIRBase):
 class DataRequirementSort(MedplumFHIRBase):
     """Specifies the order of the results to be returned."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )

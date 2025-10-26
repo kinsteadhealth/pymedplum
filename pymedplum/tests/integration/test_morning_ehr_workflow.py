@@ -137,7 +137,7 @@ def test_01_review_todays_schedule(
     try:
         # Schedule appointments for the morning
         for _i, (patient, start_time, (type_display, type_code)) in enumerate(
-            zip(morning_patients, appointment_times, appointment_types)
+            zip(morning_patients, appointment_times, appointment_types, strict=True)
         ):
             appointment = Appointment(
                 status="booked",

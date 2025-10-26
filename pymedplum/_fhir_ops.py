@@ -3,18 +3,18 @@
 This module is not part of the public API and is subject to change.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 
 def build_valueset_validate_params(
-    valueset_url: Optional[str] = None,
-    valueset_id: Optional[str] = None,  # noqa: ARG001 - Reserved for future use
-    code: Optional[str] = None,
-    system: Optional[str] = None,
-    coding: Optional[dict[str, Any]] = None,
-    codeable_concept: Optional[dict[str, Any]] = None,
-    display: Optional[str] = None,
-    abstract: Optional[bool] = None,
+    valueset_url: str | None = None,
+    valueset_id: str | None = None,  # noqa: ARG001 - Reserved for future use
+    code: str | None = None,
+    system: str | None = None,
+    coding: dict[str, Any | None] | None = None,
+    codeable_concept: dict[str, Any | None] | None = None,
+    display: str | None = None,
+    abstract: bool | None = None,
 ) -> dict[str, Any]:
     """Build Parameters resource for ValueSet/$validate-code operation.
 
@@ -64,11 +64,11 @@ def build_valueset_validate_params(
 
 
 def build_codesystem_validate_params(
-    codesystem_url: Optional[str] = None,
-    codesystem_id: Optional[str] = None,  # noqa: ARG001 - Reserved for future use
-    code: Optional[str] = None,
-    coding: Optional[dict[str, Any]] = None,
-    version: Optional[str] = None,
+    codesystem_url: str | None = None,
+    codesystem_id: str | None = None,  # noqa: ARG001 - Reserved for future use
+    code: str | None = None,
+    coding: dict[str, Any | None] | None = None,
+    version: str | None = None,
 ) -> dict[str, Any]:
     """Build Parameters resource for CodeSystem/$validate-code operation.
 

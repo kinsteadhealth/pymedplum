@@ -1,10 +1,12 @@
 """Type stubs for pymedplum.fhir module.
+This is a generated file.
+Do not edit it manually
 
 This stub file provides full type information to IDEs and type checkers
 without the runtime cost of importing all FHIR models.
 """
 
-from typing import overload
+from typing import Any
 
 from pymedplum.fhir.accesspolicy import (
     AccessPolicy,
@@ -1590,8 +1592,7 @@ Resource = (
 )
 
 # Stub for runtime lazy loader
-@overload
-def __getattr__(name: str) -> type[Resource]: ...
+def __getattr__(name: str) -> Any: ...
 
 # Introspection support
 def __dir__() -> list[str]: ...

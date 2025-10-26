@@ -1,23 +1,24 @@
 import random
 import time
 from collections.abc import Iterator
-from typing import Any, Literal, Optional, TypeVar, Union, overload
+from typing import Any, Literal, TypeVar, overload
 
 import httpx
 
 from ._base import BaseClient, OnBehalfOfContext, _raise_or_json
 from .bundle import FHIRBundle
 from .exceptions import MedplumError
+from .fhir.base import MedplumFHIRBase
 from .helpers import decode_jwt_exp, to_fhir_json
 from .types import OrgMode, PatchOperation, QueryTypes
 
-T = TypeVar("T")
+ResourceT = TypeVar("ResourceT", bound=MedplumFHIRBase)
 
 
 class MedplumClient(BaseClient):
     """Synchronous Medplum client with retry logic and production features"""
 
-    def __init__(self, http_client: Optional[httpx.Client] = None, **kwargs):
+    def __init__(self, http_client: httpx.Client | None = None, **kwargs):
         super().__init__(**kwargs)
 
         if http_client:
@@ -66,7 +67,7 @@ class MedplumClient(BaseClient):
 
         return self.access_token
 
-    def _request(self, method: str, url: str, **kwargs) -> Optional[dict[str, Any]]:
+    def _request(self, method: str, url: str, **kwargs) -> dict[str, Any] | None:
         """Make HTTP request with retry logic and OperationOutcome handling.
 
         Args:
@@ -127,7 +128,7 @@ class MedplumClient(BaseClient):
 
         raise MedplumError("Request failed after retries")
 
-    def on_behalf_of(self, membership: Union[str, Any]) -> OnBehalfOfContext:
+    def on_behalf_of(self, membership: str | Any) -> OnBehalfOfContext:
         """Create context manager for on-behalf-of operations.
 
         Example:
@@ -144,9 +145,9 @@ class MedplumClient(BaseClient):
 
     def create_resource(
         self,
-        resource: Union[dict[str, Any], Any],
-        org_mode: Optional[OrgMode] = None,
-        org_ref: Optional[str] = None,
+        resource: dict[str, Any] | Any,
+        org_mode: OrgMode | None = None,
+        org_ref: str | None = None,
     ) -> dict[str, Any]:
         """Create a FHIR resource.
 
@@ -170,8 +171,8 @@ class MedplumClient(BaseClient):
 
     @overload
     def read_resource(
-        self, resource_type: str, resource_id: str, as_fhir: type[T]
-    ) -> T: ...
+        self, resource_type: str, resource_id: str, as_fhir: type[ResourceT]
+    ) -> ResourceT: ...
 
     @overload
     def read_resource(
@@ -179,8 +180,11 @@ class MedplumClient(BaseClient):
     ) -> dict[str, Any]: ...  # type: ignore[overload-cannot-match]
 
     def read_resource(
-        self, resource_type: str, resource_id: str, as_fhir: Optional[type[T]] = None
-    ) -> Union[T, dict[str, Any]]:
+        self,
+        resource_type: str,
+        resource_id: str,
+        as_fhir: type[ResourceT] | None = None,
+    ) -> ResourceT | dict[str, Any]:
         """Read a FHIR resource by type and ID.
 
         Args:
@@ -192,13 +196,13 @@ class MedplumClient(BaseClient):
             Typed resource if as_fhir provided, else dict
 
         Examples:
-            # Dict (backward compatible)
+            # Get resource as dict
             patient_dict = client.read_resource("Patient", "123")
 
-            # Typed (new)
+            # Type-safe access with Pydantic models
             from pymedplum.fhir import Patient
             patient = client.read_resource("Patient", "123", as_fhir=Patient)
-            print(patient.name[0].given)  # Full type safety!
+            print(patient.name[0].given)  # Full IDE autocomplete and type checking!
         """
         response = self._request(
             "GET", f"{self.fhir_base_url}{resource_type}/{resource_id}"
@@ -211,9 +215,9 @@ class MedplumClient(BaseClient):
 
     def update_resource(
         self,
-        resource: Union[dict[str, Any], Any],
-        org_mode: Optional[OrgMode] = None,
-        org_ref: Optional[str] = None,
+        resource: dict[str, Any] | Any,
+        org_mode: OrgMode | None = None,
+        org_ref: str | None = None,
     ) -> dict[str, Any]:
         """Update a FHIR resource (requires id).
 
@@ -255,46 +259,59 @@ class MedplumClient(BaseClient):
     def search_resources(
         self,
         resource_type: str,
-        query: Optional[QueryTypes] = None,
+        query: QueryTypes | None = None,
         return_bundle: Literal[False] = False,
+        as_fhir: None = None,
     ) -> dict[str, Any]: ...
 
     @overload
     def search_resources(
         self,
         resource_type: str,
-        query: Optional[QueryTypes] = None,
+        query: QueryTypes | None = None,
         return_bundle: Literal[True] = ...,
-    ) -> FHIRBundle: ...
+        as_fhir: None = None,
+    ) -> FHIRBundle[dict[str, Any]]: ...
+
+    @overload
+    def search_resources(
+        self,
+        resource_type: str,
+        query: QueryTypes | None = None,
+        return_bundle: Literal[True] = ...,
+        as_fhir: type[ResourceT] = ...,
+    ) -> FHIRBundle[ResourceT]: ...
 
     def search_resources(
         self,
         resource_type: str,
-        query: Optional[QueryTypes] = None,
+        query: QueryTypes | None = None,
         return_bundle: bool = False,
-    ) -> Union[FHIRBundle, dict[str, Any]]:
+        as_fhir: type[ResourceT] | None = None,
+    ) -> FHIRBundle[ResourceT] | FHIRBundle[dict[str, Any]] | dict[str, Any]:
         """Search for FHIR resources.
 
         Args:
             resource_type: FHIR resource type
             query: Search parameters
             return_bundle: If True, wrap in FHIRBundle helper
+            as_fhir: Optional FHIR resource class for typed response (only applies when return_bundle=True)
 
         Returns:
             FHIRBundle wrapper, or raw dict
 
         Examples:
-            # Raw dict (backward compatible)
+            # Get raw Bundle dict
             bundle_dict = client.search_resources("Patient", {"family": "Smith"})
 
-            # FHIRBundle wrapper
+            # Use FHIRBundle wrapper for convenience methods
             bundle = client.search_resources("Patient", {}, return_bundle=True)
             for patient in bundle:
                 print(patient['name'])
 
-            # With typing
+            # Type-safe access with Pydantic models
             from pymedplum.fhir import Patient
-            bundle = client.search_resources("Patient", {}, return_bundle=True)
+            bundle = client.search_resources("Patient", {}, return_bundle=True, as_fhir=Patient)
             patients = bundle.get_resources_typed(Patient)
         """
         params = self._build_query_params(query)
@@ -303,13 +320,16 @@ class MedplumClient(BaseClient):
         )
 
         if return_bundle:
-            return FHIRBundle(response)
+            bundle: FHIRBundle[Any] = FHIRBundle(response)
+            if as_fhir:
+                bundle._resource_class = as_fhir
+            return bundle
 
         return response
 
     def search_one(
-        self, resource_type: str, query: Optional[QueryTypes] = None
-    ) -> Optional[dict[str, Any]]:
+        self, resource_type: str, query: QueryTypes | None = None
+    ) -> dict[str, Any] | None:
         """Search for a single resource (limit 1).
 
         Args:
@@ -322,9 +342,10 @@ class MedplumClient(BaseClient):
         params = self._build_query_params(query)
         params.append(("_count", "1"))
 
-        bundle = self._request(
+        bundle: dict[str, Any] | None = self._request(
             "GET", f"{self.fhir_base_url}{resource_type}", params=params
         )
+        assert bundle is not None
         entries = bundle.get("entry", [])
 
         if entries and "resource" in entries[0]:
@@ -332,19 +353,43 @@ class MedplumClient(BaseClient):
         return None
 
     def search_resource_pages(
-        self, resource_type: str, query: Optional[QueryTypes] = None
-    ) -> Iterator[dict[str, Any]]:
+        self,
+        resource_type: str,
+        query: QueryTypes | None = None,
+        as_fhir: type[ResourceT] | None = None,
+    ) -> Iterator[ResourceT | dict[str, Any]]:
         """Search resources with automatic pagination.
+
+        Args:
+            resource_type: FHIR resource type
+            query: Search parameters
+            as_fhir: Optional FHIR resource class for typed response
 
         Yields:
             Individual resources from paginated results
+
+        Examples:
+            # Iterate over dict resources
+            for patient in client.search_resource_pages("Patient", {"family": "Smith"}):
+                print(patient['name'])
+
+            # Type-safe iteration with Pydantic models
+            from pymedplum.fhir import Patient
+            for patient in client.search_resource_pages("Patient", {"family": "Smith"}, as_fhir=Patient):
+                print(patient.name[0].given)  # Full type safety and IDE autocomplete!
         """
-        bundle = self.search_resources(resource_type, query)
+        bundle_response = self.search_resources(resource_type, query)
+        assert isinstance(bundle_response, dict)
+        bundle: dict[str, Any] | None = bundle_response
 
         while bundle:
             for entry in bundle.get("entry", []):
                 if "resource" in entry:
-                    yield entry["resource"]
+                    resource = entry["resource"]
+                    if as_fhir:
+                        yield as_fhir(**resource)
+                    else:
+                        yield resource
 
             next_url = None
             for link in bundle.get("link", []):
@@ -358,7 +403,7 @@ class MedplumClient(BaseClient):
             bundle = self._request("GET", next_url)
 
     def execute_graphql(
-        self, query: str, variables: Optional[dict] = None
+        self, query: str, variables: dict | None = None
     ) -> dict[str, Any]:
         """Execute a GraphQL query"""
         return self._request(
@@ -369,9 +414,9 @@ class MedplumClient(BaseClient):
 
     def execute_batch(
         self,
-        bundle: Union[dict[str, Any], Any],
-        org_mode: Optional[OrgMode] = None,
-        org_ref: Optional[str] = None,
+        bundle: dict[str, Any] | Any,
+        org_mode: OrgMode | None = None,
+        org_ref: str | None = None,
     ) -> dict[str, Any]:
         """Execute a FHIR batch/transaction bundle.
 
@@ -461,11 +506,11 @@ class MedplumClient(BaseClient):
         first_name: str,
         last_name: str,
         email: str,
-        password: Optional[str] = None,
+        password: str | None = None,
         send_email: bool = True,
         admin: bool = False,
         scope: str = "project",
-        access_policy: Optional[str] = None,
+        access_policy: str | None = None,
     ) -> dict[str, Any]:
         """Invite a user to a project, creating User, profile, and ProjectMembership.
 
@@ -552,14 +597,14 @@ class MedplumClient(BaseClient):
 
     def validate_valueset_code(
         self,
-        valueset_url: Optional[str] = None,
-        valueset_id: Optional[str] = None,
-        code: Optional[str] = None,
-        system: Optional[str] = None,
-        coding: Optional[dict] = None,
-        codeable_concept: Optional[dict] = None,
-        display: Optional[str] = None,
-        abstract: Optional[bool] = None,
+        valueset_url: str | None = None,
+        valueset_id: str | None = None,
+        code: str | None = None,
+        system: str | None = None,
+        coding: dict | None = None,
+        codeable_concept: dict | None = None,
+        display: str | None = None,
+        abstract: bool | None = None,
     ) -> dict[str, Any]:
         """Validate if a code is in a ValueSet.
 
@@ -612,11 +657,11 @@ class MedplumClient(BaseClient):
 
     def validate_codesystem_code(
         self,
-        codesystem_url: Optional[str] = None,
-        codesystem_id: Optional[str] = None,
-        code: Optional[str] = None,
-        coding: Optional[dict] = None,
-        version: Optional[str] = None,
+        codesystem_url: str | None = None,
+        codesystem_id: str | None = None,
+        code: str | None = None,
+        coding: dict | None = None,
+        version: str | None = None,
     ) -> dict[str, Any]:
         """Validate if a code exists in a CodeSystem.
 
@@ -660,7 +705,7 @@ class MedplumClient(BaseClient):
 
         return self._request("POST", endpoint, json=params_resource)
 
-    def execute_transaction(self, bundle: Union[dict, Any]) -> dict[str, Any]:
+    def execute_transaction(self, bundle: dict | Any) -> dict[str, Any]:
         """Execute a transaction bundle atomically.
 
         All operations in a transaction bundle succeed or fail together.
@@ -776,8 +821,8 @@ class MedplumClient(BaseClient):
         binary_id: str,
         content_type: str,
         title: str,
-        description: Optional[str] = None,
-        doc_type_code: Optional[dict] = None,
+        description: str | None = None,
+        doc_type_code: dict | None = None,
     ) -> dict[str, Any]:
         """Create a DocumentReference pointing to binary content.
 

@@ -8,7 +8,7 @@ import base64
 import copy
 import json
 from datetime import datetime, timezone
-from typing import Any, Optional, Union
+from typing import Any
 
 
 def parse_reference(reference: str) -> tuple[str, str]:
@@ -99,7 +99,7 @@ def get_patient_display_name(patient: dict[str, Any]) -> str:
     return " ".join(parts) if parts else "Unknown"
 
 
-def extract_identifier(resource: dict[str, Any], system: str) -> Optional[str]:
+def extract_identifier(resource: dict[str, Any], system: str) -> str | None:
     """Extract an identifier value by system URI.
 
     Args:
@@ -127,7 +127,7 @@ def extract_identifier(resource: dict[str, Any], system: str) -> Optional[str]:
     return None
 
 
-def get_code_display(codeable_concept: dict[str, Any]) -> Optional[str]:
+def get_code_display(codeable_concept: dict[str, Any]) -> str | None:
     """Extract display text from a CodeableConcept.
 
     Args:
@@ -156,7 +156,7 @@ def get_code_display(codeable_concept: dict[str, Any]) -> Optional[str]:
     return None
 
 
-def to_fhir_json(resource: Union[dict[str, Any], Any]) -> dict[str, Any]:
+def to_fhir_json(resource: dict[str | Any, Any]) -> dict[str, Any]:
     """Convert a resource to FHIR JSON format.
 
     Handles both dict resources and Pydantic models.
@@ -246,7 +246,7 @@ def to_portable(
     return result
 
 
-def decode_jwt_exp(token: str) -> Optional[datetime]:
+def decode_jwt_exp(token: str) -> datetime | None:
     """Decode JWT token and extract expiration time.
 
     Args:

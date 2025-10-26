@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field
 
@@ -48,15 +48,15 @@ if TYPE_CHECKING:
 class ElementDefinition(MedplumFHIRBase):
     """Captures constraints on each element within the resource, profile, or extension."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    modifier_extension: Optional[list[Extension]] = Field(
+    modifier_extension: list[Extension] | None = Field(
         default=None,
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the element and that modifies the understanding of the element in which it is contained and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
@@ -65,967 +65,967 @@ class ElementDefinition(MedplumFHIRBase):
         default=...,
         description="The path identifies the element and is expressed as a &quot;.&quot;-separated list of ancestor elements, beginning with the name of the resource or extension.",
     )
-    representation: Optional[
-        list[Literal["xmlAttr", "xmlText", "typeAttr", "cdaText", "xhtml"]]
-    ] = Field(
+    representation: (
+        list[Literal["xmlAttr", "xmlText", "typeAttr", "cdaText", "xhtml"]] | None
+    ) = Field(
         default=None,
         description="Codes that define how this element is represented in instances, when the deviation varies from the normal case.",
     )
-    slice_name: Optional[str] = Field(
+    slice_name: str | None = Field(
         default=None,
         alias="sliceName",
         description="The name of this element definition slice, when slicing is working. The name must be a token with no dots or spaces. This is a unique name referring to a specific set of constraints applied to this element, used to provide a name to different slices of the same element.",
     )
-    slice_is_constraining: Optional[bool] = Field(
+    slice_is_constraining: bool | None = Field(
         default=None,
         alias="sliceIsConstraining",
         description="If true, indicates that this slice definition is constraining a slice definition with the same name in an inherited profile. If false, the slice is not overriding any slice in an inherited profile. If missing, the slice might or might not be overriding a slice in an inherited profile, depending on the sliceName.",
     )
-    label: Optional[str] = Field(
+    label: str | None = Field(
         default=None,
         description="A single preferred label which is the text to display beside the element indicating its meaning or to use to prompt for the element in a user display or form.",
     )
-    code: Optional[list[Coding]] = Field(
+    code: list[Coding] | None = Field(
         default=None,
         description="A code that has the same meaning as the element in a particular terminology.",
     )
-    slicing: Optional[ElementDefinitionSlicing] = Field(
+    slicing: ElementDefinitionSlicing | None = Field(
         default=None,
         description="Indicates that the element is sliced into a set of alternative definitions (i.e. in a structure definition, there are multiple different constraints on a single element in the base resource). Slicing can be used in any resource that has cardinality ..* on the base resource, or any resource with a choice of types. The set of slices is any elements that come after this in the element sequence that have the same path, until a shorter path occurs (the shorter path terminates the set).",
     )
-    short: Optional[str] = Field(
+    short: str | None = Field(
         default=None,
         description="A concise description of what this element means (e.g. for use in autogenerated summaries).",
     )
-    definition: Optional[str] = Field(
+    definition: str | None = Field(
         default=None,
         description="Provides a complete explanation of the meaning of the data element for human readability. For the case of elements derived from existing elements (e.g. constraints), the definition SHALL be consistent with the base definition, but convey the meaning of the element in the particular context of use of the resource. (Note: The text you are reading is specified in ElementDefinition.definition).",
     )
-    comment: Optional[str] = Field(
+    comment: str | None = Field(
         default=None,
         description="Explanatory notes and implementation guidance about the data element, including notes about how to use the data properly, exceptions to proper use, etc. (Note: The text you are reading is specified in ElementDefinition.comment).",
     )
-    requirements: Optional[str] = Field(
+    requirements: str | None = Field(
         default=None,
         description="This element is for traceability of why the element was created and why the constraints exist as they do. This may be used to point to source materials or specifications that drove the structure of this element.",
     )
-    alias: Optional[list[str]] = Field(
+    alias: list[str] | None = Field(
         default=None,
         description="Identifies additional names by which this element might also be known.",
     )
-    min: Optional[Union[int, float]] = Field(
+    min: int | float | None = Field(
         default=None,
         description="The minimum number of times this element SHALL appear in the instance.",
     )
-    max: Optional[str] = Field(
+    max: str | None = Field(
         default=None,
         description="The maximum number of times this element is permitted to appear in the instance.",
     )
-    base: Optional[ElementDefinitionBase] = Field(
+    base: ElementDefinitionBase | None = Field(
         default=None,
         description="Information about the base definition of the element, provided to make it unnecessary for tools to trace the deviation of the element through the derived and related profiles. When the element definition is not the original definition of an element - i.g. either in a constraint on another type, or for elements from a super type in a snap shot - then the information in provided in the element definition may be different to the base definition. On the original definition of the element, it will be same.",
     )
-    content_reference: Optional[str] = Field(
+    content_reference: str | None = Field(
         default=None,
         alias="contentReference",
         description="Identifies an element defined elsewhere in the definition whose content rules should be applied to the current element. ContentReferences bring across all the rules that are in the ElementDefinition for the element, including definitions, cardinality constraints, bindings, invariants etc.",
     )
-    type: Optional[list[ElementDefinitionType]] = Field(
+    type: list[ElementDefinitionType] | None = Field(
         default=None,
         description="The data type or resource that the value of this element is permitted to be.",
     )
-    default_value_base64_binary: Optional[str] = Field(
+    default_value_base64_binary: str | None = Field(
         default=None,
         alias="defaultValueBase64Binary",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_boolean: Optional[bool] = Field(
+    default_value_boolean: bool | None = Field(
         default=None,
         alias="defaultValueBoolean",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_canonical: Optional[str] = Field(
+    default_value_canonical: str | None = Field(
         default=None,
         alias="defaultValueCanonical",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_code: Optional[str] = Field(
+    default_value_code: str | None = Field(
         default=None,
         alias="defaultValueCode",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_date: Optional[str] = Field(
+    default_value_date: str | None = Field(
         default=None,
         alias="defaultValueDate",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_date_time: Optional[str] = Field(
+    default_value_date_time: str | None = Field(
         default=None,
         alias="defaultValueDateTime",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_decimal: Optional[Union[int, float]] = Field(
+    default_value_decimal: int | float | None = Field(
         default=None,
         alias="defaultValueDecimal",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_id: Optional[str] = Field(
+    default_value_id: str | None = Field(
         default=None,
         alias="defaultValueId",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_instant: Optional[str] = Field(
+    default_value_instant: str | None = Field(
         default=None,
         alias="defaultValueInstant",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_integer: Optional[Union[int, float]] = Field(
+    default_value_integer: int | float | None = Field(
         default=None,
         alias="defaultValueInteger",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_markdown: Optional[str] = Field(
+    default_value_markdown: str | None = Field(
         default=None,
         alias="defaultValueMarkdown",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_oid: Optional[str] = Field(
+    default_value_oid: str | None = Field(
         default=None,
         alias="defaultValueOid",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_positive_int: Optional[Union[int, float]] = Field(
+    default_value_positive_int: int | float | None = Field(
         default=None,
         alias="defaultValuePositiveInt",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_string: Optional[str] = Field(
+    default_value_string: str | None = Field(
         default=None,
         alias="defaultValueString",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_time: Optional[str] = Field(
+    default_value_time: str | None = Field(
         default=None,
         alias="defaultValueTime",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_unsigned_int: Optional[Union[int, float]] = Field(
+    default_value_unsigned_int: int | float | None = Field(
         default=None,
         alias="defaultValueUnsignedInt",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_uri: Optional[str] = Field(
+    default_value_uri: str | None = Field(
         default=None,
         alias="defaultValueUri",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_url: Optional[str] = Field(
+    default_value_url: str | None = Field(
         default=None,
         alias="defaultValueUrl",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_uuid: Optional[str] = Field(
+    default_value_uuid: str | None = Field(
         default=None,
         alias="defaultValueUuid",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_address: Optional[Address] = Field(
+    default_value_address: Address | None = Field(
         default=None,
         alias="defaultValueAddress",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_age: Optional[Age] = Field(
+    default_value_age: Age | None = Field(
         default=None,
         alias="defaultValueAge",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_annotation: Optional[Annotation] = Field(
+    default_value_annotation: Annotation | None = Field(
         default=None,
         alias="defaultValueAnnotation",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_attachment: Optional[Attachment] = Field(
+    default_value_attachment: Attachment | None = Field(
         default=None,
         alias="defaultValueAttachment",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_codeable_concept: Optional[CodeableConcept] = Field(
+    default_value_codeable_concept: CodeableConcept | None = Field(
         default=None,
         alias="defaultValueCodeableConcept",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_coding: Optional[Coding] = Field(
+    default_value_coding: Coding | None = Field(
         default=None,
         alias="defaultValueCoding",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_contact_point: Optional[ContactPoint] = Field(
+    default_value_contact_point: ContactPoint | None = Field(
         default=None,
         alias="defaultValueContactPoint",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_count: Optional[Count] = Field(
+    default_value_count: Count | None = Field(
         default=None,
         alias="defaultValueCount",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_distance: Optional[Distance] = Field(
+    default_value_distance: Distance | None = Field(
         default=None,
         alias="defaultValueDistance",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_duration: Optional[Duration] = Field(
+    default_value_duration: Duration | None = Field(
         default=None,
         alias="defaultValueDuration",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_human_name: Optional[HumanName] = Field(
+    default_value_human_name: HumanName | None = Field(
         default=None,
         alias="defaultValueHumanName",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_identifier: Optional[Identifier] = Field(
+    default_value_identifier: Identifier | None = Field(
         default=None,
         alias="defaultValueIdentifier",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_money: Optional[Money] = Field(
+    default_value_money: Money | None = Field(
         default=None,
         alias="defaultValueMoney",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_period: Optional[Period] = Field(
+    default_value_period: Period | None = Field(
         default=None,
         alias="defaultValuePeriod",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_quantity: Optional[Quantity] = Field(
+    default_value_quantity: Quantity | None = Field(
         default=None,
         alias="defaultValueQuantity",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_range: Optional[Range] = Field(
+    default_value_range: Range | None = Field(
         default=None,
         alias="defaultValueRange",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_ratio: Optional[Ratio] = Field(
+    default_value_ratio: Ratio | None = Field(
         default=None,
         alias="defaultValueRatio",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_reference: Optional[Reference] = Field(
+    default_value_reference: Reference | None = Field(
         default=None,
         alias="defaultValueReference",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_sampled_data: Optional[SampledData] = Field(
+    default_value_sampled_data: SampledData | None = Field(
         default=None,
         alias="defaultValueSampledData",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_signature: Optional[Signature] = Field(
+    default_value_signature: Signature | None = Field(
         default=None,
         alias="defaultValueSignature",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_timing: Optional[Timing] = Field(
+    default_value_timing: Timing | None = Field(
         default=None,
         alias="defaultValueTiming",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_contact_detail: Optional[ContactDetail] = Field(
+    default_value_contact_detail: ContactDetail | None = Field(
         default=None,
         alias="defaultValueContactDetail",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_contributor: Optional[Contributor] = Field(
+    default_value_contributor: Contributor | None = Field(
         default=None,
         alias="defaultValueContributor",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_data_requirement: Optional[DataRequirement] = Field(
+    default_value_data_requirement: DataRequirement | None = Field(
         default=None,
         alias="defaultValueDataRequirement",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_expression: Optional[Expression] = Field(
+    default_value_expression: Expression | None = Field(
         default=None,
         alias="defaultValueExpression",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_parameter_definition: Optional[ParameterDefinition] = Field(
+    default_value_parameter_definition: ParameterDefinition | None = Field(
         default=None,
         alias="defaultValueParameterDefinition",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_related_artifact: Optional[RelatedArtifact] = Field(
+    default_value_related_artifact: RelatedArtifact | None = Field(
         default=None,
         alias="defaultValueRelatedArtifact",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_trigger_definition: Optional[TriggerDefinition] = Field(
+    default_value_trigger_definition: TriggerDefinition | None = Field(
         default=None,
         alias="defaultValueTriggerDefinition",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_usage_context: Optional[UsageContext] = Field(
+    default_value_usage_context: UsageContext | None = Field(
         default=None,
         alias="defaultValueUsageContext",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_dosage: Optional[Dosage] = Field(
+    default_value_dosage: Dosage | None = Field(
         default=None,
         alias="defaultValueDosage",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_meta: Optional[Meta] = Field(
+    default_value_meta: Meta | None = Field(
         default=None,
         alias="defaultValueMeta",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    meaning_when_missing: Optional[str] = Field(
+    meaning_when_missing: str | None = Field(
         default=None,
         alias="meaningWhenMissing",
         description="The Implicit meaning that is to be understood when this element is missing (e.g. 'when this element is missing, the period is ongoing').",
     )
-    order_meaning: Optional[str] = Field(
+    order_meaning: str | None = Field(
         default=None,
         alias="orderMeaning",
         description="If present, indicates that the order of the repeating element has meaning and describes what that meaning is. If absent, it means that the order of the element has no meaning.",
     )
-    fixed_base64_binary: Optional[str] = Field(
+    fixed_base64_binary: str | None = Field(
         default=None,
         alias="fixedBase64Binary",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_boolean: Optional[bool] = Field(
+    fixed_boolean: bool | None = Field(
         default=None,
         alias="fixedBoolean",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_canonical: Optional[str] = Field(
+    fixed_canonical: str | None = Field(
         default=None,
         alias="fixedCanonical",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_code: Optional[str] = Field(
+    fixed_code: str | None = Field(
         default=None,
         alias="fixedCode",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_date: Optional[str] = Field(
+    fixed_date: str | None = Field(
         default=None,
         alias="fixedDate",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_date_time: Optional[str] = Field(
+    fixed_date_time: str | None = Field(
         default=None,
         alias="fixedDateTime",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_decimal: Optional[Union[int, float]] = Field(
+    fixed_decimal: int | float | None = Field(
         default=None,
         alias="fixedDecimal",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_id: Optional[str] = Field(
+    fixed_id: str | None = Field(
         default=None,
         alias="fixedId",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_instant: Optional[str] = Field(
+    fixed_instant: str | None = Field(
         default=None,
         alias="fixedInstant",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_integer: Optional[Union[int, float]] = Field(
+    fixed_integer: int | float | None = Field(
         default=None,
         alias="fixedInteger",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_markdown: Optional[str] = Field(
+    fixed_markdown: str | None = Field(
         default=None,
         alias="fixedMarkdown",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_oid: Optional[str] = Field(
+    fixed_oid: str | None = Field(
         default=None,
         alias="fixedOid",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_positive_int: Optional[Union[int, float]] = Field(
+    fixed_positive_int: int | float | None = Field(
         default=None,
         alias="fixedPositiveInt",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_string: Optional[str] = Field(
+    fixed_string: str | None = Field(
         default=None,
         alias="fixedString",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_time: Optional[str] = Field(
+    fixed_time: str | None = Field(
         default=None,
         alias="fixedTime",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_unsigned_int: Optional[Union[int, float]] = Field(
+    fixed_unsigned_int: int | float | None = Field(
         default=None,
         alias="fixedUnsignedInt",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_uri: Optional[str] = Field(
+    fixed_uri: str | None = Field(
         default=None,
         alias="fixedUri",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_url: Optional[str] = Field(
+    fixed_url: str | None = Field(
         default=None,
         alias="fixedUrl",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_uuid: Optional[str] = Field(
+    fixed_uuid: str | None = Field(
         default=None,
         alias="fixedUuid",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_address: Optional[Address] = Field(
+    fixed_address: Address | None = Field(
         default=None,
         alias="fixedAddress",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_age: Optional[Age] = Field(
+    fixed_age: Age | None = Field(
         default=None,
         alias="fixedAge",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_annotation: Optional[Annotation] = Field(
+    fixed_annotation: Annotation | None = Field(
         default=None,
         alias="fixedAnnotation",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_attachment: Optional[Attachment] = Field(
+    fixed_attachment: Attachment | None = Field(
         default=None,
         alias="fixedAttachment",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_codeable_concept: Optional[CodeableConcept] = Field(
+    fixed_codeable_concept: CodeableConcept | None = Field(
         default=None,
         alias="fixedCodeableConcept",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_coding: Optional[Coding] = Field(
+    fixed_coding: Coding | None = Field(
         default=None,
         alias="fixedCoding",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_contact_point: Optional[ContactPoint] = Field(
+    fixed_contact_point: ContactPoint | None = Field(
         default=None,
         alias="fixedContactPoint",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_count: Optional[Count] = Field(
+    fixed_count: Count | None = Field(
         default=None,
         alias="fixedCount",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_distance: Optional[Distance] = Field(
+    fixed_distance: Distance | None = Field(
         default=None,
         alias="fixedDistance",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_duration: Optional[Duration] = Field(
+    fixed_duration: Duration | None = Field(
         default=None,
         alias="fixedDuration",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_human_name: Optional[HumanName] = Field(
+    fixed_human_name: HumanName | None = Field(
         default=None,
         alias="fixedHumanName",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_identifier: Optional[Identifier] = Field(
+    fixed_identifier: Identifier | None = Field(
         default=None,
         alias="fixedIdentifier",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_money: Optional[Money] = Field(
+    fixed_money: Money | None = Field(
         default=None,
         alias="fixedMoney",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_period: Optional[Period] = Field(
+    fixed_period: Period | None = Field(
         default=None,
         alias="fixedPeriod",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_quantity: Optional[Quantity] = Field(
+    fixed_quantity: Quantity | None = Field(
         default=None,
         alias="fixedQuantity",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_range: Optional[Range] = Field(
+    fixed_range: Range | None = Field(
         default=None,
         alias="fixedRange",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_ratio: Optional[Ratio] = Field(
+    fixed_ratio: Ratio | None = Field(
         default=None,
         alias="fixedRatio",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_reference: Optional[Reference] = Field(
+    fixed_reference: Reference | None = Field(
         default=None,
         alias="fixedReference",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_sampled_data: Optional[SampledData] = Field(
+    fixed_sampled_data: SampledData | None = Field(
         default=None,
         alias="fixedSampledData",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_signature: Optional[Signature] = Field(
+    fixed_signature: Signature | None = Field(
         default=None,
         alias="fixedSignature",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_timing: Optional[Timing] = Field(
+    fixed_timing: Timing | None = Field(
         default=None,
         alias="fixedTiming",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_contact_detail: Optional[ContactDetail] = Field(
+    fixed_contact_detail: ContactDetail | None = Field(
         default=None,
         alias="fixedContactDetail",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_contributor: Optional[Contributor] = Field(
+    fixed_contributor: Contributor | None = Field(
         default=None,
         alias="fixedContributor",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_data_requirement: Optional[DataRequirement] = Field(
+    fixed_data_requirement: DataRequirement | None = Field(
         default=None,
         alias="fixedDataRequirement",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_expression: Optional[Expression] = Field(
+    fixed_expression: Expression | None = Field(
         default=None,
         alias="fixedExpression",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_parameter_definition: Optional[ParameterDefinition] = Field(
+    fixed_parameter_definition: ParameterDefinition | None = Field(
         default=None,
         alias="fixedParameterDefinition",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_related_artifact: Optional[RelatedArtifact] = Field(
+    fixed_related_artifact: RelatedArtifact | None = Field(
         default=None,
         alias="fixedRelatedArtifact",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_trigger_definition: Optional[TriggerDefinition] = Field(
+    fixed_trigger_definition: TriggerDefinition | None = Field(
         default=None,
         alias="fixedTriggerDefinition",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_usage_context: Optional[UsageContext] = Field(
+    fixed_usage_context: UsageContext | None = Field(
         default=None,
         alias="fixedUsageContext",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_dosage: Optional[Dosage] = Field(
+    fixed_dosage: Dosage | None = Field(
         default=None,
         alias="fixedDosage",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_meta: Optional[Meta] = Field(
+    fixed_meta: Meta | None = Field(
         default=None,
         alias="fixedMeta",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    pattern_base64_binary: Optional[str] = Field(
+    pattern_base64_binary: str | None = Field(
         default=None,
         alias="patternBase64Binary",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_boolean: Optional[bool] = Field(
+    pattern_boolean: bool | None = Field(
         default=None,
         alias="patternBoolean",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_canonical: Optional[str] = Field(
+    pattern_canonical: str | None = Field(
         default=None,
         alias="patternCanonical",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_code: Optional[str] = Field(
+    pattern_code: str | None = Field(
         default=None,
         alias="patternCode",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_date: Optional[str] = Field(
+    pattern_date: str | None = Field(
         default=None,
         alias="patternDate",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_date_time: Optional[str] = Field(
+    pattern_date_time: str | None = Field(
         default=None,
         alias="patternDateTime",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_decimal: Optional[Union[int, float]] = Field(
+    pattern_decimal: int | float | None = Field(
         default=None,
         alias="patternDecimal",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_id: Optional[str] = Field(
+    pattern_id: str | None = Field(
         default=None,
         alias="patternId",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_instant: Optional[str] = Field(
+    pattern_instant: str | None = Field(
         default=None,
         alias="patternInstant",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_integer: Optional[Union[int, float]] = Field(
+    pattern_integer: int | float | None = Field(
         default=None,
         alias="patternInteger",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_markdown: Optional[str] = Field(
+    pattern_markdown: str | None = Field(
         default=None,
         alias="patternMarkdown",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_oid: Optional[str] = Field(
+    pattern_oid: str | None = Field(
         default=None,
         alias="patternOid",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_positive_int: Optional[Union[int, float]] = Field(
+    pattern_positive_int: int | float | None = Field(
         default=None,
         alias="patternPositiveInt",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_string: Optional[str] = Field(
+    pattern_string: str | None = Field(
         default=None,
         alias="patternString",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_time: Optional[str] = Field(
+    pattern_time: str | None = Field(
         default=None,
         alias="patternTime",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_unsigned_int: Optional[Union[int, float]] = Field(
+    pattern_unsigned_int: int | float | None = Field(
         default=None,
         alias="patternUnsignedInt",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_uri: Optional[str] = Field(
+    pattern_uri: str | None = Field(
         default=None,
         alias="patternUri",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_url: Optional[str] = Field(
+    pattern_url: str | None = Field(
         default=None,
         alias="patternUrl",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_uuid: Optional[str] = Field(
+    pattern_uuid: str | None = Field(
         default=None,
         alias="patternUuid",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_address: Optional[Address] = Field(
+    pattern_address: Address | None = Field(
         default=None,
         alias="patternAddress",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_age: Optional[Age] = Field(
+    pattern_age: Age | None = Field(
         default=None,
         alias="patternAge",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_annotation: Optional[Annotation] = Field(
+    pattern_annotation: Annotation | None = Field(
         default=None,
         alias="patternAnnotation",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_attachment: Optional[Attachment] = Field(
+    pattern_attachment: Attachment | None = Field(
         default=None,
         alias="patternAttachment",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_codeable_concept: Optional[CodeableConcept] = Field(
+    pattern_codeable_concept: CodeableConcept | None = Field(
         default=None,
         alias="patternCodeableConcept",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_coding: Optional[Coding] = Field(
+    pattern_coding: Coding | None = Field(
         default=None,
         alias="patternCoding",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_contact_point: Optional[ContactPoint] = Field(
+    pattern_contact_point: ContactPoint | None = Field(
         default=None,
         alias="patternContactPoint",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_count: Optional[Count] = Field(
+    pattern_count: Count | None = Field(
         default=None,
         alias="patternCount",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_distance: Optional[Distance] = Field(
+    pattern_distance: Distance | None = Field(
         default=None,
         alias="patternDistance",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_duration: Optional[Duration] = Field(
+    pattern_duration: Duration | None = Field(
         default=None,
         alias="patternDuration",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_human_name: Optional[HumanName] = Field(
+    pattern_human_name: HumanName | None = Field(
         default=None,
         alias="patternHumanName",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_identifier: Optional[Identifier] = Field(
+    pattern_identifier: Identifier | None = Field(
         default=None,
         alias="patternIdentifier",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_money: Optional[Money] = Field(
+    pattern_money: Money | None = Field(
         default=None,
         alias="patternMoney",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_period: Optional[Period] = Field(
+    pattern_period: Period | None = Field(
         default=None,
         alias="patternPeriod",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_quantity: Optional[Quantity] = Field(
+    pattern_quantity: Quantity | None = Field(
         default=None,
         alias="patternQuantity",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_range: Optional[Range] = Field(
+    pattern_range: Range | None = Field(
         default=None,
         alias="patternRange",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_ratio: Optional[Ratio] = Field(
+    pattern_ratio: Ratio | None = Field(
         default=None,
         alias="patternRatio",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_reference: Optional[Reference] = Field(
+    pattern_reference: Reference | None = Field(
         default=None,
         alias="patternReference",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_sampled_data: Optional[SampledData] = Field(
+    pattern_sampled_data: SampledData | None = Field(
         default=None,
         alias="patternSampledData",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_signature: Optional[Signature] = Field(
+    pattern_signature: Signature | None = Field(
         default=None,
         alias="patternSignature",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_timing: Optional[Timing] = Field(
+    pattern_timing: Timing | None = Field(
         default=None,
         alias="patternTiming",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_contact_detail: Optional[ContactDetail] = Field(
+    pattern_contact_detail: ContactDetail | None = Field(
         default=None,
         alias="patternContactDetail",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_contributor: Optional[Contributor] = Field(
+    pattern_contributor: Contributor | None = Field(
         default=None,
         alias="patternContributor",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_data_requirement: Optional[DataRequirement] = Field(
+    pattern_data_requirement: DataRequirement | None = Field(
         default=None,
         alias="patternDataRequirement",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_expression: Optional[Expression] = Field(
+    pattern_expression: Expression | None = Field(
         default=None,
         alias="patternExpression",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_parameter_definition: Optional[ParameterDefinition] = Field(
+    pattern_parameter_definition: ParameterDefinition | None = Field(
         default=None,
         alias="patternParameterDefinition",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_related_artifact: Optional[RelatedArtifact] = Field(
+    pattern_related_artifact: RelatedArtifact | None = Field(
         default=None,
         alias="patternRelatedArtifact",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_trigger_definition: Optional[TriggerDefinition] = Field(
+    pattern_trigger_definition: TriggerDefinition | None = Field(
         default=None,
         alias="patternTriggerDefinition",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_usage_context: Optional[UsageContext] = Field(
+    pattern_usage_context: UsageContext | None = Field(
         default=None,
         alias="patternUsageContext",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_dosage: Optional[Dosage] = Field(
+    pattern_dosage: Dosage | None = Field(
         default=None,
         alias="patternDosage",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_meta: Optional[Meta] = Field(
+    pattern_meta: Meta | None = Field(
         default=None,
         alias="patternMeta",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    example: Optional[list[ElementDefinitionExample]] = Field(
+    example: list[ElementDefinitionExample] | None = Field(
         default=None,
         description="A sample value for this element demonstrating the type of information that would typically be found in the element.",
     )
-    min_value_date: Optional[str] = Field(
+    min_value_date: str | None = Field(
         default=None,
         alias="minValueDate",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    min_value_date_time: Optional[str] = Field(
+    min_value_date_time: str | None = Field(
         default=None,
         alias="minValueDateTime",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    min_value_instant: Optional[str] = Field(
+    min_value_instant: str | None = Field(
         default=None,
         alias="minValueInstant",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    min_value_time: Optional[str] = Field(
+    min_value_time: str | None = Field(
         default=None,
         alias="minValueTime",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    min_value_decimal: Optional[Union[int, float]] = Field(
+    min_value_decimal: int | float | None = Field(
         default=None,
         alias="minValueDecimal",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    min_value_integer: Optional[Union[int, float]] = Field(
+    min_value_integer: int | float | None = Field(
         default=None,
         alias="minValueInteger",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    min_value_positive_int: Optional[Union[int, float]] = Field(
+    min_value_positive_int: int | float | None = Field(
         default=None,
         alias="minValuePositiveInt",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    min_value_unsigned_int: Optional[Union[int, float]] = Field(
+    min_value_unsigned_int: int | float | None = Field(
         default=None,
         alias="minValueUnsignedInt",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    min_value_quantity: Optional[Quantity] = Field(
+    min_value_quantity: Quantity | None = Field(
         default=None,
         alias="minValueQuantity",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_value_date: Optional[str] = Field(
+    max_value_date: str | None = Field(
         default=None,
         alias="maxValueDate",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_value_date_time: Optional[str] = Field(
+    max_value_date_time: str | None = Field(
         default=None,
         alias="maxValueDateTime",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_value_instant: Optional[str] = Field(
+    max_value_instant: str | None = Field(
         default=None,
         alias="maxValueInstant",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_value_time: Optional[str] = Field(
+    max_value_time: str | None = Field(
         default=None,
         alias="maxValueTime",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_value_decimal: Optional[Union[int, float]] = Field(
+    max_value_decimal: int | float | None = Field(
         default=None,
         alias="maxValueDecimal",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_value_integer: Optional[Union[int, float]] = Field(
+    max_value_integer: int | float | None = Field(
         default=None,
         alias="maxValueInteger",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_value_positive_int: Optional[Union[int, float]] = Field(
+    max_value_positive_int: int | float | None = Field(
         default=None,
         alias="maxValuePositiveInt",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_value_unsigned_int: Optional[Union[int, float]] = Field(
+    max_value_unsigned_int: int | float | None = Field(
         default=None,
         alias="maxValueUnsignedInt",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_value_quantity: Optional[Quantity] = Field(
+    max_value_quantity: Quantity | None = Field(
         default=None,
         alias="maxValueQuantity",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_length: Optional[Union[int, float]] = Field(
+    max_length: int | float | None = Field(
         default=None,
         alias="maxLength",
         description="Indicates the maximum length in characters that is permitted to be present in conformant instances and which is expected to be supported by conformant consumers that support the element.",
     )
-    condition: Optional[list[str]] = Field(
+    condition: list[str] | None = Field(
         default=None,
         description="A reference to an invariant that may make additional statements about the cardinality or value in the instance.",
     )
-    constraint: Optional[list[ElementDefinitionConstraint]] = Field(
+    constraint: list[ElementDefinitionConstraint] | None = Field(
         default=None,
         description="Formal constraints such as co-occurrence and other constraints that can be computationally evaluated within the context of the instance.",
     )
-    must_support: Optional[bool] = Field(
+    must_support: bool | None = Field(
         default=None,
         alias="mustSupport",
         description="If true, implementations that produce or consume resources SHALL provide &quot;support&quot; for the element in some meaningful way. If false, the element may be ignored and not supported. If false, whether to populate or use the data element in any way is at the discretion of the implementation.",
     )
-    is_modifier: Optional[bool] = Field(
+    is_modifier: bool | None = Field(
         default=None,
         alias="isModifier",
         description="If true, the value of this element affects the interpretation of the element or resource that contains it, and the value of the element cannot be ignored. Typically, this is used for status, negation and qualification codes. The effect of this is that the element cannot be ignored by systems: they SHALL either recognize the element and process it, and/or a pre-determination has been made that it is not relevant to their particular system.",
     )
-    is_modifier_reason: Optional[str] = Field(
+    is_modifier_reason: str | None = Field(
         default=None,
         alias="isModifierReason",
         description="Explains how that element affects the interpretation of the resource or element that contains it.",
     )
-    is_summary: Optional[bool] = Field(
+    is_summary: bool | None = Field(
         default=None,
         alias="isSummary",
         description="Whether the element should be included if a client requests a search with the parameter _summary=true.",
     )
-    binding: Optional[ElementDefinitionBinding] = Field(
+    binding: ElementDefinitionBinding | None = Field(
         default=None,
         description="Binds to a value set if this element is coded (code, Coding, CodeableConcept, Quantity), or the data types (string, uri).",
     )
-    mapping: Optional[list[ElementDefinitionMapping]] = Field(
+    mapping: list[ElementDefinitionMapping] | None = Field(
         default=None,
         description="Identifies a concept from an external specification that roughly corresponds to this element.",
     )
@@ -1042,11 +1042,11 @@ class ElementDefinitionBase(MedplumFHIRBase):
     will be same.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
@@ -1054,7 +1054,7 @@ class ElementDefinitionBase(MedplumFHIRBase):
         default=...,
         description="The Path that identifies the base element - this matches the ElementDefinition.path for that element. Across FHIR, there is only one base definition of any element - that is, an element definition on a [StructureDefinition](structuredefinition.html#) without a StructureDefinition.base.",
     )
-    min: Union[int, float] = Field(
+    min: int | float = Field(
         default=...,
         description="Minimum cardinality of the base element identified by the path.",
     )
@@ -1069,11 +1069,11 @@ class ElementDefinitionBinding(MedplumFHIRBase):
     CodeableConcept, Quantity), or the data types (string, uri).
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
@@ -1081,11 +1081,11 @@ class ElementDefinitionBinding(MedplumFHIRBase):
         default=...,
         description="Indicates the degree of conformance expectations associated with this binding - that is, the degree to which the provided value set must be adhered to in the instances.",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
         description="Describes the intended use of this particular set of codes.",
     )
-    value_set: Optional[str] = Field(
+    value_set: str | None = Field(
         default=None,
         alias="valueSet",
         description="Refers to the value set that identifies the set of codes the binding refers to.",
@@ -1097,11 +1097,11 @@ class ElementDefinitionConstraint(MedplumFHIRBase):
     be computationally evaluated within the context of the instance.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
@@ -1109,7 +1109,7 @@ class ElementDefinitionConstraint(MedplumFHIRBase):
         default=...,
         description="Allows identification of which elements have their cardinalities impacted by the constraint. Will not be referenced for constraints that do not affect cardinality.",
     )
-    requirements: Optional[str] = Field(
+    requirements: str | None = Field(
         default=None,
         description="Description of why this constraint is necessary or appropriate.",
     )
@@ -1121,15 +1121,15 @@ class ElementDefinitionConstraint(MedplumFHIRBase):
         default=...,
         description="Text that can be used to describe the constraint in messages identifying that the constraint has been violated.",
     )
-    expression: Optional[str] = Field(
+    expression: str | None = Field(
         default=None,
         description="A [FHIRPath](fhirpath.html) expression of constraint that can be executed to see if this constraint is met.",
     )
-    xpath: Optional[str] = Field(
+    xpath: str | None = Field(
         default=None,
         description="An XPath expression of constraint that can be executed to see if this constraint is met.",
     )
-    source: Optional[str] = Field(
+    source: str | None = Field(
         default=None,
         description="A reference to the original source of the constraint, for traceability purposes.",
     )
@@ -1140,11 +1140,11 @@ class ElementDefinitionExample(MedplumFHIRBase):
     that would typically be found in the element.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
@@ -1152,252 +1152,252 @@ class ElementDefinitionExample(MedplumFHIRBase):
         default=...,
         description="Describes the purpose of this example amoung the set of examples.",
     )
-    value_base64_binary: Optional[str] = Field(
+    value_base64_binary: str | None = Field(
         default=None,
         alias="valueBase64Binary",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_boolean: Optional[bool] = Field(
+    value_boolean: bool | None = Field(
         default=None,
         alias="valueBoolean",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_canonical: Optional[str] = Field(
+    value_canonical: str | None = Field(
         default=None,
         alias="valueCanonical",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_code: Optional[str] = Field(
+    value_code: str | None = Field(
         default=None,
         alias="valueCode",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_date: Optional[str] = Field(
+    value_date: str | None = Field(
         default=None,
         alias="valueDate",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_date_time: Optional[str] = Field(
+    value_date_time: str | None = Field(
         default=None,
         alias="valueDateTime",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_decimal: Optional[Union[int, float]] = Field(
+    value_decimal: int | float | None = Field(
         default=None,
         alias="valueDecimal",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_id: Optional[str] = Field(
+    value_id: str | None = Field(
         default=None,
         alias="valueId",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_instant: Optional[str] = Field(
+    value_instant: str | None = Field(
         default=None,
         alias="valueInstant",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_integer: Optional[Union[int, float]] = Field(
+    value_integer: int | float | None = Field(
         default=None,
         alias="valueInteger",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_markdown: Optional[str] = Field(
+    value_markdown: str | None = Field(
         default=None,
         alias="valueMarkdown",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_oid: Optional[str] = Field(
+    value_oid: str | None = Field(
         default=None,
         alias="valueOid",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_positive_int: Optional[Union[int, float]] = Field(
+    value_positive_int: int | float | None = Field(
         default=None,
         alias="valuePositiveInt",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_string: Optional[str] = Field(
+    value_string: str | None = Field(
         default=None,
         alias="valueString",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_time: Optional[str] = Field(
+    value_time: str | None = Field(
         default=None,
         alias="valueTime",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_unsigned_int: Optional[Union[int, float]] = Field(
+    value_unsigned_int: int | float | None = Field(
         default=None,
         alias="valueUnsignedInt",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_uri: Optional[str] = Field(
+    value_uri: str | None = Field(
         default=None,
         alias="valueUri",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_url: Optional[str] = Field(
+    value_url: str | None = Field(
         default=None,
         alias="valueUrl",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_uuid: Optional[str] = Field(
+    value_uuid: str | None = Field(
         default=None,
         alias="valueUuid",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_address: Optional[Address] = Field(
+    value_address: Address | None = Field(
         default=None,
         alias="valueAddress",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_age: Optional[Age] = Field(
+    value_age: Age | None = Field(
         default=None,
         alias="valueAge",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_annotation: Optional[Annotation] = Field(
+    value_annotation: Annotation | None = Field(
         default=None,
         alias="valueAnnotation",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_attachment: Optional[Attachment] = Field(
+    value_attachment: Attachment | None = Field(
         default=None,
         alias="valueAttachment",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_codeable_concept: Optional[CodeableConcept] = Field(
+    value_codeable_concept: CodeableConcept | None = Field(
         default=None,
         alias="valueCodeableConcept",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_coding: Optional[Coding] = Field(
+    value_coding: Coding | None = Field(
         default=None,
         alias="valueCoding",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_contact_point: Optional[ContactPoint] = Field(
+    value_contact_point: ContactPoint | None = Field(
         default=None,
         alias="valueContactPoint",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_count: Optional[Count] = Field(
+    value_count: Count | None = Field(
         default=None,
         alias="valueCount",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_distance: Optional[Distance] = Field(
+    value_distance: Distance | None = Field(
         default=None,
         alias="valueDistance",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_duration: Optional[Duration] = Field(
+    value_duration: Duration | None = Field(
         default=None,
         alias="valueDuration",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_human_name: Optional[HumanName] = Field(
+    value_human_name: HumanName | None = Field(
         default=None,
         alias="valueHumanName",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_identifier: Optional[Identifier] = Field(
+    value_identifier: Identifier | None = Field(
         default=None,
         alias="valueIdentifier",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_money: Optional[Money] = Field(
+    value_money: Money | None = Field(
         default=None,
         alias="valueMoney",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_period: Optional[Period] = Field(
+    value_period: Period | None = Field(
         default=None,
         alias="valuePeriod",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_quantity: Optional[Quantity] = Field(
+    value_quantity: Quantity | None = Field(
         default=None,
         alias="valueQuantity",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_range: Optional[Range] = Field(
+    value_range: Range | None = Field(
         default=None,
         alias="valueRange",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_ratio: Optional[Ratio] = Field(
+    value_ratio: Ratio | None = Field(
         default=None,
         alias="valueRatio",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_reference: Optional[Reference] = Field(
+    value_reference: Reference | None = Field(
         default=None,
         alias="valueReference",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_sampled_data: Optional[SampledData] = Field(
+    value_sampled_data: SampledData | None = Field(
         default=None,
         alias="valueSampledData",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_signature: Optional[Signature] = Field(
+    value_signature: Signature | None = Field(
         default=None,
         alias="valueSignature",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_timing: Optional[Timing] = Field(
+    value_timing: Timing | None = Field(
         default=None,
         alias="valueTiming",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_contact_detail: Optional[ContactDetail] = Field(
+    value_contact_detail: ContactDetail | None = Field(
         default=None,
         alias="valueContactDetail",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_contributor: Optional[Contributor] = Field(
+    value_contributor: Contributor | None = Field(
         default=None,
         alias="valueContributor",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_data_requirement: Optional[DataRequirement] = Field(
+    value_data_requirement: DataRequirement | None = Field(
         default=None,
         alias="valueDataRequirement",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_expression: Optional[Expression] = Field(
+    value_expression: Expression | None = Field(
         default=None,
         alias="valueExpression",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_parameter_definition: Optional[ParameterDefinition] = Field(
+    value_parameter_definition: ParameterDefinition | None = Field(
         default=None,
         alias="valueParameterDefinition",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_related_artifact: Optional[RelatedArtifact] = Field(
+    value_related_artifact: RelatedArtifact | None = Field(
         default=None,
         alias="valueRelatedArtifact",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_trigger_definition: Optional[TriggerDefinition] = Field(
+    value_trigger_definition: TriggerDefinition | None = Field(
         default=None,
         alias="valueTriggerDefinition",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_usage_context: Optional[UsageContext] = Field(
+    value_usage_context: UsageContext | None = Field(
         default=None,
         alias="valueUsageContext",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_dosage: Optional[Dosage] = Field(
+    value_dosage: Dosage | None = Field(
         default=None,
         alias="valueDosage",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_meta: Optional[Meta] = Field(
+    value_meta: Meta | None = Field(
         default=None,
         alias="valueMeta",
         description="The actual value for the element, which must be one of the types allowed for this element.",
@@ -1409,18 +1409,18 @@ class ElementDefinitionMapping(MedplumFHIRBase):
     corresponds to this element.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
     identity: str = Field(
         default=..., description="An internal reference to the definition of a mapping."
     )
-    language: Optional[str] = Field(
+    language: str | None = Field(
         default=None,
         description="Identifies the computable language in which mapping.map is expressed.",
     )
@@ -1428,7 +1428,7 @@ class ElementDefinitionMapping(MedplumFHIRBase):
         default=...,
         description="Expresses what part of the target specification corresponds to this element.",
     )
-    comment: Optional[str] = Field(
+    comment: str | None = Field(
         default=None,
         description="Comments that provide information about the mapping or its use.",
     )
@@ -1445,23 +1445,23 @@ class ElementDefinitionSlicing(MedplumFHIRBase):
     set).
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
-    discriminator: Optional[list[ElementDefinitionSlicingDiscriminator]] = Field(
+    discriminator: list[ElementDefinitionSlicingDiscriminator] | None = Field(
         default=None,
         description="Designates which child elements are used to discriminate between the slices when processing an instance. If one or more discriminators are provided, the value of the child elements in the instance data SHALL completely distinguish which slice the element in the resource matches based on the allowed values for those elements in each of the slices.",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
         description="A human-readable text description of how the slicing works. If there is no discriminator, this is required to be present to provide whatever information is possible about how the slices can be differentiated.",
     )
-    ordered: Optional[bool] = Field(
+    ordered: bool | None = Field(
         default=None,
         description="If the matching elements have to occur in the same order as defined in the profile.",
     )
@@ -1479,11 +1479,11 @@ class ElementDefinitionSlicingDiscriminator(MedplumFHIRBase):
     based on the allowed values for those elements in each of the slices.
     """
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
@@ -1500,11 +1500,11 @@ class ElementDefinitionSlicingDiscriminator(MedplumFHIRBase):
 class ElementDefinitionType(MedplumFHIRBase):
     """The data type or resource that the value of this element is permitted to be."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
     )
-    extension: Optional[list[Extension]] = Field(
+    extension: list[Extension] | None = Field(
         default=None,
         description="May be used to represent additional information that is not part of the basic definition of the element. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer can define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension.",
     )
@@ -1512,20 +1512,20 @@ class ElementDefinitionType(MedplumFHIRBase):
         default=...,
         description="URL of Data type or Resource that is a(or the) type used for this element. References are URLs that are relative to http://hl7.org/fhir/StructureDefinition e.g. &quot;string&quot; is a reference to http://hl7.org/fhir/StructureDefinition/string. Absolute URLs are only allowed in logical models.",
     )
-    profile: Optional[list[str]] = Field(
+    profile: list[str] | None = Field(
         default=None,
         description="Identifies a profile structure or implementation Guide that applies to the datatype this element refers to. If any profiles are specified, then the content must conform to at least one of them. The URL can be a local reference - to a contained StructureDefinition, or a reference to another StructureDefinition or Implementation Guide by a canonical URL. When an implementation guide is specified, the type SHALL conform to at least one profile defined in the implementation guide.",
     )
-    target_profile: Optional[list[str]] = Field(
+    target_profile: list[str] | None = Field(
         default=None,
         alias="targetProfile",
         description="Used when the type is &quot;Reference&quot; or &quot;canonical&quot;, and identifies a profile structure or implementation Guide that applies to the target of the reference this element refers to. If any profiles are specified, then the content must conform to at least one of them. The URL can be a local reference - to a contained StructureDefinition, or a reference to another StructureDefinition or Implementation Guide by a canonical URL. When an implementation guide is specified, the target resource SHALL conform to at least one profile defined in the implementation guide.",
     )
-    aggregation: Optional[list[Literal["contained", "referenced", "bundled"]]] = Field(
+    aggregation: list[Literal["contained", "referenced", "bundled"]] | None = Field(
         default=None,
         description="If the type is a reference to another resource, how the resource is or can be aggregated - is it a contained resource, or a reference, and if the context is a bundle, is it included in the bundle.",
     )
-    versioning: Optional[Literal["either", "independent", "specific"]] = Field(
+    versioning: Literal["either", "independent", "specific"] | None = Field(
         default=None,
         description="Whether this reference needs to be version specific or version independent, or whether either can be used.",
     )

@@ -4,7 +4,7 @@ These exceptions map to HTTP status codes and common error scenarios,
 enabling targeted exception handling and clearer debugging.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 
 class MedplumError(Exception):
@@ -17,8 +17,8 @@ class MedplumError(Exception):
     def __init__(
         self,
         message: str,
-        status_code: Optional[int] = None,
-        response_data: Optional[dict] = None,
+        status_code: int | None = None,
+        response_data: dict | None = None,
     ):
         super().__init__(message)
         self.status_code = status_code
@@ -28,7 +28,7 @@ class MedplumError(Exception):
 class OperationOutcomeError(MedplumError):
     """FHIR OperationOutcome error with full context"""
 
-    def __init__(self, status: int, outcome: Optional[dict[str, Any]], text: str):
+    def __init__(self, status: int, outcome: dict[str, Any | None], text: str):
         self.status = status
         self.outcome = outcome
         self.text = text

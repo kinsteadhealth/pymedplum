@@ -128,6 +128,11 @@ observations = client.search_resources("Observation", {
 # Iterate through all pages automatically
 for patient in client.search_resource_pages("Patient", {"family": "Smith"}):
     print(patient["name"])
+
+# Type-safe iteration with Pydantic models
+from pymedplum.fhir import Patient
+for patient in client.search_resource_pages("Patient", {"family": "Smith"}, as_fhir=Patient):
+    print(patient.name[0].family)  # Full IDE autocomplete!
 ```
 
 ### Binary Files & Documents
@@ -281,8 +286,13 @@ bundle = client.search_resources("Patient", {"family": "Smith"}, return_bundle=T
 for patient in bundle:
     print(patient['name'])
 
-# Get typed resources
+# Get typed resources with as_fhir parameter
 from pymedplum.fhir import Patient
+bundle = client.search_resources("Patient", {"family": "Smith"}, return_bundle=True, as_fhir=Patient)
+patients = bundle.get_resources_typed(Patient)
+
+# Or use get_resources_typed on any bundle
+bundle = client.search_resources("Patient", {"family": "Smith"}, return_bundle=True)
 patients = bundle.get_resources_typed(Patient)
 
 # Check if empty, get total, access pagination

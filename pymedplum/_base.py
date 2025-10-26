@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qsl
 
 import httpx
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from .client import MedplumClient
 
 
-def _raise_or_json(response: httpx.Response) -> Optional[dict[str, Any]]:
+def _raise_or_json(response: httpx.Response) -> dict[str, Any | None]:
     """Parse response or raise appropriate exception based on status code.
 
     Args:
@@ -98,16 +98,16 @@ class BaseClient:
     def __init__(
         self,
         base_url: str = "https://api.medplum.com/",
-        client_id: Optional[str] = None,
-        client_secret: Optional[str] = None,
-        access_token: Optional[str] = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        access_token: str | None = None,
         fhir_url_path: str = "fhir/R4/",
-        project_id: Optional[str] = None,
-        org_mode: Optional[OrgMode] = None,
-        org_ref: Optional[str] = None,
+        project_id: str | None = None,
+        org_mode: OrgMode | None = None,
+        org_ref: str | None = None,
         org_extension_url: str = DEFAULT_ORG_EXTENSION_URL,
-        before_request: Optional[BeforeRequestCallback] = None,
-        default_on_behalf_of: Optional[str] = None,
+        before_request: BeforeRequestCallback | None = None,
+        default_on_behalf_of: str | None = None,
     ):
         self.base_url = base_url.rstrip("/") + "/"
         self.fhir_base_url = self.base_url + fhir_url_path
@@ -121,10 +121,10 @@ class BaseClient:
         self.before_request = before_request
         self.default_on_behalf_of = default_on_behalf_of
 
-        self.token_expires_at: Optional[datetime] = None
+        self.token_expires_at: datetime | None = None
         self._obo_stack: list[str] = []
 
-    def _obo_current(self) -> Optional[str]:
+    def _obo_current(self) -> str | None:
         """Get current on-behalf-of membership (top of stack)."""
         return self._obo_stack[-1] if self._obo_stack else None
 
@@ -145,7 +145,7 @@ class BaseClient:
 
         return headers
 
-    def _normalize_membership(self, membership: Union[str, Any]) -> str:
+    def _normalize_membership(self, membership: str | Any) -> str:
         """Normalize membership input to canonical ProjectMembership reference.
 
         Args:
@@ -205,8 +205,8 @@ class BaseClient:
     def _inject_org_tag(
         self,
         resource: dict[str, Any],
-        org_mode: Optional[OrgMode] = None,
-        org_ref: Optional[str] = None,
+        org_mode: OrgMode | None = None,
+        org_ref: str | None = None,
     ) -> dict[str, Any]:
         """Inject org tag into resource based on org_mode setting.
 
@@ -292,7 +292,7 @@ class OnBehalfOfContext:
     Supports nested contexts safely and auto-authenticates if needed.
     """
 
-    def __init__(self, client: MedplumClient, membership: Union[str, Any]):
+    def __init__(self, client: MedplumClient, membership: str | Any):
         self.client = client
         self.member_ref = client._normalize_membership(membership)
 
@@ -316,7 +316,7 @@ class OnBehalfOfContext:
 class AsyncOnBehalfOfContext:
     """Async context manager for on-behalf-of operations with auto-authentication."""
 
-    def __init__(self, client: AsyncMedplumClient, membership: Union[str, Any]):
+    def __init__(self, client: AsyncMedplumClient, membership: str | Any):
         self.client = client
         self.member_ref = client._normalize_membership(membership)
 

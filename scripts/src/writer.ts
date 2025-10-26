@@ -76,7 +76,7 @@ function analyzeTypingImports(parsedFile: ParsedFile): TypingImports {
   // Check which typing constructs are used
   parsedFile.interfaces.forEach((iface) => {
     iface.fields.forEach((field) => {
-      if (field.optional) imports.hasOptional = true;
+      // No longer need Optional since we use | None syntax
       if (field.pythonType === "Any" || field.pythonType.includes("[Any]"))
         imports.hasAny = true;
       if (field.pythonType.includes("Union[")) imports.hasUnion = true;
@@ -100,11 +100,14 @@ function buildTypingImports(
 ): string[] {
   const typingImports = new Set<string>();
 
-  if (imports.hasTypeVar) typingImports.add("TypeVar");
+  if (imports.hasTypeVar) {
+    typingImports.add("TypeVar");
+    typingImports.add("Generic");
+  }
   if (imports.hasAny) typingImports.add("Any");
   // No longer need Dict and List - using built-in dict and list
   if (imports.hasLiteral) typingImports.add("Literal");
-  if (imports.hasOptional) typingImports.add("Optional");
+  // No longer need Optional - using | None syntax
   if (imports.hasUnion) typingImports.add("Union");
   if (hasExternalImports) typingImports.add("TYPE_CHECKING");
 
@@ -249,7 +252,7 @@ function processTypeAnnotation(field: ParsedField, externalTypes: Set<string>): 
     }
   }
   if (field.optional) {
-    typeAnnotation = `Optional[${typeAnnotation}]`;
+    typeAnnotation = `${typeAnnotation} | None`;
   }
 
   // With `from __future__ import annotations`, no need to quote annotations
@@ -373,7 +376,9 @@ function generateClass(
 ): string[] {
   const lines: string[] = [];
 
-  lines.push(`class ${parsed.name}(${BASE_CLASS}):`);
+  const isGeneric = parsed.fields.some((f) => f.pythonType === "T");
+  const parentClass = isGeneric ? `${BASE_CLASS}, Generic[T]` : BASE_CLASS;
+  lines.push(`class ${parsed.name}(${parentClass}):`);
 
   // Docstring
   lines.push(
@@ -881,14 +886,16 @@ export function generateStubFile(
 ): string {
   const lines: string[] = [
     '"""Type stubs for pymedplum.fhir module.',
+    'This is a generated file.',
+    'Do not edit it manually',
     '',
-    'This stub file provides full type information to IDEs and type checkers',
-    'without the runtime cost of importing all FHIR models.',
+    "This stub file provides full type information to IDEs and type checkers",
+    "without the runtime cost of importing all FHIR models.",
     '"""',
-    '',
-    'from typing import Union, overload',
-    '',
-    'from .base import MedplumFHIRBase',
+    "",
+    "from typing import Any, Union, overload",
+    "",
+    "from .base import MedplumFHIRBase",
     '',
   ];
 
@@ -918,8 +925,7 @@ export function generateStubFile(
   lines.push(`Resource = ${resourceTypesForUnion}`);
   lines.push("");
   lines.push("# Stub for runtime lazy loader");
-  lines.push("@overload");
-  lines.push("def __getattr__(name: str) -> type[Resource]: ...");
+  lines.push("def __getattr__(name: str) -> Any: ...");
   lines.push("");
   lines.push("# Introspection support");
   lines.push("def __dir__() -> list[str]: ...");
