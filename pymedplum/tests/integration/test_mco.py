@@ -7,9 +7,9 @@ All helpers are now in conftest.py for reuse across test files.
 """
 
 import pytest
-from fhir.resources.R4B.patient import Patient
 
 from pymedplum import to_fhir_json, to_portable
+from pymedplum.fhir.patient import Patient
 
 
 @pytest.fixture
@@ -388,8 +388,8 @@ def test_fhir_resources_roundtrip(medplum_client, mco_setup):
 
     # Verify key fields
     assert patient_model.id == mco_setup["patients"]["a1"]["id"]
-    # resource_type is a class attribute in fhir.resources
-    assert patient_model.__resource_type__ == "Patient"
+    # Use the Python field name (resource_type) not the FHIR alias (resourceType)
+    assert patient_model.resource_type == "Patient"
     assert len(patient_model.name) == 1
     assert patient_model.name[0].given[0] == "Alice"
     assert patient_model.gender == "female"

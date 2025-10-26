@@ -7,7 +7,8 @@ Tests every public method on MedplumClient and AsyncMedplumClient to ensure:
 """
 
 import pytest
-from fhir.resources.R4B.patient import Patient
+
+from pymedplum.fhir.patient import Patient
 
 # ============================================================================
 # SYNC CLIENT TESTS

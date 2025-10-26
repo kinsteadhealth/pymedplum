@@ -14,45 +14,45 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from fhir.resources.R4B.address import Address
-from fhir.resources.R4B.appointment import Appointment, AppointmentParticipant
-from fhir.resources.R4B.attachment import Attachment
-from fhir.resources.R4B.careplan import CarePlan, CarePlanActivity
-from fhir.resources.R4B.claim import Claim, ClaimDiagnosis, ClaimInsurance, ClaimItem
-from fhir.resources.R4B.codeableconcept import CodeableConcept
-from fhir.resources.R4B.coding import Coding
-from fhir.resources.R4B.condition import Condition
-from fhir.resources.R4B.consent import Consent, ConsentProvision
-from fhir.resources.R4B.contactpoint import ContactPoint
-from fhir.resources.R4B.coverage import Coverage, CoverageClass
-from fhir.resources.R4B.documentreference import (
+
+from pymedplum import to_fhir_json
+from pymedplum.fhir.address import Address
+from pymedplum.fhir.appointment import Appointment, AppointmentParticipant
+from pymedplum.fhir.attachment import Attachment
+from pymedplum.fhir.careplan import CarePlan, CarePlanActivity
+from pymedplum.fhir.claim import Claim, ClaimDiagnosis, ClaimInsurance, ClaimItem
+from pymedplum.fhir.codeableconcept import CodeableConcept
+from pymedplum.fhir.coding import Coding
+from pymedplum.fhir.condition import Condition
+from pymedplum.fhir.consent import Consent, ConsentProvision
+from pymedplum.fhir.contactpoint import ContactPoint
+from pymedplum.fhir.coverage import Coverage, CoverageClass
+from pymedplum.fhir.documentreference import (
     DocumentReference,
     DocumentReferenceContent,
 )
-from fhir.resources.R4B.dosage import Dosage
-from fhir.resources.R4B.duration import Duration
-from fhir.resources.R4B.encounter import Encounter, EncounterParticipant
-from fhir.resources.R4B.goal import Goal, GoalTarget
-from fhir.resources.R4B.humanname import HumanName
-from fhir.resources.R4B.identifier import Identifier
-from fhir.resources.R4B.medicationrequest import (
+from pymedplum.fhir.dosage import Dosage
+from pymedplum.fhir.duration import Duration
+from pymedplum.fhir.encounter import Encounter, EncounterParticipant
+from pymedplum.fhir.goal import Goal, GoalTarget
+from pymedplum.fhir.humanname import HumanName
+from pymedplum.fhir.identifier import Identifier
+from pymedplum.fhir.medicationrequest import (
     MedicationRequest,
     MedicationRequestDispenseRequest,
 )
-from fhir.resources.R4B.money import Money
-from fhir.resources.R4B.observation import Observation
-from fhir.resources.R4B.organization import Organization
-from fhir.resources.R4B.patient import Patient
-from fhir.resources.R4B.period import Period
-from fhir.resources.R4B.practitioner import Practitioner
-from fhir.resources.R4B.procedure import Procedure
-from fhir.resources.R4B.provenance import Provenance, ProvenanceAgent
-from fhir.resources.R4B.quantity import Quantity
-from fhir.resources.R4B.reference import Reference
-from fhir.resources.R4B.servicerequest import ServiceRequest
-from fhir.resources.R4B.timing import Timing, TimingRepeat
-
-from pymedplum import to_fhir_json
+from pymedplum.fhir.money import Money
+from pymedplum.fhir.observation import Observation
+from pymedplum.fhir.organization import Organization
+from pymedplum.fhir.patient import Patient
+from pymedplum.fhir.period import Period
+from pymedplum.fhir.practitioner import Practitioner
+from pymedplum.fhir.procedure import Procedure
+from pymedplum.fhir.provenance import Provenance, ProvenanceAgent
+from pymedplum.fhir.quantity import Quantity
+from pymedplum.fhir.reference import Reference
+from pymedplum.fhir.servicerequest import ServiceRequest
+from pymedplum.fhir.timing import Timing, TimingRepeat
 
 
 @pytest.fixture
@@ -170,7 +170,7 @@ def medicare_coverage(medplum_client, elderly_diabetic_patient, visit_test_id):
         subscriber=Reference(reference=f"Patient/{elderly_diabetic_patient['id']}"),
         beneficiary=Reference(reference=f"Patient/{elderly_diabetic_patient['id']}"),
         payor=[Reference(display="Centers for Medicare & Medicaid Services")],
-        class_fhir=[
+        class_=[
             CoverageClass(
                 type=CodeableConcept(
                     coding=[
@@ -221,7 +221,7 @@ def test_01_create_primary_care_encounter(
         # Create encounter for annual diabetic follow-up visit
         encounter = Encounter(
             status="finished",
-            class_fhir=Coding(
+            class_=Coding(
                 system="http://terminology.hl7.org/CodeSystem/v3-ActCode",
                 code="AMB",
                 display="ambulatory",
@@ -667,7 +667,7 @@ def test_10_perform_diabetic_foot_exam(
     # Create encounter for this procedure
     encounter = Encounter(
         status="finished",
-        class_fhir=Coding(
+        class_=Coding(
             system="http://terminology.hl7.org/CodeSystem/v3-ActCode",
             code="AMB",
             display="ambulatory",
@@ -1034,7 +1034,7 @@ def test_14_create_billing_claim(
 
     encounter = Encounter(
         status="finished",
-        class_fhir=Coding(
+        class_=Coding(
             system="http://terminology.hl7.org/CodeSystem/v3-ActCode",
             code="AMB",
         ),

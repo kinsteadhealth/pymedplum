@@ -7,7 +7,7 @@ import pytest
 import respx
 
 from pymedplum import MedplumClient
-from pymedplum.exceptions import OperationOutcomeError
+from pymedplum.exceptions import RateLimitError, ServerError
 
 
 @pytest.fixture
@@ -111,10 +111,10 @@ def test_retry_429_max_attempts(mock_client):
         route = respx.get("https://api.test.medplum.com/fhir/R4/Patient/123")
         route.mock(return_value=httpx.Response(429, json=mock_response_data))
 
-        with pytest.raises(OperationOutcomeError) as exc_info:
+        with pytest.raises(RateLimitError) as exc_info:
             mock_client.read_resource("Patient", "123")
 
-        assert exc_info.value.status == 429
+        assert exc_info.value.status_code == 429
         # Initial attempt + 5 retries = 6 total calls
         assert route.call_count == 6
 
@@ -126,10 +126,10 @@ def test_retry_502_max_attempts(mock_client):
         route = respx.get("https://api.test.medplum.com/fhir/R4/Patient/123")
         route.mock(return_value=httpx.Response(502, text="Bad Gateway"))
 
-        with pytest.raises(OperationOutcomeError) as exc_info:
+        with pytest.raises(ServerError) as exc_info:
             mock_client.read_resource("Patient", "123")
 
-        assert exc_info.value.status == 502
+        assert exc_info.value.status_code == 502
         # Initial attempt + 2 retries = 3 total calls
         assert route.call_count == 3
 

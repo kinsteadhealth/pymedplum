@@ -1,15 +1,17 @@
 import asyncio
 import random
 from collections.abc import AsyncIterator
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, TypeVar, Type, overload
 
 import httpx
 
 from ._base import AsyncOnBehalfOfContext, BaseClient, _raise_or_json
+from .bundle import FHIRBundle
 from .exceptions import MedplumError
-from .helpers.fhir import to_fhir_json
-from .helpers.jwt import decode_jwt_exp
+from .helpers import to_fhir_json, decode_jwt_exp
 from .types import OrgMode, QueryTypes
+
+T = TypeVar("T")
 
 
 class AsyncMedplumClient(BaseClient):
@@ -142,13 +144,51 @@ class AsyncMedplumClient(BaseClient):
             "POST", f"{self.fhir_base_url}{resource_type}", json=data
         )
 
+    @overload
     async def read_resource(
-        self, resource_type: str, resource_id: str
+        self, resource_type: str, resource_id: str, as_fhir: None = None
     ) -> dict[str, Any]:
-        """Read a FHIR resource by type and ID"""
-        return await self._request(
+        """Return raw dict (backward compatible)"""
+        ...
+
+    @overload
+    async def read_resource(
+        self, resource_type: str, resource_id: str, as_fhir: Type[T]
+    ) -> T:
+        """Return typed FHIR resource"""
+        ...
+
+    async def read_resource(
+        self, resource_type: str, resource_id: str, as_fhir: Optional[Type[T]] = None
+    ) -> Union[T, dict[str, Any]]:
+        """
+        Read a FHIR resource by type and ID.
+
+        Args:
+            resource_type: FHIR resource type (e.g., "Patient")
+            resource_id: Resource ID
+            as_fhir: Optional FHIR resource class for typed response
+
+        Returns:
+            Typed resource if as_fhir provided, else dict
+
+        Examples:
+            # Dict (backward compatible)
+            patient_dict = await client.read_resource("Patient", "123")
+
+            # Typed (new)
+            from pymedplum.fhir import Patient
+            patient = await client.read_resource("Patient", "123", as_fhir=Patient)
+            print(patient.name[0].given)  # Full type safety!
+        """
+        response = await self._request(
             "GET", f"{self.fhir_base_url}{resource_type}/{resource_id}"
         )
+
+        if as_fhir:
+            return as_fhir(**response)
+
+        return response
 
     async def update_resource(
         self,
@@ -170,14 +210,62 @@ class AsyncMedplumClient(BaseClient):
             "PUT", f"{self.fhir_base_url}{resource_type}/{resource_id}", json=data
         )
 
+    @overload
     async def search_resources(
-        self, resource_type: str, query: Optional[QueryTypes] = None
-    ) -> dict[str, Any]:
-        """Search for FHIR resources"""
+        self,
+        resource_type: str,
+        query: Optional[QueryTypes] = None,
+        return_bundle: bool = False,
+    ) -> dict[str, Any]: ...
+
+    @overload
+    async def search_resources(
+        self,
+        resource_type: str,
+        query: Optional[QueryTypes] = None,
+        return_bundle: bool = True,
+    ) -> FHIRBundle: ...
+
+    async def search_resources(
+        self,
+        resource_type: str,
+        query: Optional[QueryTypes] = None,
+        return_bundle: bool = False,
+    ) -> Union[FHIRBundle, dict[str, Any]]:
+        """
+        Search for FHIR resources.
+
+        Args:
+            resource_type: FHIR resource type
+            query: Search parameters
+            return_bundle: If True, wrap in FHIRBundle helper
+
+        Returns:
+            FHIRBundle wrapper, or raw dict
+
+        Examples:
+            # Raw dict (backward compatible)
+            bundle_dict = await client.search_resources("Patient", {"family": "Smith"})
+
+            # FHIRBundle wrapper
+            bundle = await client.search_resources("Patient", {}, return_bundle=True)
+            for patient in bundle:
+                print(patient['name'])
+
+            # With typing
+            from pymedplum.fhir import Patient
+            bundle = await client.search_resources("Patient", {}, return_bundle=True)
+            patients = bundle.get_resources_typed(Patient)
+        """
         params = self._build_query_params(query)
-        return await self._request(
+        response = await self._request(
             "GET", f"{self.fhir_base_url}{resource_type}", params=params
         )
+
+        if return_bundle:
+            return FHIRBundle(response)
+
+        return response
 
     async def search_one(
         self, resource_type: str, query: Optional[QueryTypes] = None

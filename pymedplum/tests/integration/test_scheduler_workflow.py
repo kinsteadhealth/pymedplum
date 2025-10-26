@@ -15,21 +15,21 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
-from fhir.resources.R4B.appointment import Appointment
-from fhir.resources.R4B.codeableconcept import CodeableConcept
-from fhir.resources.R4B.coding import Coding
-from fhir.resources.R4B.contactpoint import ContactPoint
-from fhir.resources.R4B.humanname import HumanName
-from fhir.resources.R4B.identifier import Identifier
-from fhir.resources.R4B.patient import Patient
-from fhir.resources.R4B.period import Period
-from fhir.resources.R4B.practitioner import Practitioner
-from fhir.resources.R4B.reference import Reference
-from fhir.resources.R4B.schedule import Schedule
-from fhir.resources.R4B.slot import Slot
 
 from pymedplum.client import MedplumClient
-from pymedplum.helpers.fhir import to_fhir_json
+from pymedplum.fhir.appointment import Appointment
+from pymedplum.fhir.codeableconcept import CodeableConcept
+from pymedplum.fhir.coding import Coding
+from pymedplum.fhir.contactpoint import ContactPoint
+from pymedplum.fhir.humanname import HumanName
+from pymedplum.fhir.identifier import Identifier
+from pymedplum.fhir.patient import Patient
+from pymedplum.fhir.period import Period
+from pymedplum.fhir.practitioner import Practitioner
+from pymedplum.fhir.reference import Reference
+from pymedplum.fhir.schedule import Schedule
+from pymedplum.fhir.slot import Slot
+from pymedplum.helpers import to_fhir_json
 
 # Visit Type Definitions (based on primary care research)
 VISIT_TYPES = {
@@ -104,8 +104,8 @@ def clinic_schedule(
         active=True,
         actor=[Reference(reference=f"Practitioner/{provider['id']}")],
         planningHorizon=Period(
-            start=next_monday.replace(hour=9, minute=0, second=0),
-            end=next_friday.replace(hour=17, minute=0, second=0),
+            start=next_monday.replace(hour=9, minute=0, second=0).isoformat(),
+            end=next_friday.replace(hour=17, minute=0, second=0).isoformat(),
         ),
         comment="Primary care clinic schedule - Wave scheduling approach",
     )
@@ -140,8 +140,8 @@ def create_appointment_slots(
         slot = Slot(
             schedule=Reference(reference=f"Schedule/{schedule_id}"),
             status="free",
-            start=current_time,
-            end=slot_end,
+            start=current_time.isoformat(),
+            end=slot_end.isoformat(),
             serviceType=[
                 CodeableConcept(
                     coding=[
@@ -243,8 +243,8 @@ def test_02_schedule_with_multiple_providers(
                 active=True,
                 actor=[Reference(reference=f"Practitioner/{provider['id']}")],
                 planningHorizon=Period(
-                    start=tomorrow.replace(hour=9, minute=0),
-                    end=tomorrow.replace(hour=17, minute=0),
+                    start=tomorrow.replace(hour=9, minute=0).isoformat(),
+                    end=tomorrow.replace(hour=17, minute=0).isoformat(),
                 ),
             )
             schedule_result = medplum_client.create_resource(to_fhir_json(schedule))
@@ -255,8 +255,8 @@ def test_02_schedule_with_multiple_providers(
                 slot = Slot(
                     schedule=Reference(reference=f"Schedule/{schedule_result['id']}"),
                     status="free",
-                    start=tomorrow.replace(hour=hour, minute=0),
-                    end=tomorrow.replace(hour=hour, minute=30),
+                    start=tomorrow.replace(hour=hour, minute=0).isoformat(),
+                    end=tomorrow.replace(hour=hour, minute=30).isoformat(),
                     serviceType=[
                         CodeableConcept(
                             coding=[
@@ -282,9 +282,9 @@ def test_02_schedule_with_multiple_providers(
         )
 
         assert "entry" in provider_slots
-        assert len(provider_slots["entry"]) >= 3, (
-            "Should find at least 3 slots for first provider"
-        )
+        assert (
+            len(provider_slots["entry"]) >= 3
+        ), "Should find at least 3 slots for first provider"
 
         print(
             f"""
@@ -337,8 +337,8 @@ def test_03_create_new_patient_and_book_appointment(
         new_patient_slot = Slot(
             schedule=Reference(reference=f"Schedule/{clinic_schedule['id']}"),
             status="free",
-            start=slot_start,
-            end=slot_start + timedelta(minutes=45),
+            start=slot_start.isoformat(),
+            end=(slot_start + timedelta(minutes=45)).isoformat(),
             serviceType=[
                 CodeableConcept(
                     coding=[
@@ -368,8 +368,8 @@ def test_03_create_new_patient_and_book_appointment(
                     ]
                 )
             ],
-            start=slot_start,
-            end=slot_start + timedelta(minutes=45),
+            start=slot_start.isoformat(),
+            end=(slot_start + timedelta(minutes=45)).isoformat(),
             participant=[
                 {
                     "actor": Reference(reference=f"Patient/{patient_result['id']}"),
@@ -450,8 +450,8 @@ def test_04_prevent_double_booking_conflict(
         slot = Slot(
             schedule=Reference(reference=f"Schedule/{clinic_schedule['id']}"),
             status="free",
-            start=slot_start,
-            end=slot_start + timedelta(minutes=15),
+            start=slot_start.isoformat(),
+            end=(slot_start + timedelta(minutes=15)).isoformat(),
             serviceType=[
                 CodeableConcept(
                     coding=[
@@ -481,8 +481,8 @@ def test_04_prevent_double_booking_conflict(
                     ]
                 )
             ],
-            start=slot_start,
-            end=slot_start + timedelta(minutes=15),
+            start=slot_start.isoformat(),
+            end=(slot_start + timedelta(minutes=15)).isoformat(),
             participant=[
                 {
                     "actor": Reference(reference=f"Patient/{patient1_result['id']}"),
@@ -597,8 +597,8 @@ def test_05_handle_duplicate_patient_records(
         slot = Slot(
             schedule=Reference(reference=f"Schedule/{clinic_schedule['id']}"),
             status="free",
-            start=slot_start,
-            end=slot_start + timedelta(minutes=30),
+            start=slot_start.isoformat(),
+            end=(slot_start + timedelta(minutes=30)).isoformat(),
             serviceType=[
                 CodeableConcept(
                     coding=[
@@ -628,8 +628,8 @@ def test_05_handle_duplicate_patient_records(
                     ]
                 )
             ],
-            start=slot_start,
-            end=slot_start + timedelta(minutes=30),
+            start=slot_start.isoformat(),
+            end=(slot_start + timedelta(minutes=30)).isoformat(),
             participant=[
                 {
                     "actor": Reference(
@@ -657,9 +657,9 @@ def test_05_handle_duplicate_patient_records(
         )
 
         assert "entry" in duplicates_search
-        assert len(duplicates_search["entry"]) == 2, (
-            "Should find 2 patients with same name/DOB"
-        )
+        assert (
+            len(duplicates_search["entry"]) == 2
+        ), "Should find 2 patients with same name/DOB"
 
         # Step 2: Identify which is the duplicate (newer creation date or different identifier)
         # In real scenario, this might involve manual review or more sophisticated matching
@@ -690,9 +690,9 @@ def test_05_handle_duplicate_patient_records(
 
         # Verify appointment now references original patient
         patient_ref = updated_appointment["participant"][0]["actor"]["reference"]
-        assert patient_ref == f"Patient/{original_result['id']}", (
-            "Appointment should now reference original patient"
-        )
+        assert (
+            patient_ref == f"Patient/{original_result['id']}"
+        ), "Appointment should now reference original patient"
 
         # Step 4: Delete duplicate patient (after ensuring no other references)
         medplum_client.delete_resource("Patient", duplicate_result["id"])
@@ -762,8 +762,8 @@ def test_06_wave_scheduling_simulation(
         slot_annual = Slot(
             schedule=Reference(reference=f"Schedule/{clinic_schedule['id']}"),
             status="free",
-            start=wave_time,
-            end=wave_time + timedelta(minutes=30),
+            start=wave_time.isoformat(),
+            end=(wave_time + timedelta(minutes=30)).isoformat(),
             serviceType=[
                 CodeableConcept(
                     coding=[
@@ -784,8 +784,8 @@ def test_06_wave_scheduling_simulation(
         slot_sick = Slot(
             schedule=Reference(reference=f"Schedule/{clinic_schedule['id']}"),
             status="free",
-            start=wave_time,
-            end=wave_time + timedelta(minutes=15),
+            start=wave_time.isoformat(),
+            end=(wave_time + timedelta(minutes=15)).isoformat(),
             serviceType=[
                 CodeableConcept(
                     coding=[
@@ -816,8 +816,8 @@ def test_06_wave_scheduling_simulation(
                     ]
                 )
             ],
-            start=wave_time,
-            end=wave_time + timedelta(minutes=30),
+            start=wave_time.isoformat(),
+            end=(wave_time + timedelta(minutes=30)).isoformat(),
             participant=[
                 {
                     "actor": Reference(
@@ -854,8 +854,8 @@ def test_06_wave_scheduling_simulation(
                     ]
                 )
             ],
-            start=wave_time,
-            end=wave_time + timedelta(minutes=15),
+            start=wave_time.isoformat(),
+            end=(wave_time + timedelta(minutes=15)).isoformat(),
             participant=[
                 {
                     "actor": Reference(
