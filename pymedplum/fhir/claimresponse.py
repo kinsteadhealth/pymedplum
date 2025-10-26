@@ -1,15 +1,27 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.address import Address
+    from pymedplum.fhir.attachment import Attachment
+    from pymedplum.fhir.codeableconcept import CodeableConcept
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.identifier import Identifier
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.money import Money
+    from pymedplum.fhir.narrative import Narrative
+    from pymedplum.fhir.period import Period
+    from pymedplum.fhir.quantity import Quantity
+    from pymedplum.fhir.reference import Reference
 
 
 class ClaimResponse(MedplumFHIRBase):
@@ -705,26 +717,3 @@ class ClaimResponseTotal(MedplumFHIRBase):
     amount: Money = Field(
         default=..., description="Monetary total amount associated with the category."
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("ClaimResponse", ClaimResponse)
-    register_model("ClaimResponseAddItem", ClaimResponseAddItem)
-    register_model("ClaimResponseAddItemDetail", ClaimResponseAddItemDetail)
-    register_model(
-        "ClaimResponseAddItemDetailSubDetail", ClaimResponseAddItemDetailSubDetail
-    )
-    register_model("ClaimResponseError", ClaimResponseError)
-    register_model("ClaimResponseInsurance", ClaimResponseInsurance)
-    register_model("ClaimResponseItem", ClaimResponseItem)
-    register_model("ClaimResponseItemAdjudication", ClaimResponseItemAdjudication)
-    register_model("ClaimResponseItemDetail", ClaimResponseItemDetail)
-    register_model("ClaimResponseItemDetailSubDetail", ClaimResponseItemDetailSubDetail)
-    register_model("ClaimResponsePayment", ClaimResponsePayment)
-    register_model("ClaimResponseProcessNote", ClaimResponseProcessNote)
-    register_model("ClaimResponseTotal", ClaimResponseTotal)

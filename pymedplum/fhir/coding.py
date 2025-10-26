@@ -1,15 +1,17 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.extension import Extension
 
 
 class Coding(MedplumFHIRBase):
@@ -44,12 +46,3 @@ class Coding(MedplumFHIRBase):
         alias="userSelected",
         description="Indicates that this coding was chosen by a user directly - e.g. off a pick list of available items (codes or displays).",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("Coding", Coding)

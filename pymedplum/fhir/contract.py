@@ -1,15 +1,30 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.annotation import Annotation
+    from pymedplum.fhir.attachment import Attachment
+    from pymedplum.fhir.codeableconcept import CodeableConcept
+    from pymedplum.fhir.coding import Coding
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.identifier import Identifier
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.money import Money
+    from pymedplum.fhir.narrative import Narrative
+    from pymedplum.fhir.period import Period
+    from pymedplum.fhir.quantity import Quantity
+    from pymedplum.fhir.reference import Reference
+    from pymedplum.fhir.signature import Signature
+    from pymedplum.fhir.timing import Timing
 
 
 class Contract(MedplumFHIRBase):
@@ -992,27 +1007,3 @@ class ContractTermSecurityLabel(MedplumFHIRBase):
         default=None,
         description="Security label privacy tag that species the manner in which term and/or term elements are to be protected.",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("Contract", Contract)
-    register_model("ContractContentDefinition", ContractContentDefinition)
-    register_model("ContractFriendly", ContractFriendly)
-    register_model("ContractLegal", ContractLegal)
-    register_model("ContractRule", ContractRule)
-    register_model("ContractSigner", ContractSigner)
-    register_model("ContractTerm", ContractTerm)
-    register_model("ContractTermAction", ContractTermAction)
-    register_model("ContractTermActionSubject", ContractTermActionSubject)
-    register_model("ContractTermAsset", ContractTermAsset)
-    register_model("ContractTermAssetContext", ContractTermAssetContext)
-    register_model("ContractTermAssetValuedItem", ContractTermAssetValuedItem)
-    register_model("ContractTermOffer", ContractTermOffer)
-    register_model("ContractTermOfferAnswer", ContractTermOfferAnswer)
-    register_model("ContractTermOfferParty", ContractTermOfferParty)
-    register_model("ContractTermSecurityLabel", ContractTermSecurityLabel)

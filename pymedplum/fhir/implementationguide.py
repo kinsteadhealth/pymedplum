@@ -1,15 +1,24 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.codeableconcept import CodeableConcept
+    from pymedplum.fhir.contactdetail import ContactDetail
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.narrative import Narrative
+    from pymedplum.fhir.reference import Reference
+    from pymedplum.fhir.resourcetype import ResourceType
+    from pymedplum.fhir.usagecontext import UsageContext
 
 
 class ImplementationGuide(MedplumFHIRBase):
@@ -920,36 +929,4 @@ class ImplementationGuideManifestResource(MedplumFHIRBase):
         default=None,
         alias="relativePath",
         description="The relative path for primary page for this resource within the IG.",
-    )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("ImplementationGuide", ImplementationGuide)
-    register_model("ImplementationGuideDefinition", ImplementationGuideDefinition)
-    register_model(
-        "ImplementationGuideDefinitionGrouping", ImplementationGuideDefinitionGrouping
-    )
-    register_model(
-        "ImplementationGuideDefinitionPage", ImplementationGuideDefinitionPage
-    )
-    register_model(
-        "ImplementationGuideDefinitionParameter", ImplementationGuideDefinitionParameter
-    )
-    register_model(
-        "ImplementationGuideDefinitionResource", ImplementationGuideDefinitionResource
-    )
-    register_model(
-        "ImplementationGuideDefinitionTemplate", ImplementationGuideDefinitionTemplate
-    )
-    register_model("ImplementationGuideDependsOn", ImplementationGuideDependsOn)
-    register_model("ImplementationGuideGlobal", ImplementationGuideGlobal)
-    register_model("ImplementationGuideManifest", ImplementationGuideManifest)
-    register_model("ImplementationGuideManifestPage", ImplementationGuideManifestPage)
-    register_model(
-        "ImplementationGuideManifestResource", ImplementationGuideManifestResource
     )

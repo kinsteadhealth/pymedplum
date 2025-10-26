@@ -1,15 +1,26 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.codeableconcept import CodeableConcept
+    from pymedplum.fhir.dosage import Dosage
+    from pymedplum.fhir.duration import Duration
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.money import Money
+    from pymedplum.fhir.narrative import Narrative
+    from pymedplum.fhir.quantity import Quantity
+    from pymedplum.fhir.ratio import Ratio
+    from pymedplum.fhir.reference import Reference
 
 
 class MedicationKnowledge(MedplumFHIRBase):
@@ -634,56 +645,4 @@ class MedicationKnowledgeRelatedMedicationKnowledge(MedplumFHIRBase):
     reference: list[Reference] = Field(
         default=...,
         description="Associated documentation about the associated medication knowledge.",
-    )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("MedicationKnowledge", MedicationKnowledge)
-    register_model(
-        "MedicationKnowledgeAdministrationGuidelines",
-        MedicationKnowledgeAdministrationGuidelines,
-    )
-    register_model(
-        "MedicationKnowledgeAdministrationGuidelinesDosage",
-        MedicationKnowledgeAdministrationGuidelinesDosage,
-    )
-    register_model(
-        "MedicationKnowledgeAdministrationGuidelinesPatientCharacteristics",
-        MedicationKnowledgeAdministrationGuidelinesPatientCharacteristics,
-    )
-    register_model("MedicationKnowledgeCost", MedicationKnowledgeCost)
-    register_model(
-        "MedicationKnowledgeDrugCharacteristic", MedicationKnowledgeDrugCharacteristic
-    )
-    register_model("MedicationKnowledgeIngredient", MedicationKnowledgeIngredient)
-    register_model("MedicationKnowledgeKinetics", MedicationKnowledgeKinetics)
-    register_model(
-        "MedicationKnowledgeMedicineClassification",
-        MedicationKnowledgeMedicineClassification,
-    )
-    register_model(
-        "MedicationKnowledgeMonitoringProgram", MedicationKnowledgeMonitoringProgram
-    )
-    register_model("MedicationKnowledgeMonograph", MedicationKnowledgeMonograph)
-    register_model("MedicationKnowledgePackaging", MedicationKnowledgePackaging)
-    register_model("MedicationKnowledgeRegulatory", MedicationKnowledgeRegulatory)
-    register_model(
-        "MedicationKnowledgeRegulatoryMaxDispense",
-        MedicationKnowledgeRegulatoryMaxDispense,
-    )
-    register_model(
-        "MedicationKnowledgeRegulatorySchedule", MedicationKnowledgeRegulatorySchedule
-    )
-    register_model(
-        "MedicationKnowledgeRegulatorySubstitution",
-        MedicationKnowledgeRegulatorySubstitution,
-    )
-    register_model(
-        "MedicationKnowledgeRelatedMedicationKnowledge",
-        MedicationKnowledgeRelatedMedicationKnowledge,
     )

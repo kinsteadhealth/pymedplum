@@ -1,15 +1,25 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.codeableconcept import CodeableConcept
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.identifier import Identifier
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.narrative import Narrative
+    from pymedplum.fhir.period import Period
+    from pymedplum.fhir.quantity import Quantity
+    from pymedplum.fhir.range import Range
+    from pymedplum.fhir.reference import Reference
 
 
 class Group(MedplumFHIRBase):
@@ -181,14 +191,3 @@ class GroupMember(MedplumFHIRBase):
         default=None,
         description="A flag to indicate that the member is no longer in the group, but previously may have been a member.",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("Group", Group)
-    register_model("GroupCharacteristic", GroupCharacteristic)
-    register_model("GroupMember", GroupMember)

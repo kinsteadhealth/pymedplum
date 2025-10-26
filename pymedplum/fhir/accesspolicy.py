@@ -1,15 +1,21 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.expression import Expression
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.narrative import Narrative
+    from pymedplum.fhir.reference import Reference
 
 
 class AccessPolicy(MedplumFHIRBase):
@@ -126,14 +132,3 @@ class AccessPolicyResource(MedplumFHIRBase):
         alias="writeConstraint",
         description="Invariants that must be satisfied for the resource to be written. Can include %before and %after placeholders to refer to the resource before and after the updates are applied.",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("AccessPolicy", AccessPolicy)
-    register_model("AccessPolicyIpAccessRule", AccessPolicyIpAccessRule)
-    register_model("AccessPolicyResource", AccessPolicyResource)

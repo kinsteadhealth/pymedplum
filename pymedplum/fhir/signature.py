@@ -1,15 +1,19 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.coding import Coding
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.reference import Reference
 
 
 class Signature(MedplumFHIRBase):
@@ -57,12 +61,3 @@ class Signature(MedplumFHIRBase):
         default=None,
         description="The base64 encoding of the Signature content. When signature is not recorded electronically this element would be empty.",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("Signature", Signature)

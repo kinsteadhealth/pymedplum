@@ -1,15 +1,18 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.quantity import Quantity
 
 
 class Range(MedplumFHIRBase):
@@ -29,12 +32,3 @@ class Range(MedplumFHIRBase):
     high: Optional[Quantity] = Field(
         default=None, description="The high limit. The boundary is inclusive."
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("Range", Range)

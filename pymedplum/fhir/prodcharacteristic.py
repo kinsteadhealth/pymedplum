@@ -1,15 +1,20 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.attachment import Attachment
+    from pymedplum.fhir.codeableconcept import CodeableConcept
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.quantity import Quantity
 
 
 class ProdCharacteristic(MedplumFHIRBase):
@@ -77,12 +82,3 @@ class ProdCharacteristic(MedplumFHIRBase):
         default=None,
         description="Where applicable, the scoring can be specified An appropriate controlled vocabulary shall be used The term and the term identifier shall be used.",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("ProdCharacteristic", ProdCharacteristic)

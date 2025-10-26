@@ -1,15 +1,25 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.annotation import Annotation
+    from pymedplum.fhir.codeableconcept import CodeableConcept
+    from pymedplum.fhir.contactpoint import ContactPoint
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.identifier import Identifier
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.narrative import Narrative
+    from pymedplum.fhir.period import Period
+    from pymedplum.fhir.reference import Reference
 
 
 class CareTeam(MedplumFHIRBase):
@@ -142,13 +152,3 @@ class CareTeamParticipant(MedplumFHIRBase):
         default=None,
         description="Indicates when the specific member or organization did (or is intended to) come into effect and end.",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("CareTeam", CareTeam)
-    register_model("CareTeamParticipant", CareTeamParticipant)

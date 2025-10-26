@@ -1,15 +1,28 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.address import Address
+    from pymedplum.fhir.codeableconcept import CodeableConcept
+    from pymedplum.fhir.contactpoint import ContactPoint
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.humanname import HumanName
+    from pymedplum.fhir.identifier import Identifier
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.money import Money
+    from pymedplum.fhir.narrative import Narrative
+    from pymedplum.fhir.period import Period
+    from pymedplum.fhir.quantity import Quantity
+    from pymedplum.fhir.reference import Reference
 
 
 class InsurancePlan(MedplumFHIRBase):
@@ -382,29 +395,4 @@ class InsurancePlanPlanSpecificCostBenefitCost(MedplumFHIRBase):
     value: Optional[Quantity] = Field(
         default=None,
         description="The actual cost value. (some of the costs may be represented as percentages rather than currency, e.g. 10% coinsurance).",
-    )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("InsurancePlan", InsurancePlan)
-    register_model("InsurancePlanContact", InsurancePlanContact)
-    register_model("InsurancePlanCoverage", InsurancePlanCoverage)
-    register_model("InsurancePlanCoverageBenefit", InsurancePlanCoverageBenefit)
-    register_model(
-        "InsurancePlanCoverageBenefitLimit", InsurancePlanCoverageBenefitLimit
-    )
-    register_model("InsurancePlanPlan", InsurancePlanPlan)
-    register_model("InsurancePlanPlanGeneralCost", InsurancePlanPlanGeneralCost)
-    register_model("InsurancePlanPlanSpecificCost", InsurancePlanPlanSpecificCost)
-    register_model(
-        "InsurancePlanPlanSpecificCostBenefit", InsurancePlanPlanSpecificCostBenefit
-    )
-    register_model(
-        "InsurancePlanPlanSpecificCostBenefitCost",
-        InsurancePlanPlanSpecificCostBenefitCost,
     )

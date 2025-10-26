@@ -1,15 +1,24 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.codeableconcept import CodeableConcept
+    from pymedplum.fhir.coding import Coding
+    from pymedplum.fhir.contactdetail import ContactDetail
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.identifier import Identifier
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.narrative import Narrative
+    from pymedplum.fhir.usagecontext import UsageContext
 
 
 class CodeSystem(MedplumFHIRBase):
@@ -367,17 +376,3 @@ class CodeSystemProperty(MedplumFHIRBase):
         default=...,
         description="The type of the property value. Properties of type &quot;code&quot; contain a code defined by the code system (e.g. a reference to another defined concept).",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("CodeSystem", CodeSystem)
-    register_model("CodeSystemConcept", CodeSystemConcept)
-    register_model("CodeSystemConceptDesignation", CodeSystemConceptDesignation)
-    register_model("CodeSystemConceptProperty", CodeSystemConceptProperty)
-    register_model("CodeSystemFilter", CodeSystemFilter)
-    register_model("CodeSystemProperty", CodeSystemProperty)

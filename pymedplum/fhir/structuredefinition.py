@@ -1,15 +1,25 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.codeableconcept import CodeableConcept
+    from pymedplum.fhir.coding import Coding
+    from pymedplum.fhir.contactdetail import ContactDetail
+    from pymedplum.fhir.elementdefinition import ElementDefinition
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.identifier import Identifier
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.narrative import Narrative
+    from pymedplum.fhir.usagecontext import UsageContext
 
 
 class StructureDefinition(MedplumFHIRBase):
@@ -301,16 +311,3 @@ class StructureDefinitionSnapshot(MedplumFHIRBase):
         default=...,
         description="Captures constraints on each element within the resource.",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("StructureDefinition", StructureDefinition)
-    register_model("StructureDefinitionContext", StructureDefinitionContext)
-    register_model("StructureDefinitionDifferential", StructureDefinitionDifferential)
-    register_model("StructureDefinitionMapping", StructureDefinitionMapping)
-    register_model("StructureDefinitionSnapshot", StructureDefinitionSnapshot)

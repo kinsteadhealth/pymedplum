@@ -1,15 +1,21 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.datarequirement import DataRequirement
+    from pymedplum.fhir.expression import Expression
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.reference import Reference
+    from pymedplum.fhir.timing import Timing
 
 
 class TriggerDefinition(MedplumFHIRBase):
@@ -67,12 +73,3 @@ class TriggerDefinition(MedplumFHIRBase):
         default=None,
         description="A boolean-valued expression that is evaluated in the context of the container of the trigger definition and returns whether or not the trigger fires.",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("TriggerDefinition", TriggerDefinition)

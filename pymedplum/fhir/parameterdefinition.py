@@ -1,15 +1,17 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal, Optional, Union
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.extension import Extension
 
 
 class ParameterDefinition(MedplumFHIRBase):
@@ -52,12 +54,3 @@ class ParameterDefinition(MedplumFHIRBase):
         default=None,
         description="If specified, this indicates a profile that the input data must conform to, or that the output data will conform to.",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("ParameterDefinition", ParameterDefinition)

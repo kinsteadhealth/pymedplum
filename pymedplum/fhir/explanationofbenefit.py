@@ -1,15 +1,28 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.address import Address
+    from pymedplum.fhir.attachment import Attachment
+    from pymedplum.fhir.codeableconcept import CodeableConcept
+    from pymedplum.fhir.coding import Coding
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.identifier import Identifier
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.money import Money
+    from pymedplum.fhir.narrative import Narrative
+    from pymedplum.fhir.period import Period
+    from pymedplum.fhir.quantity import Quantity
+    from pymedplum.fhir.reference import Reference
 
 
 class ExplanationOfBenefit(MedplumFHIRBase):
@@ -1290,49 +1303,3 @@ class ExplanationOfBenefitTotal(MedplumFHIRBase):
     amount: Money = Field(
         default=..., description="Monetary total amount associated with the category."
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("ExplanationOfBenefit", ExplanationOfBenefit)
-    register_model("ExplanationOfBenefitAccident", ExplanationOfBenefitAccident)
-    register_model("ExplanationOfBenefitAddItem", ExplanationOfBenefitAddItem)
-    register_model(
-        "ExplanationOfBenefitAddItemDetail", ExplanationOfBenefitAddItemDetail
-    )
-    register_model(
-        "ExplanationOfBenefitAddItemDetailSubDetail",
-        ExplanationOfBenefitAddItemDetailSubDetail,
-    )
-    register_model(
-        "ExplanationOfBenefitBenefitBalance", ExplanationOfBenefitBenefitBalance
-    )
-    register_model(
-        "ExplanationOfBenefitBenefitBalanceFinancial",
-        ExplanationOfBenefitBenefitBalanceFinancial,
-    )
-    register_model("ExplanationOfBenefitCareTeam", ExplanationOfBenefitCareTeam)
-    register_model("ExplanationOfBenefitDiagnosis", ExplanationOfBenefitDiagnosis)
-    register_model("ExplanationOfBenefitInsurance", ExplanationOfBenefitInsurance)
-    register_model("ExplanationOfBenefitItem", ExplanationOfBenefitItem)
-    register_model(
-        "ExplanationOfBenefitItemAdjudication", ExplanationOfBenefitItemAdjudication
-    )
-    register_model("ExplanationOfBenefitItemDetail", ExplanationOfBenefitItemDetail)
-    register_model(
-        "ExplanationOfBenefitItemDetailSubDetail",
-        ExplanationOfBenefitItemDetailSubDetail,
-    )
-    register_model("ExplanationOfBenefitPayee", ExplanationOfBenefitPayee)
-    register_model("ExplanationOfBenefitPayment", ExplanationOfBenefitPayment)
-    register_model("ExplanationOfBenefitProcedure", ExplanationOfBenefitProcedure)
-    register_model("ExplanationOfBenefitProcessNote", ExplanationOfBenefitProcessNote)
-    register_model("ExplanationOfBenefitRelated", ExplanationOfBenefitRelated)
-    register_model(
-        "ExplanationOfBenefitSupportingInfo", ExplanationOfBenefitSupportingInfo
-    )
-    register_model("ExplanationOfBenefitTotal", ExplanationOfBenefitTotal)

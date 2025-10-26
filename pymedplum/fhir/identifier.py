@@ -1,15 +1,20 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.codeableconcept import CodeableConcept
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.period import Period
+    from pymedplum.fhir.reference import Reference
 
 
 class Identifier(MedplumFHIRBase):
@@ -47,12 +52,3 @@ class Identifier(MedplumFHIRBase):
     assigner: Optional[Reference] = Field(
         default=None, description="Organization that issued/manages the identifier."
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("Identifier", Identifier)

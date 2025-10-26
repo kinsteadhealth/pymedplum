@@ -1,15 +1,22 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal, Optional, Union
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.contactdetail import ContactDetail
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.identifier import Identifier
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.resourcetype import ResourceType
+    from pymedplum.fhir.usagecontext import UsageContext
 
 
 class ViewDefinition(MedplumFHIRBase):
@@ -366,17 +373,3 @@ class ViewDefinitionWhere(MedplumFHIRBase):
         default=None,
         description="A human-readable description of the above where constraint.",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("ViewDefinition", ViewDefinition)
-    register_model("ViewDefinitionConstant", ViewDefinitionConstant)
-    register_model("ViewDefinitionSelect", ViewDefinitionSelect)
-    register_model("ViewDefinitionSelectColumn", ViewDefinitionSelectColumn)
-    register_model("ViewDefinitionSelectColumnTag", ViewDefinitionSelectColumnTag)
-    register_model("ViewDefinitionWhere", ViewDefinitionWhere)

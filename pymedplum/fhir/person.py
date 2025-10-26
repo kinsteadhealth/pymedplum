@@ -1,15 +1,25 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.address import Address
+    from pymedplum.fhir.attachment import Attachment
+    from pymedplum.fhir.contactpoint import ContactPoint
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.humanname import HumanName
+    from pymedplum.fhir.identifier import Identifier
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.narrative import Narrative
+    from pymedplum.fhir.reference import Reference
 
 
 class Person(MedplumFHIRBase):
@@ -113,13 +123,3 @@ class PersonLink(MedplumFHIRBase):
         default=None,
         description="Level of assurance that this link is associated with the target resource.",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("Person", Person)
-    register_model("PersonLink", PersonLink)

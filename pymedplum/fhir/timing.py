@@ -1,15 +1,21 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal, Optional, Union
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.codeableconcept import CodeableConcept
+    from pymedplum.fhir.duration import Duration
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.period import Period
+    from pymedplum.fhir.range import Range
 
 
 class Timing(MedplumFHIRBase):
@@ -170,13 +176,3 @@ class TimingRepeat(MedplumFHIRBase):
         default=None,
         description="The number of minutes from the event. If the event code does not indicate whether the minutes is before or after the event, then the offset is assumed to be after the event.",
     )
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("Timing", Timing)
-    register_model("TimingRepeat", TimingRepeat)

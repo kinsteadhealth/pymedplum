@@ -1,17 +1,23 @@
 # This is a generated file
 # Do not edit manually.
 # Generated from Medplum TypeScript definitions
-# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()
 
 from __future__ import annotations
 
-from typing import Literal, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Literal, Optional, TypeVar, Union
 
 from pydantic import Field
 
 from pymedplum.fhir.base import MedplumFHIRBase
 
 T = TypeVar("T")
+
+if TYPE_CHECKING:
+    from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.identifier import Identifier
+    from pymedplum.fhir.meta import Meta
+    from pymedplum.fhir.operationoutcome import OperationOutcome
+    from pymedplum.fhir.signature import Signature
 
 
 class Bundle(MedplumFHIRBase):
@@ -258,17 +264,3 @@ class BundleLink(MedplumFHIRBase):
         description="A name which details the functional use for this link - see [http://www.iana.org/assignments/link-relations/link-relations.xhtml#link-relations-1](http://www.iana.org/assignments/link-relations/link-relations.xhtml#link-relations-1).",
     )
     url: str = Field(default=..., description="The reference details for the link.")
-
-
-# Register models for forward reference resolution
-from typing import TYPE_CHECKING  # noqa: E402
-
-if not TYPE_CHECKING:
-    from pymedplum.fhir._rebuild import register_model
-
-    register_model("Bundle", Bundle)
-    register_model("BundleEntry", BundleEntry)
-    register_model("BundleEntryRequest", BundleEntryRequest)
-    register_model("BundleEntryResponse", BundleEntryResponse)
-    register_model("BundleEntrySearch", BundleEntrySearch)
-    register_model("BundleLink", BundleLink)
