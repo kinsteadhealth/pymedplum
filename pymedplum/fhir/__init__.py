@@ -9,7 +9,724 @@ import importlib
 from typing import TYPE_CHECKING, Any, Literal
 
 # ResourceType is a Literal of all FHIR resource type strings
-ResourceType = Literal["AccessPolicy", "AccessPolicyIpAccessRule", "AccessPolicyResource", "Account", "AccountCoverage", "AccountGuarantor", "ActivityDefinition", "ActivityDefinitionDynamicValue", "ActivityDefinitionParticipant", "Address", "AdverseEvent", "AdverseEventSuspectEntity", "AdverseEventSuspectEntityCausality", "Age", "Agent", "AgentChannel", "AgentSetting", "AllergyIntolerance", "AllergyIntoleranceReaction", "Annotation", "Appointment", "AppointmentParticipant", "AppointmentResponse", "AsyncJob", "Attachment", "AuditEvent", "AuditEventAgent", "AuditEventAgentNetwork", "AuditEventEntity", "AuditEventEntityDetail", "AuditEventSource", "BackboneElement", "Basic", "Binary", "BiologicallyDerivedProduct", "BiologicallyDerivedProductCollection", "BiologicallyDerivedProductManipulation", "BiologicallyDerivedProductProcessing", "BiologicallyDerivedProductStorage", "BodyStructure", "Bot", "BulkDataExport", "BulkDataExportDeleted", "BulkDataExportError", "BulkDataExportOutput", "Bundle", "BundleEntry", "BundleEntryRequest", "BundleEntryResponse", "BundleEntrySearch", "BundleLink", "CapabilityStatement", "CapabilityStatementDocument", "CapabilityStatementImplementation", "CapabilityStatementMessaging", "CapabilityStatementMessagingEndpoint", "CapabilityStatementMessagingSupportedMessage", "CapabilityStatementRest", "CapabilityStatementRestInteraction", "CapabilityStatementRestResource", "CapabilityStatementRestResourceInteraction", "CapabilityStatementRestResourceOperation", "CapabilityStatementRestResourceSearchParam", "CapabilityStatementRestSecurity", "CapabilityStatementSoftware", "CarePlan", "CarePlanActivity", "CarePlanActivityDetail", "CareTeam", "CareTeamParticipant", "CatalogEntry", "CatalogEntryRelatedEntry", "ChargeItem", "ChargeItemDefinition", "ChargeItemDefinitionApplicability", "ChargeItemDefinitionPropertyGroup", "ChargeItemDefinitionPropertyGroupPriceComponent", "ChargeItemPerformer", "Claim", "ClaimAccident", "ClaimCareTeam", "ClaimDiagnosis", "ClaimInsurance", "ClaimItem", "ClaimItemDetail", "ClaimItemDetailSubDetail", "ClaimPayee", "ClaimProcedure", "ClaimRelated", "ClaimResponse", "ClaimResponseAddItem", "ClaimResponseAddItemDetail", "ClaimResponseAddItemDetailSubDetail", "ClaimResponseError", "ClaimResponseInsurance", "ClaimResponseItem", "ClaimResponseItemAdjudication", "ClaimResponseItemDetail", "ClaimResponseItemDetailSubDetail", "ClaimResponsePayment", "ClaimResponseProcessNote", "ClaimResponseTotal", "ClaimSupportingInfo", "ClientApplication", "ClientApplicationSignInForm", "ClinicalImpression", "ClinicalImpressionFinding", "ClinicalImpressionInvestigation", "CodeSystem", "CodeSystemConcept", "CodeSystemConceptDesignation", "CodeSystemConceptProperty", "CodeSystemFilter", "CodeSystemProperty", "CodeableConcept", "Coding", "Communication", "CommunicationPayload", "CommunicationRequest", "CommunicationRequestPayload", "CompartmentDefinition", "CompartmentDefinitionResource", "Composition", "CompositionAttester", "CompositionEvent", "CompositionRelatesTo", "CompositionSection", "ConceptMap", "ConceptMapGroup", "ConceptMapGroupElement", "ConceptMapGroupElementTarget", "ConceptMapGroupElementTargetDependsOn", "ConceptMapGroupUnmapped", "Condition", "ConditionEvidence", "ConditionStage", "Consent", "ConsentPolicy", "ConsentProvision", "ConsentProvisionActor", "ConsentProvisionData", "ConsentVerification", "ContactDetail", "ContactPoint", "Contract", "ContractContentDefinition", "ContractFriendly", "ContractLegal", "ContractRule", "ContractSigner", "ContractTerm", "ContractTermAction", "ContractTermActionSubject", "ContractTermAsset", "ContractTermAssetContext", "ContractTermAssetValuedItem", "ContractTermOffer", "ContractTermOfferAnswer", "ContractTermOfferParty", "ContractTermSecurityLabel", "Contributor", "Count", "Coverage", "CoverageClass", "CoverageCostToBeneficiary", "CoverageCostToBeneficiaryException", "CoverageEligibilityRequest", "CoverageEligibilityRequestInsurance", "CoverageEligibilityRequestItem", "CoverageEligibilityRequestItemDiagnosis", "CoverageEligibilityRequestSupportingInfo", "CoverageEligibilityResponse", "CoverageEligibilityResponseError", "CoverageEligibilityResponseInsurance", "CoverageEligibilityResponseInsuranceItem", "CoverageEligibilityResponseInsuranceItemBenefit", "DataRequirement", "DataRequirementCodeFilter", "DataRequirementDateFilter", "DataRequirementSort", "DetectedIssue", "DetectedIssueEvidence", "DetectedIssueMitigation", "Device", "DeviceDefinition", "DeviceDefinitionCapability", "DeviceDefinitionClassification", "DeviceDefinitionDeviceName", "DeviceDefinitionMaterial", "DeviceDefinitionProperty", "DeviceDefinitionSpecialization", "DeviceDefinitionUdiDeviceIdentifier", "DeviceDeviceName", "DeviceMetric", "DeviceMetricCalibration", "DeviceProperty", "DeviceRequest", "DeviceRequestParameter", "DeviceSpecialization", "DeviceUdiCarrier", "DeviceUseStatement", "DeviceVersion", "DiagnosticReport", "DiagnosticReportMedia", "Distance", "DocumentManifest", "DocumentManifestRelated", "DocumentReference", "DocumentReferenceContent", "DocumentReferenceContext", "DocumentReferenceRelatesTo", "DomainConfiguration", "Dosage", "DosageDoseAndRate", "Duration", "EffectEvidenceSynthesis", "EffectEvidenceSynthesisCertainty", "EffectEvidenceSynthesisCertaintyCertaintySubcomponent", "EffectEvidenceSynthesisEffectEstimate", "EffectEvidenceSynthesisEffectEstimatePrecisionEstimate", "EffectEvidenceSynthesisResultsByExposure", "EffectEvidenceSynthesisSampleSize", "Element", "ElementDefinition", "ElementDefinitionBase", "ElementDefinitionBinding", "ElementDefinitionConstraint", "ElementDefinitionExample", "ElementDefinitionMapping", "ElementDefinitionSlicing", "ElementDefinitionSlicingDiscriminator", "ElementDefinitionType", "Encounter", "EncounterClassHistory", "EncounterDiagnosis", "EncounterHospitalization", "EncounterLocation", "EncounterParticipant", "EncounterStatusHistory", "Endpoint", "EnrollmentRequest", "EnrollmentResponse", "EpisodeOfCare", "EpisodeOfCareDiagnosis", "EpisodeOfCareStatusHistory", "EventDefinition", "Evidence", "EvidenceVariable", "EvidenceVariableCharacteristic", "EvidenceVariableCharacteristicDefinitionByCombination", "EvidenceVariableCharacteristicDefinitionByTypeAndValue", "EvidenceVariableCharacteristicTimeFromEvent", "ExampleScenario", "ExampleScenarioActor", "ExampleScenarioInstance", "ExampleScenarioInstanceContainedInstance", "ExampleScenarioInstanceVersion", "ExampleScenarioProcess", "ExampleScenarioProcessStep", "ExampleScenarioProcessStepAlternative", "ExampleScenarioProcessStepOperation", "ExplanationOfBenefit", "ExplanationOfBenefitAccident", "ExplanationOfBenefitAddItem", "ExplanationOfBenefitAddItemDetail", "ExplanationOfBenefitAddItemDetailSubDetail", "ExplanationOfBenefitBenefitBalance", "ExplanationOfBenefitBenefitBalanceFinancial", "ExplanationOfBenefitCareTeam", "ExplanationOfBenefitDiagnosis", "ExplanationOfBenefitInsurance", "ExplanationOfBenefitItem", "ExplanationOfBenefitItemAdjudication", "ExplanationOfBenefitItemDetail", "ExplanationOfBenefitItemDetailSubDetail", "ExplanationOfBenefitPayee", "ExplanationOfBenefitPayment", "ExplanationOfBenefitProcedure", "ExplanationOfBenefitProcessNote", "ExplanationOfBenefitRelated", "ExplanationOfBenefitSupportingInfo", "ExplanationOfBenefitTotal", "Expression", "Extension", "FamilyMemberHistory", "FamilyMemberHistoryCondition", "Flag", "Goal", "GoalTarget", "GraphDefinition", "GraphDefinitionLink", "GraphDefinitionLinkTarget", "GraphDefinitionLinkTargetCompartment", "Group", "GroupCharacteristic", "GroupMember", "GuidanceResponse", "HealthcareService", "HealthcareServiceAvailableTime", "HealthcareServiceEligibility", "HealthcareServiceNotAvailable", "HumanName", "Identifier", "IdentityProvider", "ImagingStudy", "ImagingStudySeries", "ImagingStudySeriesInstance", "ImagingStudySeriesPerformer", "Immunization", "ImmunizationEducation", "ImmunizationEvaluation", "ImmunizationPerformer", "ImmunizationProtocolApplied", "ImmunizationReaction", "ImmunizationRecommendation", "ImmunizationRecommendationRecommendation", "ImmunizationRecommendationRecommendationDateCriterion", "ImplementationGuide", "ImplementationGuideDefinition", "ImplementationGuideDefinitionGrouping", "ImplementationGuideDefinitionPage", "ImplementationGuideDefinitionParameter", "ImplementationGuideDefinitionResource", "ImplementationGuideDefinitionTemplate", "ImplementationGuideDependsOn", "ImplementationGuideGlobal", "ImplementationGuideManifest", "ImplementationGuideManifestPage", "ImplementationGuideManifestResource", "InsurancePlan", "InsurancePlanContact", "InsurancePlanCoverage", "InsurancePlanCoverageBenefit", "InsurancePlanCoverageBenefitLimit", "InsurancePlanPlan", "InsurancePlanPlanGeneralCost", "InsurancePlanPlanSpecificCost", "InsurancePlanPlanSpecificCostBenefit", "InsurancePlanPlanSpecificCostBenefitCost", "Invoice", "InvoiceLineItem", "InvoiceLineItemPriceComponent", "InvoiceParticipant", "JsonWebKey", "Library", "Linkage", "LinkageItem", "List", "ListEntry", "Location", "LocationHoursOfOperation", "LocationPosition", "Login", "MarketingStatus", "Measure", "MeasureGroup", "MeasureGroupPopulation", "MeasureGroupStratifier", "MeasureGroupStratifierComponent", "MeasureReport", "MeasureReportGroup", "MeasureReportGroupPopulation", "MeasureReportGroupStratifier", "MeasureReportGroupStratifierStratum", "MeasureReportGroupStratifierStratumComponent", "MeasureReportGroupStratifierStratumPopulation", "MeasureSupplementalData", "Media", "Medication", "MedicationAdministration", "MedicationAdministrationDosage", "MedicationAdministrationPerformer", "MedicationBatch", "MedicationDispense", "MedicationDispensePerformer", "MedicationDispenseSubstitution", "MedicationIngredient", "MedicationKnowledge", "MedicationKnowledgeAdministrationGuidelines", "MedicationKnowledgeAdministrationGuidelinesDosage", "MedicationKnowledgeAdministrationGuidelinesPatientCharacteristics", "MedicationKnowledgeCost", "MedicationKnowledgeDrugCharacteristic", "MedicationKnowledgeIngredient", "MedicationKnowledgeKinetics", "MedicationKnowledgeMedicineClassification", "MedicationKnowledgeMonitoringProgram", "MedicationKnowledgeMonograph", "MedicationKnowledgePackaging", "MedicationKnowledgeRegulatory", "MedicationKnowledgeRegulatoryMaxDispense", "MedicationKnowledgeRegulatorySchedule", "MedicationKnowledgeRegulatorySubstitution", "MedicationKnowledgeRelatedMedicationKnowledge", "MedicationRequest", "MedicationRequestDispenseRequest", "MedicationRequestDispenseRequestInitialFill", "MedicationRequestSubstitution", "MedicationStatement", "MedicinalProduct", "MedicinalProductAuthorization", "MedicinalProductAuthorizationJurisdictionalAuthorization", "MedicinalProductAuthorizationProcedure", "MedicinalProductContraindication", "MedicinalProductContraindicationOtherTherapy", "MedicinalProductIndication", "MedicinalProductIndicationOtherTherapy", "MedicinalProductIngredient", "MedicinalProductIngredientSpecifiedSubstance", "MedicinalProductIngredientSpecifiedSubstanceStrength", "MedicinalProductIngredientSpecifiedSubstanceStrengthReferenceStrength", "MedicinalProductIngredientSubstance", "MedicinalProductInteraction", "MedicinalProductInteractionInteractant", "MedicinalProductManufactured", "MedicinalProductManufacturingBusinessOperation", "MedicinalProductName", "MedicinalProductNameCountryLanguage", "MedicinalProductNameNamePart", "MedicinalProductPackaged", "MedicinalProductPackagedBatchIdentifier", "MedicinalProductPackagedPackageItem", "MedicinalProductPharmaceutical", "MedicinalProductPharmaceuticalCharacteristics", "MedicinalProductPharmaceuticalRouteOfAdministration", "MedicinalProductPharmaceuticalRouteOfAdministrationTargetSpecies", "MedicinalProductPharmaceuticalRouteOfAdministrationTargetSpeciesWithdrawalPeriod", "MedicinalProductSpecialDesignation", "MedicinalProductUndesirableEffect", "MessageDefinition", "MessageDefinitionAllowedResponse", "MessageDefinitionFocus", "MessageHeader", "MessageHeaderDestination", "MessageHeaderResponse", "MessageHeaderSource", "Meta", "MetadataResource", "MolecularSequence", "MolecularSequenceQuality", "MolecularSequenceQualityRoc", "MolecularSequenceReferenceSeq", "MolecularSequenceRepository", "MolecularSequenceStructureVariant", "MolecularSequenceStructureVariantInner", "MolecularSequenceStructureVariantOuter", "MolecularSequenceVariant", "Money", "MoneyQuantity", "NamingSystem", "NamingSystemUniqueId", "Narrative", "NutritionOrder", "NutritionOrderEnteralFormula", "NutritionOrderEnteralFormulaAdministration", "NutritionOrderOralDiet", "NutritionOrderOralDietNutrient", "NutritionOrderOralDietTexture", "NutritionOrderSupplement", "Observation", "ObservationComponent", "ObservationDefinition", "ObservationDefinitionQualifiedInterval", "ObservationDefinitionQuantitativeDetails", "ObservationReferenceRange", "OperationDefinition", "OperationDefinitionOverload", "OperationDefinitionParameter", "OperationDefinitionParameterBinding", "OperationDefinitionParameterReferencedFrom", "OperationOutcome", "OperationOutcomeIssue", "Organization", "OrganizationAffiliation", "OrganizationContact", "ParameterDefinition", "Parameters", "ParametersParameter", "PasswordChangeRequest", "Patient", "PatientCommunication", "PatientContact", "PatientLink", "PaymentNotice", "PaymentReconciliation", "PaymentReconciliationDetail", "PaymentReconciliationProcessNote", "Period", "Person", "PersonLink", "PlanDefinition", "PlanDefinitionAction", "PlanDefinitionActionCondition", "PlanDefinitionActionDynamicValue", "PlanDefinitionActionParticipant", "PlanDefinitionActionRelatedAction", "PlanDefinitionGoal", "PlanDefinitionGoalTarget", "Population", "Practitioner", "PractitionerQualification", "PractitionerRole", "PractitionerRoleAvailableTime", "PractitionerRoleNotAvailable", "Procedure", "ProcedureFocalDevice", "ProcedurePerformer", "ProdCharacteristic", "ProductShelfLife", "Project", "ProjectDefaultProfile", "ProjectLink", "ProjectMembership", "ProjectMembershipAccess", "ProjectMembershipAccessParameter", "ProjectSetting", "ProjectSite", "Provenance", "ProvenanceAgent", "ProvenanceEntity", "Quantity", "Questionnaire", "QuestionnaireItem", "QuestionnaireItemAnswerOption", "QuestionnaireItemEnableWhen", "QuestionnaireItemInitial", "QuestionnaireResponse", "QuestionnaireResponseItem", "QuestionnaireResponseItemAnswer", "Range", "Ratio", "Reference", "RelatedArtifact", "RelatedPerson", "RelatedPersonCommunication", "RequestGroup", "RequestGroupAction", "RequestGroupActionCondition", "RequestGroupActionRelatedAction", "ResearchDefinition", "ResearchElementDefinition", "ResearchElementDefinitionCharacteristic", "ResearchStudy", "ResearchStudyArm", "ResearchStudyAssociatedParty", "ResearchStudyComparisonGroup", "ResearchStudyLabel", "ResearchStudyObjective", "ResearchStudyOutcomeMeasure", "ResearchStudyProgressStatus", "ResearchStudyRecruitment", "ResearchSubject", "RiskAssessment", "RiskAssessmentPrediction", "RiskEvidenceSynthesis", "RiskEvidenceSynthesisCertainty", "RiskEvidenceSynthesisCertaintyCertaintySubcomponent", "RiskEvidenceSynthesisRiskEstimate", "RiskEvidenceSynthesisRiskEstimatePrecisionEstimate", "RiskEvidenceSynthesisSampleSize", "SampledData", "Schedule", "SearchParameter", "SearchParameterComponent", "ServiceRequest", "Signature", "SimpleQuantity", "Slot", "SmartAppLaunch", "Specimen", "SpecimenCollection", "SpecimenContainer", "SpecimenDefinition", "SpecimenDefinitionTypeTested", "SpecimenDefinitionTypeTestedContainer", "SpecimenDefinitionTypeTestedContainerAdditive", "SpecimenDefinitionTypeTestedHandling", "SpecimenProcessing", "StructureDefinition", "StructureDefinitionContext", "StructureDefinitionDifferential", "StructureDefinitionMapping", "StructureDefinitionSnapshot", "StructureMap", "StructureMapGroup", "StructureMapGroupInput", "StructureMapGroupRule", "StructureMapGroupRuleDependent", "StructureMapGroupRuleSource", "StructureMapGroupRuleTarget", "StructureMapGroupRuleTargetParameter", "StructureMapStructure", "Subscription", "SubscriptionChannel", "SubscriptionStatus", "SubscriptionStatusNotificationEvent", "Substance", "SubstanceAmount", "SubstanceAmountReferenceRange", "SubstanceIngredient", "SubstanceInstance", "SubstanceNucleicAcid", "SubstanceNucleicAcidSubunit", "SubstanceNucleicAcidSubunitLinkage", "SubstanceNucleicAcidSubunitSugar", "SubstancePolymer", "SubstancePolymerMonomerSet", "SubstancePolymerMonomerSetStartingMaterial", "SubstancePolymerRepeat", "SubstancePolymerRepeatRepeatUnit", "SubstancePolymerRepeatRepeatUnitDegreeOfPolymerisation", "SubstancePolymerRepeatRepeatUnitStructuralRepresentation", "SubstanceProtein", "SubstanceProteinSubunit", "SubstanceReferenceInformation", "SubstanceReferenceInformationClassification", "SubstanceReferenceInformationGene", "SubstanceReferenceInformationGeneElement", "SubstanceReferenceInformationTarget", "SubstanceSourceMaterial", "SubstanceSourceMaterialFractionDescription", "SubstanceSourceMaterialOrganism", "SubstanceSourceMaterialOrganismAuthor", "SubstanceSourceMaterialOrganismHybrid", "SubstanceSourceMaterialOrganismOrganismGeneral", "SubstanceSourceMaterialPartDescription", "SubstanceSpecification", "SubstanceSpecificationCode", "SubstanceSpecificationMoiety", "SubstanceSpecificationName", "SubstanceSpecificationNameOfficial", "SubstanceSpecificationProperty", "SubstanceSpecificationRelationship", "SubstanceSpecificationStructure", "SubstanceSpecificationStructureIsotope", "SubstanceSpecificationStructureIsotopeMolecularWeight", "SubstanceSpecificationStructureRepresentation", "SupplyDelivery", "SupplyDeliverySuppliedItem", "SupplyRequest", "SupplyRequestParameter", "Task", "TaskInput", "TaskOutput", "TaskRestriction", "TerminologyCapabilities", "TerminologyCapabilitiesClosure", "TerminologyCapabilitiesCodeSystem", "TerminologyCapabilitiesCodeSystemVersion", "TerminologyCapabilitiesCodeSystemVersionFilter", "TerminologyCapabilitiesExpansion", "TerminologyCapabilitiesExpansionParameter", "TerminologyCapabilitiesImplementation", "TerminologyCapabilitiesSoftware", "TerminologyCapabilitiesTranslation", "TerminologyCapabilitiesValidateCode", "TestReport", "TestReportParticipant", "TestReportSetup", "TestReportSetupAction", "TestReportSetupActionAssert", "TestReportSetupActionOperation", "TestReportTeardown", "TestReportTeardownAction", "TestReportTest", "TestReportTestAction", "TestScript", "TestScriptDestination", "TestScriptFixture", "TestScriptMetadata", "TestScriptMetadataCapability", "TestScriptMetadataLink", "TestScriptOrigin", "TestScriptSetup", "TestScriptSetupAction", "TestScriptSetupActionAssert", "TestScriptSetupActionOperation", "TestScriptSetupActionOperationRequestHeader", "TestScriptTeardown", "TestScriptTeardownAction", "TestScriptTest", "TestScriptTestAction", "TestScriptVariable", "Timing", "TimingRepeat", "TriggerDefinition", "UsageContext", "User", "UserConfiguration", "UserConfigurationMenu", "UserConfigurationMenuLink", "UserConfigurationOption", "UserConfigurationSearch", "UserSecurityRequest", "ValueSet", "ValueSetCompose", "ValueSetComposeInclude", "ValueSetComposeIncludeConcept", "ValueSetComposeIncludeConceptDesignation", "ValueSetComposeIncludeFilter", "ValueSetExpansion", "ValueSetExpansionContains", "ValueSetExpansionParameter", "VerificationResult", "VerificationResultAttestation", "VerificationResultPrimarySource", "VerificationResultValidator", "ViewDefinition", "ViewDefinitionConstant", "ViewDefinitionSelect", "ViewDefinitionSelectColumn", "ViewDefinitionSelectColumnTag", "ViewDefinitionWhere", "VisionPrescription", "VisionPrescriptionLensSpecification", "VisionPrescriptionLensSpecificationPrism"]
+ResourceType = Literal[
+    "AccessPolicy",
+    "AccessPolicyIpAccessRule",
+    "AccessPolicyResource",
+    "Account",
+    "AccountCoverage",
+    "AccountGuarantor",
+    "ActivityDefinition",
+    "ActivityDefinitionDynamicValue",
+    "ActivityDefinitionParticipant",
+    "Address",
+    "AdverseEvent",
+    "AdverseEventSuspectEntity",
+    "AdverseEventSuspectEntityCausality",
+    "Age",
+    "Agent",
+    "AgentChannel",
+    "AgentSetting",
+    "AllergyIntolerance",
+    "AllergyIntoleranceReaction",
+    "Annotation",
+    "Appointment",
+    "AppointmentParticipant",
+    "AppointmentResponse",
+    "AsyncJob",
+    "Attachment",
+    "AuditEvent",
+    "AuditEventAgent",
+    "AuditEventAgentNetwork",
+    "AuditEventEntity",
+    "AuditEventEntityDetail",
+    "AuditEventSource",
+    "BackboneElement",
+    "Basic",
+    "Binary",
+    "BiologicallyDerivedProduct",
+    "BiologicallyDerivedProductCollection",
+    "BiologicallyDerivedProductManipulation",
+    "BiologicallyDerivedProductProcessing",
+    "BiologicallyDerivedProductStorage",
+    "BodyStructure",
+    "Bot",
+    "BulkDataExport",
+    "BulkDataExportDeleted",
+    "BulkDataExportError",
+    "BulkDataExportOutput",
+    "Bundle",
+    "BundleEntry",
+    "BundleEntryRequest",
+    "BundleEntryResponse",
+    "BundleEntrySearch",
+    "BundleLink",
+    "CapabilityStatement",
+    "CapabilityStatementDocument",
+    "CapabilityStatementImplementation",
+    "CapabilityStatementMessaging",
+    "CapabilityStatementMessagingEndpoint",
+    "CapabilityStatementMessagingSupportedMessage",
+    "CapabilityStatementRest",
+    "CapabilityStatementRestInteraction",
+    "CapabilityStatementRestResource",
+    "CapabilityStatementRestResourceInteraction",
+    "CapabilityStatementRestResourceOperation",
+    "CapabilityStatementRestResourceSearchParam",
+    "CapabilityStatementRestSecurity",
+    "CapabilityStatementSoftware",
+    "CarePlan",
+    "CarePlanActivity",
+    "CarePlanActivityDetail",
+    "CareTeam",
+    "CareTeamParticipant",
+    "CatalogEntry",
+    "CatalogEntryRelatedEntry",
+    "ChargeItem",
+    "ChargeItemDefinition",
+    "ChargeItemDefinitionApplicability",
+    "ChargeItemDefinitionPropertyGroup",
+    "ChargeItemDefinitionPropertyGroupPriceComponent",
+    "ChargeItemPerformer",
+    "Claim",
+    "ClaimAccident",
+    "ClaimCareTeam",
+    "ClaimDiagnosis",
+    "ClaimInsurance",
+    "ClaimItem",
+    "ClaimItemDetail",
+    "ClaimItemDetailSubDetail",
+    "ClaimPayee",
+    "ClaimProcedure",
+    "ClaimRelated",
+    "ClaimResponse",
+    "ClaimResponseAddItem",
+    "ClaimResponseAddItemDetail",
+    "ClaimResponseAddItemDetailSubDetail",
+    "ClaimResponseError",
+    "ClaimResponseInsurance",
+    "ClaimResponseItem",
+    "ClaimResponseItemAdjudication",
+    "ClaimResponseItemDetail",
+    "ClaimResponseItemDetailSubDetail",
+    "ClaimResponsePayment",
+    "ClaimResponseProcessNote",
+    "ClaimResponseTotal",
+    "ClaimSupportingInfo",
+    "ClientApplication",
+    "ClientApplicationSignInForm",
+    "ClinicalImpression",
+    "ClinicalImpressionFinding",
+    "ClinicalImpressionInvestigation",
+    "CodeSystem",
+    "CodeSystemConcept",
+    "CodeSystemConceptDesignation",
+    "CodeSystemConceptProperty",
+    "CodeSystemFilter",
+    "CodeSystemProperty",
+    "CodeableConcept",
+    "Coding",
+    "Communication",
+    "CommunicationPayload",
+    "CommunicationRequest",
+    "CommunicationRequestPayload",
+    "CompartmentDefinition",
+    "CompartmentDefinitionResource",
+    "Composition",
+    "CompositionAttester",
+    "CompositionEvent",
+    "CompositionRelatesTo",
+    "CompositionSection",
+    "ConceptMap",
+    "ConceptMapGroup",
+    "ConceptMapGroupElement",
+    "ConceptMapGroupElementTarget",
+    "ConceptMapGroupElementTargetDependsOn",
+    "ConceptMapGroupUnmapped",
+    "Condition",
+    "ConditionEvidence",
+    "ConditionStage",
+    "Consent",
+    "ConsentPolicy",
+    "ConsentProvision",
+    "ConsentProvisionActor",
+    "ConsentProvisionData",
+    "ConsentVerification",
+    "ContactDetail",
+    "ContactPoint",
+    "Contract",
+    "ContractContentDefinition",
+    "ContractFriendly",
+    "ContractLegal",
+    "ContractRule",
+    "ContractSigner",
+    "ContractTerm",
+    "ContractTermAction",
+    "ContractTermActionSubject",
+    "ContractTermAsset",
+    "ContractTermAssetContext",
+    "ContractTermAssetValuedItem",
+    "ContractTermOffer",
+    "ContractTermOfferAnswer",
+    "ContractTermOfferParty",
+    "ContractTermSecurityLabel",
+    "Contributor",
+    "Count",
+    "Coverage",
+    "CoverageClass",
+    "CoverageCostToBeneficiary",
+    "CoverageCostToBeneficiaryException",
+    "CoverageEligibilityRequest",
+    "CoverageEligibilityRequestInsurance",
+    "CoverageEligibilityRequestItem",
+    "CoverageEligibilityRequestItemDiagnosis",
+    "CoverageEligibilityRequestSupportingInfo",
+    "CoverageEligibilityResponse",
+    "CoverageEligibilityResponseError",
+    "CoverageEligibilityResponseInsurance",
+    "CoverageEligibilityResponseInsuranceItem",
+    "CoverageEligibilityResponseInsuranceItemBenefit",
+    "DataRequirement",
+    "DataRequirementCodeFilter",
+    "DataRequirementDateFilter",
+    "DataRequirementSort",
+    "DetectedIssue",
+    "DetectedIssueEvidence",
+    "DetectedIssueMitigation",
+    "Device",
+    "DeviceDefinition",
+    "DeviceDefinitionCapability",
+    "DeviceDefinitionClassification",
+    "DeviceDefinitionDeviceName",
+    "DeviceDefinitionMaterial",
+    "DeviceDefinitionProperty",
+    "DeviceDefinitionSpecialization",
+    "DeviceDefinitionUdiDeviceIdentifier",
+    "DeviceDeviceName",
+    "DeviceMetric",
+    "DeviceMetricCalibration",
+    "DeviceProperty",
+    "DeviceRequest",
+    "DeviceRequestParameter",
+    "DeviceSpecialization",
+    "DeviceUdiCarrier",
+    "DeviceUseStatement",
+    "DeviceVersion",
+    "DiagnosticReport",
+    "DiagnosticReportMedia",
+    "Distance",
+    "DocumentManifest",
+    "DocumentManifestRelated",
+    "DocumentReference",
+    "DocumentReferenceContent",
+    "DocumentReferenceContext",
+    "DocumentReferenceRelatesTo",
+    "DomainConfiguration",
+    "Dosage",
+    "DosageDoseAndRate",
+    "Duration",
+    "EffectEvidenceSynthesis",
+    "EffectEvidenceSynthesisCertainty",
+    "EffectEvidenceSynthesisCertaintyCertaintySubcomponent",
+    "EffectEvidenceSynthesisEffectEstimate",
+    "EffectEvidenceSynthesisEffectEstimatePrecisionEstimate",
+    "EffectEvidenceSynthesisResultsByExposure",
+    "EffectEvidenceSynthesisSampleSize",
+    "Element",
+    "ElementDefinition",
+    "ElementDefinitionBase",
+    "ElementDefinitionBinding",
+    "ElementDefinitionConstraint",
+    "ElementDefinitionExample",
+    "ElementDefinitionMapping",
+    "ElementDefinitionSlicing",
+    "ElementDefinitionSlicingDiscriminator",
+    "ElementDefinitionType",
+    "Encounter",
+    "EncounterClassHistory",
+    "EncounterDiagnosis",
+    "EncounterHospitalization",
+    "EncounterLocation",
+    "EncounterParticipant",
+    "EncounterStatusHistory",
+    "Endpoint",
+    "EnrollmentRequest",
+    "EnrollmentResponse",
+    "EpisodeOfCare",
+    "EpisodeOfCareDiagnosis",
+    "EpisodeOfCareStatusHistory",
+    "EventDefinition",
+    "Evidence",
+    "EvidenceVariable",
+    "EvidenceVariableCharacteristic",
+    "EvidenceVariableCharacteristicDefinitionByCombination",
+    "EvidenceVariableCharacteristicDefinitionByTypeAndValue",
+    "EvidenceVariableCharacteristicTimeFromEvent",
+    "ExampleScenario",
+    "ExampleScenarioActor",
+    "ExampleScenarioInstance",
+    "ExampleScenarioInstanceContainedInstance",
+    "ExampleScenarioInstanceVersion",
+    "ExampleScenarioProcess",
+    "ExampleScenarioProcessStep",
+    "ExampleScenarioProcessStepAlternative",
+    "ExampleScenarioProcessStepOperation",
+    "ExplanationOfBenefit",
+    "ExplanationOfBenefitAccident",
+    "ExplanationOfBenefitAddItem",
+    "ExplanationOfBenefitAddItemDetail",
+    "ExplanationOfBenefitAddItemDetailSubDetail",
+    "ExplanationOfBenefitBenefitBalance",
+    "ExplanationOfBenefitBenefitBalanceFinancial",
+    "ExplanationOfBenefitCareTeam",
+    "ExplanationOfBenefitDiagnosis",
+    "ExplanationOfBenefitInsurance",
+    "ExplanationOfBenefitItem",
+    "ExplanationOfBenefitItemAdjudication",
+    "ExplanationOfBenefitItemDetail",
+    "ExplanationOfBenefitItemDetailSubDetail",
+    "ExplanationOfBenefitPayee",
+    "ExplanationOfBenefitPayment",
+    "ExplanationOfBenefitProcedure",
+    "ExplanationOfBenefitProcessNote",
+    "ExplanationOfBenefitRelated",
+    "ExplanationOfBenefitSupportingInfo",
+    "ExplanationOfBenefitTotal",
+    "Expression",
+    "Extension",
+    "FamilyMemberHistory",
+    "FamilyMemberHistoryCondition",
+    "Flag",
+    "Goal",
+    "GoalTarget",
+    "GraphDefinition",
+    "GraphDefinitionLink",
+    "GraphDefinitionLinkTarget",
+    "GraphDefinitionLinkTargetCompartment",
+    "Group",
+    "GroupCharacteristic",
+    "GroupMember",
+    "GuidanceResponse",
+    "HealthcareService",
+    "HealthcareServiceAvailableTime",
+    "HealthcareServiceEligibility",
+    "HealthcareServiceNotAvailable",
+    "HumanName",
+    "Identifier",
+    "IdentityProvider",
+    "ImagingStudy",
+    "ImagingStudySeries",
+    "ImagingStudySeriesInstance",
+    "ImagingStudySeriesPerformer",
+    "Immunization",
+    "ImmunizationEducation",
+    "ImmunizationEvaluation",
+    "ImmunizationPerformer",
+    "ImmunizationProtocolApplied",
+    "ImmunizationReaction",
+    "ImmunizationRecommendation",
+    "ImmunizationRecommendationRecommendation",
+    "ImmunizationRecommendationRecommendationDateCriterion",
+    "ImplementationGuide",
+    "ImplementationGuideDefinition",
+    "ImplementationGuideDefinitionGrouping",
+    "ImplementationGuideDefinitionPage",
+    "ImplementationGuideDefinitionParameter",
+    "ImplementationGuideDefinitionResource",
+    "ImplementationGuideDefinitionTemplate",
+    "ImplementationGuideDependsOn",
+    "ImplementationGuideGlobal",
+    "ImplementationGuideManifest",
+    "ImplementationGuideManifestPage",
+    "ImplementationGuideManifestResource",
+    "InsurancePlan",
+    "InsurancePlanContact",
+    "InsurancePlanCoverage",
+    "InsurancePlanCoverageBenefit",
+    "InsurancePlanCoverageBenefitLimit",
+    "InsurancePlanPlan",
+    "InsurancePlanPlanGeneralCost",
+    "InsurancePlanPlanSpecificCost",
+    "InsurancePlanPlanSpecificCostBenefit",
+    "InsurancePlanPlanSpecificCostBenefitCost",
+    "Invoice",
+    "InvoiceLineItem",
+    "InvoiceLineItemPriceComponent",
+    "InvoiceParticipant",
+    "JsonWebKey",
+    "Library",
+    "Linkage",
+    "LinkageItem",
+    "List",
+    "ListEntry",
+    "Location",
+    "LocationHoursOfOperation",
+    "LocationPosition",
+    "Login",
+    "MarketingStatus",
+    "Measure",
+    "MeasureGroup",
+    "MeasureGroupPopulation",
+    "MeasureGroupStratifier",
+    "MeasureGroupStratifierComponent",
+    "MeasureReport",
+    "MeasureReportGroup",
+    "MeasureReportGroupPopulation",
+    "MeasureReportGroupStratifier",
+    "MeasureReportGroupStratifierStratum",
+    "MeasureReportGroupStratifierStratumComponent",
+    "MeasureReportGroupStratifierStratumPopulation",
+    "MeasureSupplementalData",
+    "Media",
+    "Medication",
+    "MedicationAdministration",
+    "MedicationAdministrationDosage",
+    "MedicationAdministrationPerformer",
+    "MedicationBatch",
+    "MedicationDispense",
+    "MedicationDispensePerformer",
+    "MedicationDispenseSubstitution",
+    "MedicationIngredient",
+    "MedicationKnowledge",
+    "MedicationKnowledgeAdministrationGuidelines",
+    "MedicationKnowledgeAdministrationGuidelinesDosage",
+    "MedicationKnowledgeAdministrationGuidelinesPatientCharacteristics",
+    "MedicationKnowledgeCost",
+    "MedicationKnowledgeDrugCharacteristic",
+    "MedicationKnowledgeIngredient",
+    "MedicationKnowledgeKinetics",
+    "MedicationKnowledgeMedicineClassification",
+    "MedicationKnowledgeMonitoringProgram",
+    "MedicationKnowledgeMonograph",
+    "MedicationKnowledgePackaging",
+    "MedicationKnowledgeRegulatory",
+    "MedicationKnowledgeRegulatoryMaxDispense",
+    "MedicationKnowledgeRegulatorySchedule",
+    "MedicationKnowledgeRegulatorySubstitution",
+    "MedicationKnowledgeRelatedMedicationKnowledge",
+    "MedicationRequest",
+    "MedicationRequestDispenseRequest",
+    "MedicationRequestDispenseRequestInitialFill",
+    "MedicationRequestSubstitution",
+    "MedicationStatement",
+    "MedicinalProduct",
+    "MedicinalProductAuthorization",
+    "MedicinalProductAuthorizationJurisdictionalAuthorization",
+    "MedicinalProductAuthorizationProcedure",
+    "MedicinalProductContraindication",
+    "MedicinalProductContraindicationOtherTherapy",
+    "MedicinalProductIndication",
+    "MedicinalProductIndicationOtherTherapy",
+    "MedicinalProductIngredient",
+    "MedicinalProductIngredientSpecifiedSubstance",
+    "MedicinalProductIngredientSpecifiedSubstanceStrength",
+    "MedicinalProductIngredientSpecifiedSubstanceStrengthReferenceStrength",
+    "MedicinalProductIngredientSubstance",
+    "MedicinalProductInteraction",
+    "MedicinalProductInteractionInteractant",
+    "MedicinalProductManufactured",
+    "MedicinalProductManufacturingBusinessOperation",
+    "MedicinalProductName",
+    "MedicinalProductNameCountryLanguage",
+    "MedicinalProductNameNamePart",
+    "MedicinalProductPackaged",
+    "MedicinalProductPackagedBatchIdentifier",
+    "MedicinalProductPackagedPackageItem",
+    "MedicinalProductPharmaceutical",
+    "MedicinalProductPharmaceuticalCharacteristics",
+    "MedicinalProductPharmaceuticalRouteOfAdministration",
+    "MedicinalProductPharmaceuticalRouteOfAdministrationTargetSpecies",
+    "MedicinalProductPharmaceuticalRouteOfAdministrationTargetSpeciesWithdrawalPeriod",
+    "MedicinalProductSpecialDesignation",
+    "MedicinalProductUndesirableEffect",
+    "MessageDefinition",
+    "MessageDefinitionAllowedResponse",
+    "MessageDefinitionFocus",
+    "MessageHeader",
+    "MessageHeaderDestination",
+    "MessageHeaderResponse",
+    "MessageHeaderSource",
+    "Meta",
+    "MetadataResource",
+    "MolecularSequence",
+    "MolecularSequenceQuality",
+    "MolecularSequenceQualityRoc",
+    "MolecularSequenceReferenceSeq",
+    "MolecularSequenceRepository",
+    "MolecularSequenceStructureVariant",
+    "MolecularSequenceStructureVariantInner",
+    "MolecularSequenceStructureVariantOuter",
+    "MolecularSequenceVariant",
+    "Money",
+    "MoneyQuantity",
+    "NamingSystem",
+    "NamingSystemUniqueId",
+    "Narrative",
+    "NutritionOrder",
+    "NutritionOrderEnteralFormula",
+    "NutritionOrderEnteralFormulaAdministration",
+    "NutritionOrderOralDiet",
+    "NutritionOrderOralDietNutrient",
+    "NutritionOrderOralDietTexture",
+    "NutritionOrderSupplement",
+    "Observation",
+    "ObservationComponent",
+    "ObservationDefinition",
+    "ObservationDefinitionQualifiedInterval",
+    "ObservationDefinitionQuantitativeDetails",
+    "ObservationReferenceRange",
+    "OperationDefinition",
+    "OperationDefinitionOverload",
+    "OperationDefinitionParameter",
+    "OperationDefinitionParameterBinding",
+    "OperationDefinitionParameterReferencedFrom",
+    "OperationOutcome",
+    "OperationOutcomeIssue",
+    "Organization",
+    "OrganizationAffiliation",
+    "OrganizationContact",
+    "ParameterDefinition",
+    "Parameters",
+    "ParametersParameter",
+    "PasswordChangeRequest",
+    "Patient",
+    "PatientCommunication",
+    "PatientContact",
+    "PatientLink",
+    "PaymentNotice",
+    "PaymentReconciliation",
+    "PaymentReconciliationDetail",
+    "PaymentReconciliationProcessNote",
+    "Period",
+    "Person",
+    "PersonLink",
+    "PlanDefinition",
+    "PlanDefinitionAction",
+    "PlanDefinitionActionCondition",
+    "PlanDefinitionActionDynamicValue",
+    "PlanDefinitionActionParticipant",
+    "PlanDefinitionActionRelatedAction",
+    "PlanDefinitionGoal",
+    "PlanDefinitionGoalTarget",
+    "Population",
+    "Practitioner",
+    "PractitionerQualification",
+    "PractitionerRole",
+    "PractitionerRoleAvailableTime",
+    "PractitionerRoleNotAvailable",
+    "Procedure",
+    "ProcedureFocalDevice",
+    "ProcedurePerformer",
+    "ProdCharacteristic",
+    "ProductShelfLife",
+    "Project",
+    "ProjectDefaultProfile",
+    "ProjectLink",
+    "ProjectMembership",
+    "ProjectMembershipAccess",
+    "ProjectMembershipAccessParameter",
+    "ProjectSetting",
+    "ProjectSite",
+    "Provenance",
+    "ProvenanceAgent",
+    "ProvenanceEntity",
+    "Quantity",
+    "Questionnaire",
+    "QuestionnaireItem",
+    "QuestionnaireItemAnswerOption",
+    "QuestionnaireItemEnableWhen",
+    "QuestionnaireItemInitial",
+    "QuestionnaireResponse",
+    "QuestionnaireResponseItem",
+    "QuestionnaireResponseItemAnswer",
+    "Range",
+    "Ratio",
+    "Reference",
+    "RelatedArtifact",
+    "RelatedPerson",
+    "RelatedPersonCommunication",
+    "RequestGroup",
+    "RequestGroupAction",
+    "RequestGroupActionCondition",
+    "RequestGroupActionRelatedAction",
+    "ResearchDefinition",
+    "ResearchElementDefinition",
+    "ResearchElementDefinitionCharacteristic",
+    "ResearchStudy",
+    "ResearchStudyArm",
+    "ResearchStudyAssociatedParty",
+    "ResearchStudyComparisonGroup",
+    "ResearchStudyLabel",
+    "ResearchStudyObjective",
+    "ResearchStudyOutcomeMeasure",
+    "ResearchStudyProgressStatus",
+    "ResearchStudyRecruitment",
+    "ResearchSubject",
+    "RiskAssessment",
+    "RiskAssessmentPrediction",
+    "RiskEvidenceSynthesis",
+    "RiskEvidenceSynthesisCertainty",
+    "RiskEvidenceSynthesisCertaintyCertaintySubcomponent",
+    "RiskEvidenceSynthesisRiskEstimate",
+    "RiskEvidenceSynthesisRiskEstimatePrecisionEstimate",
+    "RiskEvidenceSynthesisSampleSize",
+    "SampledData",
+    "Schedule",
+    "SearchParameter",
+    "SearchParameterComponent",
+    "ServiceRequest",
+    "Signature",
+    "SimpleQuantity",
+    "Slot",
+    "SmartAppLaunch",
+    "Specimen",
+    "SpecimenCollection",
+    "SpecimenContainer",
+    "SpecimenDefinition",
+    "SpecimenDefinitionTypeTested",
+    "SpecimenDefinitionTypeTestedContainer",
+    "SpecimenDefinitionTypeTestedContainerAdditive",
+    "SpecimenDefinitionTypeTestedHandling",
+    "SpecimenProcessing",
+    "StructureDefinition",
+    "StructureDefinitionContext",
+    "StructureDefinitionDifferential",
+    "StructureDefinitionMapping",
+    "StructureDefinitionSnapshot",
+    "StructureMap",
+    "StructureMapGroup",
+    "StructureMapGroupInput",
+    "StructureMapGroupRule",
+    "StructureMapGroupRuleDependent",
+    "StructureMapGroupRuleSource",
+    "StructureMapGroupRuleTarget",
+    "StructureMapGroupRuleTargetParameter",
+    "StructureMapStructure",
+    "Subscription",
+    "SubscriptionChannel",
+    "SubscriptionStatus",
+    "SubscriptionStatusNotificationEvent",
+    "Substance",
+    "SubstanceAmount",
+    "SubstanceAmountReferenceRange",
+    "SubstanceIngredient",
+    "SubstanceInstance",
+    "SubstanceNucleicAcid",
+    "SubstanceNucleicAcidSubunit",
+    "SubstanceNucleicAcidSubunitLinkage",
+    "SubstanceNucleicAcidSubunitSugar",
+    "SubstancePolymer",
+    "SubstancePolymerMonomerSet",
+    "SubstancePolymerMonomerSetStartingMaterial",
+    "SubstancePolymerRepeat",
+    "SubstancePolymerRepeatRepeatUnit",
+    "SubstancePolymerRepeatRepeatUnitDegreeOfPolymerisation",
+    "SubstancePolymerRepeatRepeatUnitStructuralRepresentation",
+    "SubstanceProtein",
+    "SubstanceProteinSubunit",
+    "SubstanceReferenceInformation",
+    "SubstanceReferenceInformationClassification",
+    "SubstanceReferenceInformationGene",
+    "SubstanceReferenceInformationGeneElement",
+    "SubstanceReferenceInformationTarget",
+    "SubstanceSourceMaterial",
+    "SubstanceSourceMaterialFractionDescription",
+    "SubstanceSourceMaterialOrganism",
+    "SubstanceSourceMaterialOrganismAuthor",
+    "SubstanceSourceMaterialOrganismHybrid",
+    "SubstanceSourceMaterialOrganismOrganismGeneral",
+    "SubstanceSourceMaterialPartDescription",
+    "SubstanceSpecification",
+    "SubstanceSpecificationCode",
+    "SubstanceSpecificationMoiety",
+    "SubstanceSpecificationName",
+    "SubstanceSpecificationNameOfficial",
+    "SubstanceSpecificationProperty",
+    "SubstanceSpecificationRelationship",
+    "SubstanceSpecificationStructure",
+    "SubstanceSpecificationStructureIsotope",
+    "SubstanceSpecificationStructureIsotopeMolecularWeight",
+    "SubstanceSpecificationStructureRepresentation",
+    "SupplyDelivery",
+    "SupplyDeliverySuppliedItem",
+    "SupplyRequest",
+    "SupplyRequestParameter",
+    "Task",
+    "TaskInput",
+    "TaskOutput",
+    "TaskRestriction",
+    "TerminologyCapabilities",
+    "TerminologyCapabilitiesClosure",
+    "TerminologyCapabilitiesCodeSystem",
+    "TerminologyCapabilitiesCodeSystemVersion",
+    "TerminologyCapabilitiesCodeSystemVersionFilter",
+    "TerminologyCapabilitiesExpansion",
+    "TerminologyCapabilitiesExpansionParameter",
+    "TerminologyCapabilitiesImplementation",
+    "TerminologyCapabilitiesSoftware",
+    "TerminologyCapabilitiesTranslation",
+    "TerminologyCapabilitiesValidateCode",
+    "TestReport",
+    "TestReportParticipant",
+    "TestReportSetup",
+    "TestReportSetupAction",
+    "TestReportSetupActionAssert",
+    "TestReportSetupActionOperation",
+    "TestReportTeardown",
+    "TestReportTeardownAction",
+    "TestReportTest",
+    "TestReportTestAction",
+    "TestScript",
+    "TestScriptDestination",
+    "TestScriptFixture",
+    "TestScriptMetadata",
+    "TestScriptMetadataCapability",
+    "TestScriptMetadataLink",
+    "TestScriptOrigin",
+    "TestScriptSetup",
+    "TestScriptSetupAction",
+    "TestScriptSetupActionAssert",
+    "TestScriptSetupActionOperation",
+    "TestScriptSetupActionOperationRequestHeader",
+    "TestScriptTeardown",
+    "TestScriptTeardownAction",
+    "TestScriptTest",
+    "TestScriptTestAction",
+    "TestScriptVariable",
+    "Timing",
+    "TimingRepeat",
+    "TriggerDefinition",
+    "UsageContext",
+    "User",
+    "UserConfiguration",
+    "UserConfigurationMenu",
+    "UserConfigurationMenuLink",
+    "UserConfigurationOption",
+    "UserConfigurationSearch",
+    "UserSecurityRequest",
+    "ValueSet",
+    "ValueSetCompose",
+    "ValueSetComposeInclude",
+    "ValueSetComposeIncludeConcept",
+    "ValueSetComposeIncludeConceptDesignation",
+    "ValueSetComposeIncludeFilter",
+    "ValueSetExpansion",
+    "ValueSetExpansionContains",
+    "ValueSetExpansionParameter",
+    "VerificationResult",
+    "VerificationResultAttestation",
+    "VerificationResultPrimarySource",
+    "VerificationResultValidator",
+    "ViewDefinition",
+    "ViewDefinitionConstant",
+    "ViewDefinitionSelect",
+    "ViewDefinitionSelectColumn",
+    "ViewDefinitionSelectColumnTag",
+    "ViewDefinitionWhere",
+    "VisionPrescription",
+    "VisionPrescriptionLensSpecification",
+    "VisionPrescriptionLensSpecificationPrism",
+]
 
 if TYPE_CHECKING:
     # Resource is a union of all FHIR resource types
@@ -903,7 +1620,724 @@ if TYPE_CHECKING:
         VisionPrescriptionLensSpecificationPrism,
     )
 
-    Resource = AccessPolicy | AccessPolicyIpAccessRule | AccessPolicyResource | Account | AccountCoverage | AccountGuarantor | ActivityDefinition | ActivityDefinitionDynamicValue | ActivityDefinitionParticipant | Address | AdverseEvent | AdverseEventSuspectEntity | AdverseEventSuspectEntityCausality | Age | Agent | AgentChannel | AgentSetting | AllergyIntolerance | AllergyIntoleranceReaction | Annotation | Appointment | AppointmentParticipant | AppointmentResponse | AsyncJob | Attachment | AuditEvent | AuditEventAgent | AuditEventAgentNetwork | AuditEventEntity | AuditEventEntityDetail | AuditEventSource | BackboneElement | Basic | Binary | BiologicallyDerivedProduct | BiologicallyDerivedProductCollection | BiologicallyDerivedProductManipulation | BiologicallyDerivedProductProcessing | BiologicallyDerivedProductStorage | BodyStructure | Bot | BulkDataExport | BulkDataExportDeleted | BulkDataExportError | BulkDataExportOutput | Bundle | BundleEntry | BundleEntryRequest | BundleEntryResponse | BundleEntrySearch | BundleLink | CapabilityStatement | CapabilityStatementDocument | CapabilityStatementImplementation | CapabilityStatementMessaging | CapabilityStatementMessagingEndpoint | CapabilityStatementMessagingSupportedMessage | CapabilityStatementRest | CapabilityStatementRestInteraction | CapabilityStatementRestResource | CapabilityStatementRestResourceInteraction | CapabilityStatementRestResourceOperation | CapabilityStatementRestResourceSearchParam | CapabilityStatementRestSecurity | CapabilityStatementSoftware | CarePlan | CarePlanActivity | CarePlanActivityDetail | CareTeam | CareTeamParticipant | CatalogEntry | CatalogEntryRelatedEntry | ChargeItem | ChargeItemDefinition | ChargeItemDefinitionApplicability | ChargeItemDefinitionPropertyGroup | ChargeItemDefinitionPropertyGroupPriceComponent | ChargeItemPerformer | Claim | ClaimAccident | ClaimCareTeam | ClaimDiagnosis | ClaimInsurance | ClaimItem | ClaimItemDetail | ClaimItemDetailSubDetail | ClaimPayee | ClaimProcedure | ClaimRelated | ClaimResponse | ClaimResponseAddItem | ClaimResponseAddItemDetail | ClaimResponseAddItemDetailSubDetail | ClaimResponseError | ClaimResponseInsurance | ClaimResponseItem | ClaimResponseItemAdjudication | ClaimResponseItemDetail | ClaimResponseItemDetailSubDetail | ClaimResponsePayment | ClaimResponseProcessNote | ClaimResponseTotal | ClaimSupportingInfo | ClientApplication | ClientApplicationSignInForm | ClinicalImpression | ClinicalImpressionFinding | ClinicalImpressionInvestigation | CodeSystem | CodeSystemConcept | CodeSystemConceptDesignation | CodeSystemConceptProperty | CodeSystemFilter | CodeSystemProperty | CodeableConcept | Coding | Communication | CommunicationPayload | CommunicationRequest | CommunicationRequestPayload | CompartmentDefinition | CompartmentDefinitionResource | Composition | CompositionAttester | CompositionEvent | CompositionRelatesTo | CompositionSection | ConceptMap | ConceptMapGroup | ConceptMapGroupElement | ConceptMapGroupElementTarget | ConceptMapGroupElementTargetDependsOn | ConceptMapGroupUnmapped | Condition | ConditionEvidence | ConditionStage | Consent | ConsentPolicy | ConsentProvision | ConsentProvisionActor | ConsentProvisionData | ConsentVerification | ContactDetail | ContactPoint | Contract | ContractContentDefinition | ContractFriendly | ContractLegal | ContractRule | ContractSigner | ContractTerm | ContractTermAction | ContractTermActionSubject | ContractTermAsset | ContractTermAssetContext | ContractTermAssetValuedItem | ContractTermOffer | ContractTermOfferAnswer | ContractTermOfferParty | ContractTermSecurityLabel | Contributor | Count | Coverage | CoverageClass | CoverageCostToBeneficiary | CoverageCostToBeneficiaryException | CoverageEligibilityRequest | CoverageEligibilityRequestInsurance | CoverageEligibilityRequestItem | CoverageEligibilityRequestItemDiagnosis | CoverageEligibilityRequestSupportingInfo | CoverageEligibilityResponse | CoverageEligibilityResponseError | CoverageEligibilityResponseInsurance | CoverageEligibilityResponseInsuranceItem | CoverageEligibilityResponseInsuranceItemBenefit | DataRequirement | DataRequirementCodeFilter | DataRequirementDateFilter | DataRequirementSort | DetectedIssue | DetectedIssueEvidence | DetectedIssueMitigation | Device | DeviceDefinition | DeviceDefinitionCapability | DeviceDefinitionClassification | DeviceDefinitionDeviceName | DeviceDefinitionMaterial | DeviceDefinitionProperty | DeviceDefinitionSpecialization | DeviceDefinitionUdiDeviceIdentifier | DeviceDeviceName | DeviceMetric | DeviceMetricCalibration | DeviceProperty | DeviceRequest | DeviceRequestParameter | DeviceSpecialization | DeviceUdiCarrier | DeviceUseStatement | DeviceVersion | DiagnosticReport | DiagnosticReportMedia | Distance | DocumentManifest | DocumentManifestRelated | DocumentReference | DocumentReferenceContent | DocumentReferenceContext | DocumentReferenceRelatesTo | DomainConfiguration | Dosage | DosageDoseAndRate | Duration | EffectEvidenceSynthesis | EffectEvidenceSynthesisCertainty | EffectEvidenceSynthesisCertaintyCertaintySubcomponent | EffectEvidenceSynthesisEffectEstimate | EffectEvidenceSynthesisEffectEstimatePrecisionEstimate | EffectEvidenceSynthesisResultsByExposure | EffectEvidenceSynthesisSampleSize | Element | ElementDefinition | ElementDefinitionBase | ElementDefinitionBinding | ElementDefinitionConstraint | ElementDefinitionExample | ElementDefinitionMapping | ElementDefinitionSlicing | ElementDefinitionSlicingDiscriminator | ElementDefinitionType | Encounter | EncounterClassHistory | EncounterDiagnosis | EncounterHospitalization | EncounterLocation | EncounterParticipant | EncounterStatusHistory | Endpoint | EnrollmentRequest | EnrollmentResponse | EpisodeOfCare | EpisodeOfCareDiagnosis | EpisodeOfCareStatusHistory | EventDefinition | Evidence | EvidenceVariable | EvidenceVariableCharacteristic | EvidenceVariableCharacteristicDefinitionByCombination | EvidenceVariableCharacteristicDefinitionByTypeAndValue | EvidenceVariableCharacteristicTimeFromEvent | ExampleScenario | ExampleScenarioActor | ExampleScenarioInstance | ExampleScenarioInstanceContainedInstance | ExampleScenarioInstanceVersion | ExampleScenarioProcess | ExampleScenarioProcessStep | ExampleScenarioProcessStepAlternative | ExampleScenarioProcessStepOperation | ExplanationOfBenefit | ExplanationOfBenefitAccident | ExplanationOfBenefitAddItem | ExplanationOfBenefitAddItemDetail | ExplanationOfBenefitAddItemDetailSubDetail | ExplanationOfBenefitBenefitBalance | ExplanationOfBenefitBenefitBalanceFinancial | ExplanationOfBenefitCareTeam | ExplanationOfBenefitDiagnosis | ExplanationOfBenefitInsurance | ExplanationOfBenefitItem | ExplanationOfBenefitItemAdjudication | ExplanationOfBenefitItemDetail | ExplanationOfBenefitItemDetailSubDetail | ExplanationOfBenefitPayee | ExplanationOfBenefitPayment | ExplanationOfBenefitProcedure | ExplanationOfBenefitProcessNote | ExplanationOfBenefitRelated | ExplanationOfBenefitSupportingInfo | ExplanationOfBenefitTotal | Expression | Extension | FamilyMemberHistory | FamilyMemberHistoryCondition | Flag | Goal | GoalTarget | GraphDefinition | GraphDefinitionLink | GraphDefinitionLinkTarget | GraphDefinitionLinkTargetCompartment | Group | GroupCharacteristic | GroupMember | GuidanceResponse | HealthcareService | HealthcareServiceAvailableTime | HealthcareServiceEligibility | HealthcareServiceNotAvailable | HumanName | Identifier | IdentityProvider | ImagingStudy | ImagingStudySeries | ImagingStudySeriesInstance | ImagingStudySeriesPerformer | Immunization | ImmunizationEducation | ImmunizationEvaluation | ImmunizationPerformer | ImmunizationProtocolApplied | ImmunizationReaction | ImmunizationRecommendation | ImmunizationRecommendationRecommendation | ImmunizationRecommendationRecommendationDateCriterion | ImplementationGuide | ImplementationGuideDefinition | ImplementationGuideDefinitionGrouping | ImplementationGuideDefinitionPage | ImplementationGuideDefinitionParameter | ImplementationGuideDefinitionResource | ImplementationGuideDefinitionTemplate | ImplementationGuideDependsOn | ImplementationGuideGlobal | ImplementationGuideManifest | ImplementationGuideManifestPage | ImplementationGuideManifestResource | InsurancePlan | InsurancePlanContact | InsurancePlanCoverage | InsurancePlanCoverageBenefit | InsurancePlanCoverageBenefitLimit | InsurancePlanPlan | InsurancePlanPlanGeneralCost | InsurancePlanPlanSpecificCost | InsurancePlanPlanSpecificCostBenefit | InsurancePlanPlanSpecificCostBenefitCost | Invoice | InvoiceLineItem | InvoiceLineItemPriceComponent | InvoiceParticipant | JsonWebKey | Library | Linkage | LinkageItem | List | ListEntry | Location | LocationHoursOfOperation | LocationPosition | Login | MarketingStatus | Measure | MeasureGroup | MeasureGroupPopulation | MeasureGroupStratifier | MeasureGroupStratifierComponent | MeasureReport | MeasureReportGroup | MeasureReportGroupPopulation | MeasureReportGroupStratifier | MeasureReportGroupStratifierStratum | MeasureReportGroupStratifierStratumComponent | MeasureReportGroupStratifierStratumPopulation | MeasureSupplementalData | Media | Medication | MedicationAdministration | MedicationAdministrationDosage | MedicationAdministrationPerformer | MedicationBatch | MedicationDispense | MedicationDispensePerformer | MedicationDispenseSubstitution | MedicationIngredient | MedicationKnowledge | MedicationKnowledgeAdministrationGuidelines | MedicationKnowledgeAdministrationGuidelinesDosage | MedicationKnowledgeAdministrationGuidelinesPatientCharacteristics | MedicationKnowledgeCost | MedicationKnowledgeDrugCharacteristic | MedicationKnowledgeIngredient | MedicationKnowledgeKinetics | MedicationKnowledgeMedicineClassification | MedicationKnowledgeMonitoringProgram | MedicationKnowledgeMonograph | MedicationKnowledgePackaging | MedicationKnowledgeRegulatory | MedicationKnowledgeRegulatoryMaxDispense | MedicationKnowledgeRegulatorySchedule | MedicationKnowledgeRegulatorySubstitution | MedicationKnowledgeRelatedMedicationKnowledge | MedicationRequest | MedicationRequestDispenseRequest | MedicationRequestDispenseRequestInitialFill | MedicationRequestSubstitution | MedicationStatement | MedicinalProduct | MedicinalProductAuthorization | MedicinalProductAuthorizationJurisdictionalAuthorization | MedicinalProductAuthorizationProcedure | MedicinalProductContraindication | MedicinalProductContraindicationOtherTherapy | MedicinalProductIndication | MedicinalProductIndicationOtherTherapy | MedicinalProductIngredient | MedicinalProductIngredientSpecifiedSubstance | MedicinalProductIngredientSpecifiedSubstanceStrength | MedicinalProductIngredientSpecifiedSubstanceStrengthReferenceStrength | MedicinalProductIngredientSubstance | MedicinalProductInteraction | MedicinalProductInteractionInteractant | MedicinalProductManufactured | MedicinalProductManufacturingBusinessOperation | MedicinalProductName | MedicinalProductNameCountryLanguage | MedicinalProductNameNamePart | MedicinalProductPackaged | MedicinalProductPackagedBatchIdentifier | MedicinalProductPackagedPackageItem | MedicinalProductPharmaceutical | MedicinalProductPharmaceuticalCharacteristics | MedicinalProductPharmaceuticalRouteOfAdministration | MedicinalProductPharmaceuticalRouteOfAdministrationTargetSpecies | MedicinalProductPharmaceuticalRouteOfAdministrationTargetSpeciesWithdrawalPeriod | MedicinalProductSpecialDesignation | MedicinalProductUndesirableEffect | MessageDefinition | MessageDefinitionAllowedResponse | MessageDefinitionFocus | MessageHeader | MessageHeaderDestination | MessageHeaderResponse | MessageHeaderSource | Meta | MetadataResource | MolecularSequence | MolecularSequenceQuality | MolecularSequenceQualityRoc | MolecularSequenceReferenceSeq | MolecularSequenceRepository | MolecularSequenceStructureVariant | MolecularSequenceStructureVariantInner | MolecularSequenceStructureVariantOuter | MolecularSequenceVariant | Money | MoneyQuantity | NamingSystem | NamingSystemUniqueId | Narrative | NutritionOrder | NutritionOrderEnteralFormula | NutritionOrderEnteralFormulaAdministration | NutritionOrderOralDiet | NutritionOrderOralDietNutrient | NutritionOrderOralDietTexture | NutritionOrderSupplement | Observation | ObservationComponent | ObservationDefinition | ObservationDefinitionQualifiedInterval | ObservationDefinitionQuantitativeDetails | ObservationReferenceRange | OperationDefinition | OperationDefinitionOverload | OperationDefinitionParameter | OperationDefinitionParameterBinding | OperationDefinitionParameterReferencedFrom | OperationOutcome | OperationOutcomeIssue | Organization | OrganizationAffiliation | OrganizationContact | ParameterDefinition | Parameters | ParametersParameter | PasswordChangeRequest | Patient | PatientCommunication | PatientContact | PatientLink | PaymentNotice | PaymentReconciliation | PaymentReconciliationDetail | PaymentReconciliationProcessNote | Period | Person | PersonLink | PlanDefinition | PlanDefinitionAction | PlanDefinitionActionCondition | PlanDefinitionActionDynamicValue | PlanDefinitionActionParticipant | PlanDefinitionActionRelatedAction | PlanDefinitionGoal | PlanDefinitionGoalTarget | Population | Practitioner | PractitionerQualification | PractitionerRole | PractitionerRoleAvailableTime | PractitionerRoleNotAvailable | Procedure | ProcedureFocalDevice | ProcedurePerformer | ProdCharacteristic | ProductShelfLife | Project | ProjectDefaultProfile | ProjectLink | ProjectMembership | ProjectMembershipAccess | ProjectMembershipAccessParameter | ProjectSetting | ProjectSite | Provenance | ProvenanceAgent | ProvenanceEntity | Quantity | Questionnaire | QuestionnaireItem | QuestionnaireItemAnswerOption | QuestionnaireItemEnableWhen | QuestionnaireItemInitial | QuestionnaireResponse | QuestionnaireResponseItem | QuestionnaireResponseItemAnswer | Range | Ratio | Reference | RelatedArtifact | RelatedPerson | RelatedPersonCommunication | RequestGroup | RequestGroupAction | RequestGroupActionCondition | RequestGroupActionRelatedAction | ResearchDefinition | ResearchElementDefinition | ResearchElementDefinitionCharacteristic | ResearchStudy | ResearchStudyArm | ResearchStudyAssociatedParty | ResearchStudyComparisonGroup | ResearchStudyLabel | ResearchStudyObjective | ResearchStudyOutcomeMeasure | ResearchStudyProgressStatus | ResearchStudyRecruitment | ResearchSubject | RiskAssessment | RiskAssessmentPrediction | RiskEvidenceSynthesis | RiskEvidenceSynthesisCertainty | RiskEvidenceSynthesisCertaintyCertaintySubcomponent | RiskEvidenceSynthesisRiskEstimate | RiskEvidenceSynthesisRiskEstimatePrecisionEstimate | RiskEvidenceSynthesisSampleSize | SampledData | Schedule | SearchParameter | SearchParameterComponent | ServiceRequest | Signature | SimpleQuantity | Slot | SmartAppLaunch | Specimen | SpecimenCollection | SpecimenContainer | SpecimenDefinition | SpecimenDefinitionTypeTested | SpecimenDefinitionTypeTestedContainer | SpecimenDefinitionTypeTestedContainerAdditive | SpecimenDefinitionTypeTestedHandling | SpecimenProcessing | StructureDefinition | StructureDefinitionContext | StructureDefinitionDifferential | StructureDefinitionMapping | StructureDefinitionSnapshot | StructureMap | StructureMapGroup | StructureMapGroupInput | StructureMapGroupRule | StructureMapGroupRuleDependent | StructureMapGroupRuleSource | StructureMapGroupRuleTarget | StructureMapGroupRuleTargetParameter | StructureMapStructure | Subscription | SubscriptionChannel | SubscriptionStatus | SubscriptionStatusNotificationEvent | Substance | SubstanceAmount | SubstanceAmountReferenceRange | SubstanceIngredient | SubstanceInstance | SubstanceNucleicAcid | SubstanceNucleicAcidSubunit | SubstanceNucleicAcidSubunitLinkage | SubstanceNucleicAcidSubunitSugar | SubstancePolymer | SubstancePolymerMonomerSet | SubstancePolymerMonomerSetStartingMaterial | SubstancePolymerRepeat | SubstancePolymerRepeatRepeatUnit | SubstancePolymerRepeatRepeatUnitDegreeOfPolymerisation | SubstancePolymerRepeatRepeatUnitStructuralRepresentation | SubstanceProtein | SubstanceProteinSubunit | SubstanceReferenceInformation | SubstanceReferenceInformationClassification | SubstanceReferenceInformationGene | SubstanceReferenceInformationGeneElement | SubstanceReferenceInformationTarget | SubstanceSourceMaterial | SubstanceSourceMaterialFractionDescription | SubstanceSourceMaterialOrganism | SubstanceSourceMaterialOrganismAuthor | SubstanceSourceMaterialOrganismHybrid | SubstanceSourceMaterialOrganismOrganismGeneral | SubstanceSourceMaterialPartDescription | SubstanceSpecification | SubstanceSpecificationCode | SubstanceSpecificationMoiety | SubstanceSpecificationName | SubstanceSpecificationNameOfficial | SubstanceSpecificationProperty | SubstanceSpecificationRelationship | SubstanceSpecificationStructure | SubstanceSpecificationStructureIsotope | SubstanceSpecificationStructureIsotopeMolecularWeight | SubstanceSpecificationStructureRepresentation | SupplyDelivery | SupplyDeliverySuppliedItem | SupplyRequest | SupplyRequestParameter | Task | TaskInput | TaskOutput | TaskRestriction | TerminologyCapabilities | TerminologyCapabilitiesClosure | TerminologyCapabilitiesCodeSystem | TerminologyCapabilitiesCodeSystemVersion | TerminologyCapabilitiesCodeSystemVersionFilter | TerminologyCapabilitiesExpansion | TerminologyCapabilitiesExpansionParameter | TerminologyCapabilitiesImplementation | TerminologyCapabilitiesSoftware | TerminologyCapabilitiesTranslation | TerminologyCapabilitiesValidateCode | TestReport | TestReportParticipant | TestReportSetup | TestReportSetupAction | TestReportSetupActionAssert | TestReportSetupActionOperation | TestReportTeardown | TestReportTeardownAction | TestReportTest | TestReportTestAction | TestScript | TestScriptDestination | TestScriptFixture | TestScriptMetadata | TestScriptMetadataCapability | TestScriptMetadataLink | TestScriptOrigin | TestScriptSetup | TestScriptSetupAction | TestScriptSetupActionAssert | TestScriptSetupActionOperation | TestScriptSetupActionOperationRequestHeader | TestScriptTeardown | TestScriptTeardownAction | TestScriptTest | TestScriptTestAction | TestScriptVariable | Timing | TimingRepeat | TriggerDefinition | UsageContext | User | UserConfiguration | UserConfigurationMenu | UserConfigurationMenuLink | UserConfigurationOption | UserConfigurationSearch | UserSecurityRequest | ValueSet | ValueSetCompose | ValueSetComposeInclude | ValueSetComposeIncludeConcept | ValueSetComposeIncludeConceptDesignation | ValueSetComposeIncludeFilter | ValueSetExpansion | ValueSetExpansionContains | ValueSetExpansionParameter | VerificationResult | VerificationResultAttestation | VerificationResultPrimarySource | VerificationResultValidator | ViewDefinition | ViewDefinitionConstant | ViewDefinitionSelect | ViewDefinitionSelectColumn | ViewDefinitionSelectColumnTag | ViewDefinitionWhere | VisionPrescription | VisionPrescriptionLensSpecification | VisionPrescriptionLensSpecificationPrism
+    Resource = (
+        AccessPolicy
+        | AccessPolicyIpAccessRule
+        | AccessPolicyResource
+        | Account
+        | AccountCoverage
+        | AccountGuarantor
+        | ActivityDefinition
+        | ActivityDefinitionDynamicValue
+        | ActivityDefinitionParticipant
+        | Address
+        | AdverseEvent
+        | AdverseEventSuspectEntity
+        | AdverseEventSuspectEntityCausality
+        | Age
+        | Agent
+        | AgentChannel
+        | AgentSetting
+        | AllergyIntolerance
+        | AllergyIntoleranceReaction
+        | Annotation
+        | Appointment
+        | AppointmentParticipant
+        | AppointmentResponse
+        | AsyncJob
+        | Attachment
+        | AuditEvent
+        | AuditEventAgent
+        | AuditEventAgentNetwork
+        | AuditEventEntity
+        | AuditEventEntityDetail
+        | AuditEventSource
+        | BackboneElement
+        | Basic
+        | Binary
+        | BiologicallyDerivedProduct
+        | BiologicallyDerivedProductCollection
+        | BiologicallyDerivedProductManipulation
+        | BiologicallyDerivedProductProcessing
+        | BiologicallyDerivedProductStorage
+        | BodyStructure
+        | Bot
+        | BulkDataExport
+        | BulkDataExportDeleted
+        | BulkDataExportError
+        | BulkDataExportOutput
+        | Bundle
+        | BundleEntry
+        | BundleEntryRequest
+        | BundleEntryResponse
+        | BundleEntrySearch
+        | BundleLink
+        | CapabilityStatement
+        | CapabilityStatementDocument
+        | CapabilityStatementImplementation
+        | CapabilityStatementMessaging
+        | CapabilityStatementMessagingEndpoint
+        | CapabilityStatementMessagingSupportedMessage
+        | CapabilityStatementRest
+        | CapabilityStatementRestInteraction
+        | CapabilityStatementRestResource
+        | CapabilityStatementRestResourceInteraction
+        | CapabilityStatementRestResourceOperation
+        | CapabilityStatementRestResourceSearchParam
+        | CapabilityStatementRestSecurity
+        | CapabilityStatementSoftware
+        | CarePlan
+        | CarePlanActivity
+        | CarePlanActivityDetail
+        | CareTeam
+        | CareTeamParticipant
+        | CatalogEntry
+        | CatalogEntryRelatedEntry
+        | ChargeItem
+        | ChargeItemDefinition
+        | ChargeItemDefinitionApplicability
+        | ChargeItemDefinitionPropertyGroup
+        | ChargeItemDefinitionPropertyGroupPriceComponent
+        | ChargeItemPerformer
+        | Claim
+        | ClaimAccident
+        | ClaimCareTeam
+        | ClaimDiagnosis
+        | ClaimInsurance
+        | ClaimItem
+        | ClaimItemDetail
+        | ClaimItemDetailSubDetail
+        | ClaimPayee
+        | ClaimProcedure
+        | ClaimRelated
+        | ClaimResponse
+        | ClaimResponseAddItem
+        | ClaimResponseAddItemDetail
+        | ClaimResponseAddItemDetailSubDetail
+        | ClaimResponseError
+        | ClaimResponseInsurance
+        | ClaimResponseItem
+        | ClaimResponseItemAdjudication
+        | ClaimResponseItemDetail
+        | ClaimResponseItemDetailSubDetail
+        | ClaimResponsePayment
+        | ClaimResponseProcessNote
+        | ClaimResponseTotal
+        | ClaimSupportingInfo
+        | ClientApplication
+        | ClientApplicationSignInForm
+        | ClinicalImpression
+        | ClinicalImpressionFinding
+        | ClinicalImpressionInvestigation
+        | CodeSystem
+        | CodeSystemConcept
+        | CodeSystemConceptDesignation
+        | CodeSystemConceptProperty
+        | CodeSystemFilter
+        | CodeSystemProperty
+        | CodeableConcept
+        | Coding
+        | Communication
+        | CommunicationPayload
+        | CommunicationRequest
+        | CommunicationRequestPayload
+        | CompartmentDefinition
+        | CompartmentDefinitionResource
+        | Composition
+        | CompositionAttester
+        | CompositionEvent
+        | CompositionRelatesTo
+        | CompositionSection
+        | ConceptMap
+        | ConceptMapGroup
+        | ConceptMapGroupElement
+        | ConceptMapGroupElementTarget
+        | ConceptMapGroupElementTargetDependsOn
+        | ConceptMapGroupUnmapped
+        | Condition
+        | ConditionEvidence
+        | ConditionStage
+        | Consent
+        | ConsentPolicy
+        | ConsentProvision
+        | ConsentProvisionActor
+        | ConsentProvisionData
+        | ConsentVerification
+        | ContactDetail
+        | ContactPoint
+        | Contract
+        | ContractContentDefinition
+        | ContractFriendly
+        | ContractLegal
+        | ContractRule
+        | ContractSigner
+        | ContractTerm
+        | ContractTermAction
+        | ContractTermActionSubject
+        | ContractTermAsset
+        | ContractTermAssetContext
+        | ContractTermAssetValuedItem
+        | ContractTermOffer
+        | ContractTermOfferAnswer
+        | ContractTermOfferParty
+        | ContractTermSecurityLabel
+        | Contributor
+        | Count
+        | Coverage
+        | CoverageClass
+        | CoverageCostToBeneficiary
+        | CoverageCostToBeneficiaryException
+        | CoverageEligibilityRequest
+        | CoverageEligibilityRequestInsurance
+        | CoverageEligibilityRequestItem
+        | CoverageEligibilityRequestItemDiagnosis
+        | CoverageEligibilityRequestSupportingInfo
+        | CoverageEligibilityResponse
+        | CoverageEligibilityResponseError
+        | CoverageEligibilityResponseInsurance
+        | CoverageEligibilityResponseInsuranceItem
+        | CoverageEligibilityResponseInsuranceItemBenefit
+        | DataRequirement
+        | DataRequirementCodeFilter
+        | DataRequirementDateFilter
+        | DataRequirementSort
+        | DetectedIssue
+        | DetectedIssueEvidence
+        | DetectedIssueMitigation
+        | Device
+        | DeviceDefinition
+        | DeviceDefinitionCapability
+        | DeviceDefinitionClassification
+        | DeviceDefinitionDeviceName
+        | DeviceDefinitionMaterial
+        | DeviceDefinitionProperty
+        | DeviceDefinitionSpecialization
+        | DeviceDefinitionUdiDeviceIdentifier
+        | DeviceDeviceName
+        | DeviceMetric
+        | DeviceMetricCalibration
+        | DeviceProperty
+        | DeviceRequest
+        | DeviceRequestParameter
+        | DeviceSpecialization
+        | DeviceUdiCarrier
+        | DeviceUseStatement
+        | DeviceVersion
+        | DiagnosticReport
+        | DiagnosticReportMedia
+        | Distance
+        | DocumentManifest
+        | DocumentManifestRelated
+        | DocumentReference
+        | DocumentReferenceContent
+        | DocumentReferenceContext
+        | DocumentReferenceRelatesTo
+        | DomainConfiguration
+        | Dosage
+        | DosageDoseAndRate
+        | Duration
+        | EffectEvidenceSynthesis
+        | EffectEvidenceSynthesisCertainty
+        | EffectEvidenceSynthesisCertaintyCertaintySubcomponent
+        | EffectEvidenceSynthesisEffectEstimate
+        | EffectEvidenceSynthesisEffectEstimatePrecisionEstimate
+        | EffectEvidenceSynthesisResultsByExposure
+        | EffectEvidenceSynthesisSampleSize
+        | Element
+        | ElementDefinition
+        | ElementDefinitionBase
+        | ElementDefinitionBinding
+        | ElementDefinitionConstraint
+        | ElementDefinitionExample
+        | ElementDefinitionMapping
+        | ElementDefinitionSlicing
+        | ElementDefinitionSlicingDiscriminator
+        | ElementDefinitionType
+        | Encounter
+        | EncounterClassHistory
+        | EncounterDiagnosis
+        | EncounterHospitalization
+        | EncounterLocation
+        | EncounterParticipant
+        | EncounterStatusHistory
+        | Endpoint
+        | EnrollmentRequest
+        | EnrollmentResponse
+        | EpisodeOfCare
+        | EpisodeOfCareDiagnosis
+        | EpisodeOfCareStatusHistory
+        | EventDefinition
+        | Evidence
+        | EvidenceVariable
+        | EvidenceVariableCharacteristic
+        | EvidenceVariableCharacteristicDefinitionByCombination
+        | EvidenceVariableCharacteristicDefinitionByTypeAndValue
+        | EvidenceVariableCharacteristicTimeFromEvent
+        | ExampleScenario
+        | ExampleScenarioActor
+        | ExampleScenarioInstance
+        | ExampleScenarioInstanceContainedInstance
+        | ExampleScenarioInstanceVersion
+        | ExampleScenarioProcess
+        | ExampleScenarioProcessStep
+        | ExampleScenarioProcessStepAlternative
+        | ExampleScenarioProcessStepOperation
+        | ExplanationOfBenefit
+        | ExplanationOfBenefitAccident
+        | ExplanationOfBenefitAddItem
+        | ExplanationOfBenefitAddItemDetail
+        | ExplanationOfBenefitAddItemDetailSubDetail
+        | ExplanationOfBenefitBenefitBalance
+        | ExplanationOfBenefitBenefitBalanceFinancial
+        | ExplanationOfBenefitCareTeam
+        | ExplanationOfBenefitDiagnosis
+        | ExplanationOfBenefitInsurance
+        | ExplanationOfBenefitItem
+        | ExplanationOfBenefitItemAdjudication
+        | ExplanationOfBenefitItemDetail
+        | ExplanationOfBenefitItemDetailSubDetail
+        | ExplanationOfBenefitPayee
+        | ExplanationOfBenefitPayment
+        | ExplanationOfBenefitProcedure
+        | ExplanationOfBenefitProcessNote
+        | ExplanationOfBenefitRelated
+        | ExplanationOfBenefitSupportingInfo
+        | ExplanationOfBenefitTotal
+        | Expression
+        | Extension
+        | FamilyMemberHistory
+        | FamilyMemberHistoryCondition
+        | Flag
+        | Goal
+        | GoalTarget
+        | GraphDefinition
+        | GraphDefinitionLink
+        | GraphDefinitionLinkTarget
+        | GraphDefinitionLinkTargetCompartment
+        | Group
+        | GroupCharacteristic
+        | GroupMember
+        | GuidanceResponse
+        | HealthcareService
+        | HealthcareServiceAvailableTime
+        | HealthcareServiceEligibility
+        | HealthcareServiceNotAvailable
+        | HumanName
+        | Identifier
+        | IdentityProvider
+        | ImagingStudy
+        | ImagingStudySeries
+        | ImagingStudySeriesInstance
+        | ImagingStudySeriesPerformer
+        | Immunization
+        | ImmunizationEducation
+        | ImmunizationEvaluation
+        | ImmunizationPerformer
+        | ImmunizationProtocolApplied
+        | ImmunizationReaction
+        | ImmunizationRecommendation
+        | ImmunizationRecommendationRecommendation
+        | ImmunizationRecommendationRecommendationDateCriterion
+        | ImplementationGuide
+        | ImplementationGuideDefinition
+        | ImplementationGuideDefinitionGrouping
+        | ImplementationGuideDefinitionPage
+        | ImplementationGuideDefinitionParameter
+        | ImplementationGuideDefinitionResource
+        | ImplementationGuideDefinitionTemplate
+        | ImplementationGuideDependsOn
+        | ImplementationGuideGlobal
+        | ImplementationGuideManifest
+        | ImplementationGuideManifestPage
+        | ImplementationGuideManifestResource
+        | InsurancePlan
+        | InsurancePlanContact
+        | InsurancePlanCoverage
+        | InsurancePlanCoverageBenefit
+        | InsurancePlanCoverageBenefitLimit
+        | InsurancePlanPlan
+        | InsurancePlanPlanGeneralCost
+        | InsurancePlanPlanSpecificCost
+        | InsurancePlanPlanSpecificCostBenefit
+        | InsurancePlanPlanSpecificCostBenefitCost
+        | Invoice
+        | InvoiceLineItem
+        | InvoiceLineItemPriceComponent
+        | InvoiceParticipant
+        | JsonWebKey
+        | Library
+        | Linkage
+        | LinkageItem
+        | List
+        | ListEntry
+        | Location
+        | LocationHoursOfOperation
+        | LocationPosition
+        | Login
+        | MarketingStatus
+        | Measure
+        | MeasureGroup
+        | MeasureGroupPopulation
+        | MeasureGroupStratifier
+        | MeasureGroupStratifierComponent
+        | MeasureReport
+        | MeasureReportGroup
+        | MeasureReportGroupPopulation
+        | MeasureReportGroupStratifier
+        | MeasureReportGroupStratifierStratum
+        | MeasureReportGroupStratifierStratumComponent
+        | MeasureReportGroupStratifierStratumPopulation
+        | MeasureSupplementalData
+        | Media
+        | Medication
+        | MedicationAdministration
+        | MedicationAdministrationDosage
+        | MedicationAdministrationPerformer
+        | MedicationBatch
+        | MedicationDispense
+        | MedicationDispensePerformer
+        | MedicationDispenseSubstitution
+        | MedicationIngredient
+        | MedicationKnowledge
+        | MedicationKnowledgeAdministrationGuidelines
+        | MedicationKnowledgeAdministrationGuidelinesDosage
+        | MedicationKnowledgeAdministrationGuidelinesPatientCharacteristics
+        | MedicationKnowledgeCost
+        | MedicationKnowledgeDrugCharacteristic
+        | MedicationKnowledgeIngredient
+        | MedicationKnowledgeKinetics
+        | MedicationKnowledgeMedicineClassification
+        | MedicationKnowledgeMonitoringProgram
+        | MedicationKnowledgeMonograph
+        | MedicationKnowledgePackaging
+        | MedicationKnowledgeRegulatory
+        | MedicationKnowledgeRegulatoryMaxDispense
+        | MedicationKnowledgeRegulatorySchedule
+        | MedicationKnowledgeRegulatorySubstitution
+        | MedicationKnowledgeRelatedMedicationKnowledge
+        | MedicationRequest
+        | MedicationRequestDispenseRequest
+        | MedicationRequestDispenseRequestInitialFill
+        | MedicationRequestSubstitution
+        | MedicationStatement
+        | MedicinalProduct
+        | MedicinalProductAuthorization
+        | MedicinalProductAuthorizationJurisdictionalAuthorization
+        | MedicinalProductAuthorizationProcedure
+        | MedicinalProductContraindication
+        | MedicinalProductContraindicationOtherTherapy
+        | MedicinalProductIndication
+        | MedicinalProductIndicationOtherTherapy
+        | MedicinalProductIngredient
+        | MedicinalProductIngredientSpecifiedSubstance
+        | MedicinalProductIngredientSpecifiedSubstanceStrength
+        | MedicinalProductIngredientSpecifiedSubstanceStrengthReferenceStrength
+        | MedicinalProductIngredientSubstance
+        | MedicinalProductInteraction
+        | MedicinalProductInteractionInteractant
+        | MedicinalProductManufactured
+        | MedicinalProductManufacturingBusinessOperation
+        | MedicinalProductName
+        | MedicinalProductNameCountryLanguage
+        | MedicinalProductNameNamePart
+        | MedicinalProductPackaged
+        | MedicinalProductPackagedBatchIdentifier
+        | MedicinalProductPackagedPackageItem
+        | MedicinalProductPharmaceutical
+        | MedicinalProductPharmaceuticalCharacteristics
+        | MedicinalProductPharmaceuticalRouteOfAdministration
+        | MedicinalProductPharmaceuticalRouteOfAdministrationTargetSpecies
+        | MedicinalProductPharmaceuticalRouteOfAdministrationTargetSpeciesWithdrawalPeriod
+        | MedicinalProductSpecialDesignation
+        | MedicinalProductUndesirableEffect
+        | MessageDefinition
+        | MessageDefinitionAllowedResponse
+        | MessageDefinitionFocus
+        | MessageHeader
+        | MessageHeaderDestination
+        | MessageHeaderResponse
+        | MessageHeaderSource
+        | Meta
+        | MetadataResource
+        | MolecularSequence
+        | MolecularSequenceQuality
+        | MolecularSequenceQualityRoc
+        | MolecularSequenceReferenceSeq
+        | MolecularSequenceRepository
+        | MolecularSequenceStructureVariant
+        | MolecularSequenceStructureVariantInner
+        | MolecularSequenceStructureVariantOuter
+        | MolecularSequenceVariant
+        | Money
+        | MoneyQuantity
+        | NamingSystem
+        | NamingSystemUniqueId
+        | Narrative
+        | NutritionOrder
+        | NutritionOrderEnteralFormula
+        | NutritionOrderEnteralFormulaAdministration
+        | NutritionOrderOralDiet
+        | NutritionOrderOralDietNutrient
+        | NutritionOrderOralDietTexture
+        | NutritionOrderSupplement
+        | Observation
+        | ObservationComponent
+        | ObservationDefinition
+        | ObservationDefinitionQualifiedInterval
+        | ObservationDefinitionQuantitativeDetails
+        | ObservationReferenceRange
+        | OperationDefinition
+        | OperationDefinitionOverload
+        | OperationDefinitionParameter
+        | OperationDefinitionParameterBinding
+        | OperationDefinitionParameterReferencedFrom
+        | OperationOutcome
+        | OperationOutcomeIssue
+        | Organization
+        | OrganizationAffiliation
+        | OrganizationContact
+        | ParameterDefinition
+        | Parameters
+        | ParametersParameter
+        | PasswordChangeRequest
+        | Patient
+        | PatientCommunication
+        | PatientContact
+        | PatientLink
+        | PaymentNotice
+        | PaymentReconciliation
+        | PaymentReconciliationDetail
+        | PaymentReconciliationProcessNote
+        | Period
+        | Person
+        | PersonLink
+        | PlanDefinition
+        | PlanDefinitionAction
+        | PlanDefinitionActionCondition
+        | PlanDefinitionActionDynamicValue
+        | PlanDefinitionActionParticipant
+        | PlanDefinitionActionRelatedAction
+        | PlanDefinitionGoal
+        | PlanDefinitionGoalTarget
+        | Population
+        | Practitioner
+        | PractitionerQualification
+        | PractitionerRole
+        | PractitionerRoleAvailableTime
+        | PractitionerRoleNotAvailable
+        | Procedure
+        | ProcedureFocalDevice
+        | ProcedurePerformer
+        | ProdCharacteristic
+        | ProductShelfLife
+        | Project
+        | ProjectDefaultProfile
+        | ProjectLink
+        | ProjectMembership
+        | ProjectMembershipAccess
+        | ProjectMembershipAccessParameter
+        | ProjectSetting
+        | ProjectSite
+        | Provenance
+        | ProvenanceAgent
+        | ProvenanceEntity
+        | Quantity
+        | Questionnaire
+        | QuestionnaireItem
+        | QuestionnaireItemAnswerOption
+        | QuestionnaireItemEnableWhen
+        | QuestionnaireItemInitial
+        | QuestionnaireResponse
+        | QuestionnaireResponseItem
+        | QuestionnaireResponseItemAnswer
+        | Range
+        | Ratio
+        | Reference
+        | RelatedArtifact
+        | RelatedPerson
+        | RelatedPersonCommunication
+        | RequestGroup
+        | RequestGroupAction
+        | RequestGroupActionCondition
+        | RequestGroupActionRelatedAction
+        | ResearchDefinition
+        | ResearchElementDefinition
+        | ResearchElementDefinitionCharacteristic
+        | ResearchStudy
+        | ResearchStudyArm
+        | ResearchStudyAssociatedParty
+        | ResearchStudyComparisonGroup
+        | ResearchStudyLabel
+        | ResearchStudyObjective
+        | ResearchStudyOutcomeMeasure
+        | ResearchStudyProgressStatus
+        | ResearchStudyRecruitment
+        | ResearchSubject
+        | RiskAssessment
+        | RiskAssessmentPrediction
+        | RiskEvidenceSynthesis
+        | RiskEvidenceSynthesisCertainty
+        | RiskEvidenceSynthesisCertaintyCertaintySubcomponent
+        | RiskEvidenceSynthesisRiskEstimate
+        | RiskEvidenceSynthesisRiskEstimatePrecisionEstimate
+        | RiskEvidenceSynthesisSampleSize
+        | SampledData
+        | Schedule
+        | SearchParameter
+        | SearchParameterComponent
+        | ServiceRequest
+        | Signature
+        | SimpleQuantity
+        | Slot
+        | SmartAppLaunch
+        | Specimen
+        | SpecimenCollection
+        | SpecimenContainer
+        | SpecimenDefinition
+        | SpecimenDefinitionTypeTested
+        | SpecimenDefinitionTypeTestedContainer
+        | SpecimenDefinitionTypeTestedContainerAdditive
+        | SpecimenDefinitionTypeTestedHandling
+        | SpecimenProcessing
+        | StructureDefinition
+        | StructureDefinitionContext
+        | StructureDefinitionDifferential
+        | StructureDefinitionMapping
+        | StructureDefinitionSnapshot
+        | StructureMap
+        | StructureMapGroup
+        | StructureMapGroupInput
+        | StructureMapGroupRule
+        | StructureMapGroupRuleDependent
+        | StructureMapGroupRuleSource
+        | StructureMapGroupRuleTarget
+        | StructureMapGroupRuleTargetParameter
+        | StructureMapStructure
+        | Subscription
+        | SubscriptionChannel
+        | SubscriptionStatus
+        | SubscriptionStatusNotificationEvent
+        | Substance
+        | SubstanceAmount
+        | SubstanceAmountReferenceRange
+        | SubstanceIngredient
+        | SubstanceInstance
+        | SubstanceNucleicAcid
+        | SubstanceNucleicAcidSubunit
+        | SubstanceNucleicAcidSubunitLinkage
+        | SubstanceNucleicAcidSubunitSugar
+        | SubstancePolymer
+        | SubstancePolymerMonomerSet
+        | SubstancePolymerMonomerSetStartingMaterial
+        | SubstancePolymerRepeat
+        | SubstancePolymerRepeatRepeatUnit
+        | SubstancePolymerRepeatRepeatUnitDegreeOfPolymerisation
+        | SubstancePolymerRepeatRepeatUnitStructuralRepresentation
+        | SubstanceProtein
+        | SubstanceProteinSubunit
+        | SubstanceReferenceInformation
+        | SubstanceReferenceInformationClassification
+        | SubstanceReferenceInformationGene
+        | SubstanceReferenceInformationGeneElement
+        | SubstanceReferenceInformationTarget
+        | SubstanceSourceMaterial
+        | SubstanceSourceMaterialFractionDescription
+        | SubstanceSourceMaterialOrganism
+        | SubstanceSourceMaterialOrganismAuthor
+        | SubstanceSourceMaterialOrganismHybrid
+        | SubstanceSourceMaterialOrganismOrganismGeneral
+        | SubstanceSourceMaterialPartDescription
+        | SubstanceSpecification
+        | SubstanceSpecificationCode
+        | SubstanceSpecificationMoiety
+        | SubstanceSpecificationName
+        | SubstanceSpecificationNameOfficial
+        | SubstanceSpecificationProperty
+        | SubstanceSpecificationRelationship
+        | SubstanceSpecificationStructure
+        | SubstanceSpecificationStructureIsotope
+        | SubstanceSpecificationStructureIsotopeMolecularWeight
+        | SubstanceSpecificationStructureRepresentation
+        | SupplyDelivery
+        | SupplyDeliverySuppliedItem
+        | SupplyRequest
+        | SupplyRequestParameter
+        | Task
+        | TaskInput
+        | TaskOutput
+        | TaskRestriction
+        | TerminologyCapabilities
+        | TerminologyCapabilitiesClosure
+        | TerminologyCapabilitiesCodeSystem
+        | TerminologyCapabilitiesCodeSystemVersion
+        | TerminologyCapabilitiesCodeSystemVersionFilter
+        | TerminologyCapabilitiesExpansion
+        | TerminologyCapabilitiesExpansionParameter
+        | TerminologyCapabilitiesImplementation
+        | TerminologyCapabilitiesSoftware
+        | TerminologyCapabilitiesTranslation
+        | TerminologyCapabilitiesValidateCode
+        | TestReport
+        | TestReportParticipant
+        | TestReportSetup
+        | TestReportSetupAction
+        | TestReportSetupActionAssert
+        | TestReportSetupActionOperation
+        | TestReportTeardown
+        | TestReportTeardownAction
+        | TestReportTest
+        | TestReportTestAction
+        | TestScript
+        | TestScriptDestination
+        | TestScriptFixture
+        | TestScriptMetadata
+        | TestScriptMetadataCapability
+        | TestScriptMetadataLink
+        | TestScriptOrigin
+        | TestScriptSetup
+        | TestScriptSetupAction
+        | TestScriptSetupActionAssert
+        | TestScriptSetupActionOperation
+        | TestScriptSetupActionOperationRequestHeader
+        | TestScriptTeardown
+        | TestScriptTeardownAction
+        | TestScriptTest
+        | TestScriptTestAction
+        | TestScriptVariable
+        | Timing
+        | TimingRepeat
+        | TriggerDefinition
+        | UsageContext
+        | User
+        | UserConfiguration
+        | UserConfigurationMenu
+        | UserConfigurationMenuLink
+        | UserConfigurationOption
+        | UserConfigurationSearch
+        | UserSecurityRequest
+        | ValueSet
+        | ValueSetCompose
+        | ValueSetComposeInclude
+        | ValueSetComposeIncludeConcept
+        | ValueSetComposeIncludeConceptDesignation
+        | ValueSetComposeIncludeFilter
+        | ValueSetExpansion
+        | ValueSetExpansionContains
+        | ValueSetExpansionParameter
+        | VerificationResult
+        | VerificationResultAttestation
+        | VerificationResultPrimarySource
+        | VerificationResultValidator
+        | ViewDefinition
+        | ViewDefinitionConstant
+        | ViewDefinitionSelect
+        | ViewDefinitionSelectColumn
+        | ViewDefinitionSelectColumnTag
+        | ViewDefinitionWhere
+        | VisionPrescription
+        | VisionPrescriptionLensSpecification
+        | VisionPrescriptionLensSpecificationPrism
+    )
 else:
     # At runtime, use Any to avoid circular import issues
     Resource = Any
@@ -1124,8 +2558,10 @@ importlib.import_module("pymedplum.fhir.visionprescription")
 # Register special types for forward reference resolution
 from pymedplum.fhir._rebuild import rebuild_all_models, register_model  # noqa: E402
 
-register_model('ResourceType', ResourceType)
-register_model('Resource', Resource)  # Needed for type resolution even though it's Any at runtime
+register_model("ResourceType", ResourceType)
+register_model(
+    "Resource", Resource
+)  # Needed for type resolution even though it's Any at runtime
 
 # Rebuild all models to resolve forward references
 rebuild_all_models()

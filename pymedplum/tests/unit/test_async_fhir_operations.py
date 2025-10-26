@@ -3,7 +3,6 @@
 Tests the async client implementation with mocked HTTP responses.
 """
 
-
 import httpx
 import pytest
 from respx import MockRouter
