@@ -1,7 +1,7 @@
 import asyncio
 import random
 from collections.abc import AsyncIterator
-from typing import Any, Optional, Type, TypeVar, Union, overload
+from typing import Any, Literal, Optional, TypeVar, Union, overload
 
 import httpx
 
@@ -146,20 +146,16 @@ class AsyncMedplumClient(BaseClient):
 
     @overload
     async def read_resource(
-        self, resource_type: str, resource_id: str, as_fhir: None = None
-    ) -> dict[str, Any]:
-        """Return raw dict (backward compatible)"""
-        ...
+        self, resource_type: str, resource_id: str, as_fhir: type[T]
+    ) -> T: ...
 
     @overload
     async def read_resource(
-        self, resource_type: str, resource_id: str, as_fhir: Type[T]
-    ) -> T:
-        """Return typed FHIR resource"""
-        ...
+        self, resource_type: str, resource_id: str, as_fhir: None = None
+    ) -> dict[str, Any]: ...
 
     async def read_resource(
-        self, resource_type: str, resource_id: str, as_fhir: Optional[Type[T]] = None
+        self, resource_type: str, resource_id: str, as_fhir: Optional[type[T]] = None
     ) -> Union[T, dict[str, Any]]:
         """Read a FHIR resource by type and ID.
 
@@ -214,7 +210,7 @@ class AsyncMedplumClient(BaseClient):
         self,
         resource_type: str,
         query: Optional[QueryTypes] = None,
-        return_bundle: bool = False,
+        return_bundle: Literal[False] = False,
     ) -> dict[str, Any]: ...
 
     @overload
@@ -222,7 +218,7 @@ class AsyncMedplumClient(BaseClient):
         self,
         resource_type: str,
         query: Optional[QueryTypes] = None,
-        return_bundle: bool = True,
+        return_bundle: Literal[True] = ...,
     ) -> FHIRBundle: ...
 
     async def search_resources(
@@ -436,7 +432,12 @@ class AsyncMedplumClient(BaseClient):
             payload["password"] = password
 
         if access_policy:
-            payload["accessPolicy"] = access_policy
+            if isinstance(access_policy, str):
+                payload["accessPolicy"] = {"reference": access_policy}
+            else:
+                payload["accessPolicy"] = access_policy
+
+        return await self.post(f"admin/projects/{project_id}/invite", payload)
 
     async def export_ccda(self, patient_id: str) -> str:
         """Export a patient's complete history as a C-CDA XML document.
@@ -500,31 +501,19 @@ class AsyncMedplumClient(BaseClient):
             )
             is_valid = result["parameter"][0]["valueBoolean"]  # True
         """
-        # Build parameters
-        params = []
+        from ._fhir_ops import build_valueset_validate_params
 
-        if valueset_url:
-            params.append({"name": "url", "valueUri": valueset_url})
-
-        if code:
-            params.append({"name": "code", "valueCode": code})
-
-        if system:
-            params.append({"name": "system", "valueUri": system})
-
-        if coding:
-            params.append({"name": "coding", "valueCoding": coding})
-
-        if codeable_concept:
-            params.append(
-                {"name": "codeableConcept", "valueCodeableConcept": codeable_concept}
-            )
-
-        if display:
-            params.append({"name": "display", "valueString": display})
-
-        if abstract is not None:
-            params.append({"name": "abstract", "valueBoolean": abstract})
+        # Build parameters using helper
+        params_resource = build_valueset_validate_params(
+            valueset_url=valueset_url,
+            valueset_id=valueset_id,
+            code=code,
+            system=system,
+            coding=coding,
+            codeable_concept=codeable_concept,
+            display=display,
+            abstract=abstract,
+        )
 
         # Build endpoint
         if valueset_id:
@@ -532,11 +521,7 @@ class AsyncMedplumClient(BaseClient):
         else:
             endpoint = f"{self.fhir_base_url}ValueSet/$validate-code"
 
-        return await self._request(
-            "POST",
-            endpoint,
-            json={"resourceType": "Parameters", "parameter": params},
-        )
+        return await self._request("POST", endpoint, json=params_resource)
 
     async def validate_codesystem_code(
         self,
@@ -569,20 +554,16 @@ class AsyncMedplumClient(BaseClient):
             )
             is_valid = result["parameter"][0]["valueBoolean"]  # True
         """
-        # Build parameters
-        params = []
+        from ._fhir_ops import build_codesystem_validate_params
 
-        if codesystem_url:
-            params.append({"name": "url", "valueUri": codesystem_url})
-
-        if version:
-            params.append({"name": "version", "valueString": version})
-
-        if code:
-            params.append({"name": "code", "valueCode": code})
-
-        if coding:
-            params.append({"name": "coding", "valueCoding": coding})
+        # Build parameters using helper
+        params_resource = build_codesystem_validate_params(
+            codesystem_url=codesystem_url,
+            codesystem_id=codesystem_id,
+            code=code,
+            coding=coding,
+            version=version,
+        )
 
         # Build endpoint
         if codesystem_id:
@@ -590,11 +571,7 @@ class AsyncMedplumClient(BaseClient):
         else:
             endpoint = f"{self.fhir_base_url}CodeSystem/$validate-code"
 
-        return await self._request(
-            "POST",
-            endpoint,
-            json={"resourceType": "Parameters", "parameter": params},
-        )
+        return await self._request("POST", endpoint, json=params_resource)
 
     async def execute_transaction(self, bundle: Union[dict, Any]) -> dict[str, Any]:
         """Execute a transaction bundle atomically.

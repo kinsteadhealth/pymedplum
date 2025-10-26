@@ -14,6 +14,7 @@ const PYTHON_HEADER = [
   "# This is a generated file",
   "# Do not edit manually.",
   "# Generated from Medplum TypeScript definitions",
+  "# ruff: noqa: F821 - Forward references resolved via Pydantic model_rebuild()",
   "",
   "from __future__ import annotations",
   "",
@@ -83,6 +84,8 @@ function analyzeTypingImports(parsedFile: ParsedFile): TypingImports {
       if (field.pythonType.includes("Literal[")) imports.hasLiteral = true;
       if (field.pythonType.includes("List[") || field.isArray) imports.hasList = true;
       if (field.pythonType.includes("Dict[")) imports.hasDict = true;
+      // Check if field will be converted to dict[str, Any] for Resource arrays
+      if (field.isArray && field.pythonType === "Resource") imports.hasAny = true;
     });
   });
 
@@ -100,8 +103,7 @@ function buildTypingImports(
 
   if (imports.hasTypeVar) typingImports.add("TypeVar");
   if (imports.hasAny) typingImports.add("Any");
-  if (imports.hasDict) typingImports.add("Dict");
-  if (imports.hasList) typingImports.add("List");
+  // No longer need Dict and List - using built-in dict and list
   if (imports.hasLiteral) typingImports.add("Literal");
   if (imports.hasOptional) typingImports.add("Optional");
   if (imports.hasUnion) typingImports.add("Union");
@@ -228,16 +230,24 @@ function cleanForwardReferences(typeAnnotation: string): string {
  */
 function processTypeAnnotation(field: ParsedField, externalTypes: Set<string>): string {
   let typeAnnotation = field.pythonType
-    // Keep List/Dict capitalized for Pydantic forward reference compatibility
+    // Convert to lowercase built-ins (Python 3.9+ style)
     .replace(/\bType\[/g, "type[")
+    .replace(/\bList\[/g, "list[")
+    .replace(/\bDict\[/g, "dict[")
     .replace(/Union\[\(([^)]+)\)\]/g, "Literal[$1]")
     .replace(/([A-Z][a-zA-Z0-9]*)<[^>]+>/g, "$1");
 
   typeAnnotation = flattenNestedLiterals(typeAnnotation);
   typeAnnotation = cleanForwardReferences(typeAnnotation);
 
-  if (field.isArray && !typeAnnotation.startsWith("List[")) {
-    typeAnnotation = `List[${typeAnnotation}]`;
+  if (field.isArray && !typeAnnotation.startsWith("list[")) {
+    // Special case: Resource arrays should become list[dict[str, Any]]
+    // to avoid Pydantic rebuild issues with Resource type alias
+    if (typeAnnotation === "Resource") {
+      typeAnnotation = "list[dict[str, Any]]";
+    } else {
+      typeAnnotation = `list[${typeAnnotation}]`;
+    }
   }
   if (field.optional) {
     typeAnnotation = `Optional[${typeAnnotation}]`;
@@ -340,7 +350,15 @@ function generateRegularField(
 ): string {
   const typeAnnotation = processTypeAnnotation(field, externalTypes);
   const fieldArgs = generateFieldArgs(field);
-  return `    ${field.pythonName}: ${typeAnnotation} = Field(${fieldArgs.join(", ")})`;
+  
+  // Add noqa comment if field references undefined forward types
+  const hasForwardRef = /\b[A-Z][a-zA-Z0-9]+\b/.test(typeAnnotation) &&
+    !typeAnnotation.match(/^(Optional|list|dict|Union|Literal)\[/);
+  const noqaComment = hasForwardRef && !externalTypes.has(typeAnnotation.replace(/^Optional\[|\]$/g, ''))
+    ? "  # noqa: F821"
+    : "";
+  
+  return `    ${field.pythonName}: ${typeAnnotation} = Field(${fieldArgs.join(", ")})${noqaComment}`;
 }
 
 // ============================================================================
@@ -455,10 +473,10 @@ export function generatePydanticFile(parsedFile: ParsedFile): string {
     lines.push("");
     lines.push("");
     lines.push("# Register models for forward reference resolution");
-    lines.push("from typing import TYPE_CHECKING");
+    lines.push("from typing import TYPE_CHECKING  # noqa: E402");
     lines.push("");
     lines.push("if not TYPE_CHECKING:");
-    lines.push("    from pymedplum.fhir._rebuild import register_model");
+    lines.push("    from pymedplum.fhir._rebuild import register_model  # noqa: E402");
     lines.push("");
     parsedFile.interfaces.forEach((parsed) => {
       lines.push(`    register_model("${parsed.name}", ${parsed.name})`);
@@ -542,31 +560,23 @@ export function generateInitFile(
   lines.push("");
   lines.push("__all__ = [\"Resource\", \"ResourceType\"]");
   lines.push("");
-  lines.push("# Initialize models after all modules are imported");
-  lines.push("# Import all modules to register their models");
+  lines.push("# Import all modules to trigger model registration");
+  lines.push("import importlib");
+  lines.push("");
   
   // Import all modules at runtime to register models
-  Array.from(fileToClasses.keys())
-    .sort()
-    .forEach((fileName) => {
-      lines.push(`from pymedplum.fhir import ${fileName}  # noqa: F401`);
-    });
+  const fileNames = Array.from(fileToClasses.keys()).sort();
+  fileNames.forEach((fileName) => {
+    lines.push(`importlib.import_module("pymedplum.fhir.${fileName}")`);
+  });
   
   lines.push("");
-  lines.push("# Register special types and typing constructs for forward reference resolution");
-  lines.push("from typing import Dict as typing_Dict, List as typing_List");
-  lines.push("from pymedplum.fhir._rebuild import register_model");
-  lines.push("");
-  lines.push("# Register typing constructs first (they should override FHIR classes with same names)");
-  lines.push("register_model('List', typing_List)");
-  lines.push("register_model('Dict', typing_Dict)");
-  lines.push("");
-  lines.push("# Register special FHIR type aliases");
-  lines.push("register_model('Resource', Resource)");
+  lines.push("# Register special types for forward reference resolution");
+  lines.push("from pymedplum.fhir._rebuild import register_model, rebuild_all_models  # noqa: E402");
   lines.push("register_model('ResourceType', ResourceType)");
+  lines.push("register_model('Resource', Resource)  # Needed for type resolution even though it's Any at runtime");
   lines.push("");
   lines.push("# Rebuild all models to resolve forward references");
-  lines.push("from pymedplum.fhir._rebuild import rebuild_all_models");
   lines.push("rebuild_all_models()");
 
   return lines.join("\n") + "\n";
@@ -583,15 +593,15 @@ in Pydantic models with circular dependencies. Models register themselves
 upon module import, and are rebuilt after all modules are loaded.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 # Global namespace that collects all models
-_models_namespace: Dict[str, Any] = {}
+_models_namespace: dict[str, Any] = {}
 
 
 def register_model(name: str, model: Any) -> None:
     """Register a model to be available for forward reference resolution.
-    
+
     Args:
         name: The name of the model class
         model: The model class itself
@@ -601,7 +611,7 @@ def register_model(name: str, model: Any) -> None:
 
 def rebuild_all_models() -> None:
     """Rebuild all registered models with the complete namespace.
-    
+
     This resolves all forward references by providing each model with
     a namespace containing all registered models.
     """

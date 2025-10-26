@@ -3,6 +3,7 @@
 Tests _include, _revinclude, chaining, modifiers, and other advanced search capabilities.
 """
 
+import contextlib
 import uuid
 from datetime import datetime, timedelta
 
@@ -31,7 +32,7 @@ def test_setup(medplum_client):
 
     # Create patients linked to organization
     patients = []
-    for i, (family, given) in enumerate(
+    for _i, (family, given) in enumerate(
         [("TestSmith", "John"), ("TestSmithson", "Jane"), ("TestJones", "Bob")]
     ):
         patient = Patient(
@@ -73,10 +74,8 @@ def test_setup(medplum_client):
 
     # Cleanup
     for resource_type, resource_id in reversed(created_resources):
-        try:
+        with contextlib.suppress(Exception):
             medplum_client.delete_resource(resource_type, resource_id)
-        except Exception:
-            pass
 
 
 def test_include_related_resources(medplum_client, test_setup):
@@ -143,7 +142,6 @@ def test_revinclude_observations(medplum_client, test_setup):
 def test_search_parameter_chaining(medplum_client, test_setup):
     """Test chaining search parameters through references."""
     test_id = test_setup["test_id"]
-    org_name = test_setup["organization"]["name"]
 
     # Find patients by their organization's name (chaining through managingOrganization)
     bundle = medplum_client.search_resources(
@@ -244,8 +242,6 @@ def test_date_range_with_both_bounds(medplum_client, test_setup):
 def test_combined_advanced_features(medplum_client, test_setup):
     """Test combining multiple advanced search features."""
     test_id = test_setup["test_id"]
-    today = datetime.now().date()
-    week_ago = today - timedelta(days=7)
 
     # Complex query: patients with test_id in name, include org, revinclude recent observations
     bundle = medplum_client.search_resources(

@@ -72,7 +72,6 @@ async def async_medplum_client(medplum_credentials):
 def medplum_membership(
     medplum_client,
     create_test_org,
-    create_test_practitioner,
     create_test_access_policy,
     create_test_membership,
     test_id,
@@ -85,11 +84,12 @@ def medplum_membership(
 
     # Create test resources
     create_test_org("Coverage", test_id)
-    practitioner = create_test_practitioner("Test User", test_id)
     policy = create_test_access_policy("Test Policy", test_id)
 
-    # Create membership
-    membership = create_test_membership(project_id, practitioner, policy["id"], test_id)
+    # Create membership (creates User + Practitioner + ProjectMembership)
+    membership = create_test_membership(
+        project_id, "Test", "User", policy["id"], test_id
+    )
 
     if not membership:
         pytest.skip("Could not create test membership")
@@ -222,16 +222,12 @@ def create_test_access_policy(medplum_client):
 def create_test_membership(medplum_client):
     """Factory fixture that returns a function to create test memberships."""
 
-    def _create(project_id, practitioner, policy_id, test_id):
+    def _create(project_id, first_name, last_name, policy_id, test_id):
         """Helper to create ProjectMembership using invite API with secure credentials.
 
         Creates User, profile, and ProjectMembership silently (no email).
         Uses cryptographically secure random password for security.
         """
-        name_parts = practitioner["name"][0]
-        first_name = name_parts["given"][0]
-        last_name = name_parts["family"]
-
         # Generate unique, secure credentials
         email = f"{first_name.lower()}.{last_name.lower()}.{test_id}@test.example.com"
         password = secrets.token_urlsafe(

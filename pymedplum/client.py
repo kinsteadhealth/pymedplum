@@ -1,7 +1,7 @@
 import random
 import time
 from collections.abc import Iterator
-from typing import Any, Optional, Type, TypeVar, Union, overload
+from typing import Any, Literal, Optional, TypeVar, Union, overload
 
 import httpx
 
@@ -170,20 +170,16 @@ class MedplumClient(BaseClient):
 
     @overload
     def read_resource(
-        self, resource_type: str, resource_id: str, as_fhir: None = None
-    ) -> dict[str, Any]:
-        """Return raw dict (backward compatible)"""
-        ...
+        self, resource_type: str, resource_id: str, as_fhir: type[T]
+    ) -> T: ...
 
     @overload
     def read_resource(
-        self, resource_type: str, resource_id: str, as_fhir: Type[T]
-    ) -> T:
-        """Return typed FHIR resource"""
-        ...
+        self, resource_type: str, resource_id: str, as_fhir: None = None
+    ) -> dict[str, Any]: ...  # type: ignore[overload-cannot-match]
 
     def read_resource(
-        self, resource_type: str, resource_id: str, as_fhir: Optional[Type[T]] = None
+        self, resource_type: str, resource_id: str, as_fhir: Optional[type[T]] = None
     ) -> Union[T, dict[str, Any]]:
         """Read a FHIR resource by type and ID.
 
@@ -260,7 +256,7 @@ class MedplumClient(BaseClient):
         self,
         resource_type: str,
         query: Optional[QueryTypes] = None,
-        return_bundle: bool = False,
+        return_bundle: Literal[False] = False,
     ) -> dict[str, Any]: ...
 
     @overload
@@ -268,7 +264,7 @@ class MedplumClient(BaseClient):
         self,
         resource_type: str,
         query: Optional[QueryTypes] = None,
-        return_bundle: bool = True,
+        return_bundle: Literal[True] = ...,
     ) -> FHIRBundle: ...
 
     def search_resources(
@@ -528,6 +524,8 @@ class MedplumClient(BaseClient):
             else:
                 payload["accessPolicy"] = access_policy
 
+        return self.post(f"admin/projects/{project_id}/invite", payload)
+
     def export_ccda(self, patient_id: str) -> str:
         """Export a patient's complete history as a C-CDA XML document.
 
@@ -590,31 +588,19 @@ class MedplumClient(BaseClient):
             )
             is_valid = result["parameter"][0]["valueBoolean"]  # True
         """
-        # Build parameters
-        params = []
+        from ._fhir_ops import build_valueset_validate_params
 
-        if valueset_url:
-            params.append({"name": "url", "valueUri": valueset_url})
-
-        if code:
-            params.append({"name": "code", "valueCode": code})
-
-        if system:
-            params.append({"name": "system", "valueUri": system})
-
-        if coding:
-            params.append({"name": "coding", "valueCoding": coding})
-
-        if codeable_concept:
-            params.append(
-                {"name": "codeableConcept", "valueCodeableConcept": codeable_concept}
-            )
-
-        if display:
-            params.append({"name": "display", "valueString": display})
-
-        if abstract is not None:
-            params.append({"name": "abstract", "valueBoolean": abstract})
+        # Build parameters using helper
+        params_resource = build_valueset_validate_params(
+            valueset_url=valueset_url,
+            valueset_id=valueset_id,
+            code=code,
+            system=system,
+            coding=coding,
+            codeable_concept=codeable_concept,
+            display=display,
+            abstract=abstract,
+        )
 
         # Build endpoint
         if valueset_id:
@@ -622,11 +608,7 @@ class MedplumClient(BaseClient):
         else:
             endpoint = f"{self.fhir_base_url}ValueSet/$validate-code"
 
-        return self._request(
-            "POST",
-            endpoint,
-            json={"resourceType": "Parameters", "parameter": params},
-        )
+        return self._request("POST", endpoint, json=params_resource)
 
     def validate_codesystem_code(
         self,
@@ -659,20 +641,16 @@ class MedplumClient(BaseClient):
             )
             is_valid = result["parameter"][0]["valueBoolean"]  # True
         """
-        # Build parameters
-        params = []
+        from ._fhir_ops import build_codesystem_validate_params
 
-        if codesystem_url:
-            params.append({"name": "url", "valueUri": codesystem_url})
-
-        if version:
-            params.append({"name": "version", "valueString": version})
-
-        if code:
-            params.append({"name": "code", "valueCode": code})
-
-        if coding:
-            params.append({"name": "coding", "valueCoding": coding})
+        # Build parameters using helper
+        params_resource = build_codesystem_validate_params(
+            codesystem_url=codesystem_url,
+            codesystem_id=codesystem_id,
+            code=code,
+            coding=coding,
+            version=version,
+        )
 
         # Build endpoint
         if codesystem_id:
@@ -680,11 +658,7 @@ class MedplumClient(BaseClient):
         else:
             endpoint = f"{self.fhir_base_url}CodeSystem/$validate-code"
 
-        return self._request(
-            "POST",
-            endpoint,
-            json={"resourceType": "Parameters", "parameter": params},
-        )
+        return self._request("POST", endpoint, json=params_resource)
 
     def execute_transaction(self, bundle: Union[dict, Any]) -> dict[str, Any]:
         """Execute a transaction bundle atomically.
@@ -735,43 +709,6 @@ class MedplumClient(BaseClient):
             bundle_data["type"] = "transaction"
 
         # POST to base URL (not /fhir/R4/Bundle, just /fhir/R4/)
-        return self._request("POST", self.fhir_base_url.rstrip("/"), json=bundle_data)
-
-    def execute_batch(self, bundle: Union[dict, Any]) -> dict[str, Any]:
-        """Execute a batch bundle (non-atomic operations).
-
-        Each operation in a batch bundle is processed independently.
-        If one fails, others can still succeed.
-
-        Args:
-            bundle: Bundle resource with type="batch" or dict with entries
-
-        Returns:
-            Bundle with type="batch-response" containing results
-
-        Example:
-            bundle = {
-                "resourceType": "Bundle",
-                "type": "batch",
-                "entry": [
-                    {
-                        "request": {"method": "GET", "url": "Patient/123"}
-                    },
-                    {
-                        "request": {"method": "GET", "url": "Patient/456"}
-                    }
-                ]
-            }
-            result = client.execute_batch(bundle)
-        """
-        from .helpers import to_fhir_json
-
-        bundle_data = to_fhir_json(bundle) if hasattr(bundle, "model_dump") else bundle
-
-        # Ensure it's a batch bundle
-        if bundle_data.get("type") != "batch":
-            bundle_data["type"] = "batch"
-
         return self._request("POST", self.fhir_base_url.rstrip("/"), json=bundle_data)
 
     def upload_binary(

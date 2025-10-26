@@ -173,7 +173,7 @@ output = "coverage.xml"
 
 [tool.mypy]
 packages = ["pymedplum"]
-exclude = ["tests/.*"]
+exclude = ["tests/.*", "pymedplum/fhir/.*"]
 python_version = "3.9"
 
 # Basic type checking - catches common bugs without being overly strict

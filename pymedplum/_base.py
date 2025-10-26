@@ -298,9 +298,12 @@ class OnBehalfOfContext:
 
     def __enter__(self):
         # Auto-authenticate if not already authenticated
-        if not self.client.access_token or self.client._should_refresh_token():
-            if self.client.client_id and self.client.client_secret:
-                self.client.authenticate()
+        if (
+            (not self.client.access_token or self.client._should_refresh_token())
+            and self.client.client_id
+            and self.client.client_secret
+        ):
+            self.client.authenticate()
 
         self.client._validate_on_behalf_of_usage()
         self.client._obo_stack.append(self.member_ref)
@@ -319,9 +322,12 @@ class AsyncOnBehalfOfContext:
 
     async def __aenter__(self):
         # Auto-authenticate if not already authenticated
-        if not self.client.access_token or self.client._should_refresh_token():
-            if self.client.client_id and self.client.client_secret:
-                await self.client.authenticate()
+        if (
+            (not self.client.access_token or self.client._should_refresh_token())
+            and self.client.client_id
+            and self.client.client_secret
+        ):
+            await self.client.authenticate()
 
         self.client._validate_on_behalf_of_usage()
         self.client._obo_stack.append(self.member_ref)

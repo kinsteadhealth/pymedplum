@@ -8,10 +8,10 @@ import base64
 import copy
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 
-def parse_reference(reference: str) -> Tuple[str, str]:
+def parse_reference(reference: str) -> tuple[str, str]:
     """Parse a FHIR reference string into resource type and ID.
 
     Args:
@@ -57,7 +57,7 @@ def build_reference(resource_type: str, resource_id: str) -> str:
     return f"{resource_type}/{resource_id}"
 
 
-def get_patient_display_name(patient: Dict[str, Any]) -> str:
+def get_patient_display_name(patient: dict[str, Any]) -> str:
     """Extract a display-friendly name from a Patient resource.
 
     Handles the complexity of FHIR's HumanName structure and returns
@@ -99,7 +99,7 @@ def get_patient_display_name(patient: Dict[str, Any]) -> str:
     return " ".join(parts) if parts else "Unknown"
 
 
-def extract_identifier(resource: Dict[str, Any], system: str) -> Optional[str]:
+def extract_identifier(resource: dict[str, Any], system: str) -> Optional[str]:
     """Extract an identifier value by system URI.
 
     Args:
@@ -127,7 +127,7 @@ def extract_identifier(resource: Dict[str, Any], system: str) -> Optional[str]:
     return None
 
 
-def get_code_display(codeable_concept: Dict[str, Any]) -> Optional[str]:
+def get_code_display(codeable_concept: dict[str, Any]) -> Optional[str]:
     """Extract display text from a CodeableConcept.
 
     Args:
@@ -156,7 +156,7 @@ def get_code_display(codeable_concept: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def to_fhir_json(resource: Union[Dict[str, Any], Any]) -> Dict[str, Any]:
+def to_fhir_json(resource: Union[dict[str, Any], Any]) -> dict[str, Any]:
     """Convert a resource to FHIR JSON format.
 
     Handles both dict resources and Pydantic models.
@@ -180,9 +180,9 @@ def to_fhir_json(resource: Union[Dict[str, Any], Any]) -> Dict[str, Any]:
 
 
 def to_portable(
-    resource: Dict[str, Any],
+    resource: dict[str, Any],
     org_ext_url: str = "https://example.org/fhir/StructureDefinition/orgLink",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Convert Medplum-specific FHIR to portable FHIR.
 
     Removes vendor-specific meta fields and converts Medplum's
@@ -283,27 +283,3 @@ def decode_jwt_exp(token: str) -> Optional[datetime]:
         return datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
     except Exception:
         return None
-
-
-def to_fhir_json(model):
-    """Convert a Pydantic FHIR model to JSON-compatible dict.
-
-    This helper converts Pydantic FHIR models to dictionaries suitable for
-    sending to the Medplum API. It uses field aliases (FHIR's camelCase naming)
-    and excludes None values to keep payloads clean.
-
-    Args:
-        model: Pydantic FHIR model instance or dict
-
-    Returns:
-        Dict with FHIR field names (aliases) and None values excluded
-
-    Example:
-        >>> from pymedplum.fhir.patient import Patient
-        >>> patient = Patient(name=[HumanName(given=["John"], family="Doe")])
-        >>> json_data = to_fhir_json(patient)
-        >>> # json_data uses camelCase FHIR field names
-    """
-    if isinstance(model, dict):
-        return model
-    return model.model_dump(by_alias=True, exclude_none=True)

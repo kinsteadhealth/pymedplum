@@ -158,12 +158,21 @@ function mapTypeScriptTypeToPython(tsType: string): string {
   const genericMatch = tsType.match(GENERIC_REGEX);
   if (genericMatch) {
     const [, container, inner] = genericMatch;
+    // Special case: Array<Resource> should become list[dict[str, Any]]
+    // to avoid Pydantic rebuild issues with Resource type alias
+    if (container === "Array" && inner === "Resource") {
+      return "list[dict[str, Any]]";
+    }
     return mapGenericType(container, inner);
   }
 
   // Array types with [] notation
   if (tsType.endsWith("[]")) {
     const elementType = tsType.slice(0, -2);
+    // Special case: Resource[] should become list[dict[str, Any]]
+    if (elementType === "Resource") {
+      return "list[dict[str, Any]]";
+    }
     return `list[${mapTypeScriptTypeToPython(elementType)}]`;
   }
 

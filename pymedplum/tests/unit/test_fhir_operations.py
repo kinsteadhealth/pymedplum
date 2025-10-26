@@ -273,7 +273,7 @@ def test_execute_transaction_auto_sets_type(
 
 def test_execute_batch_bundle_success(client: MedplumClient, respx_mock: MockRouter):
     """Test successful batch bundle execution."""
-    respx_mock.post("https://api.medplum.com/fhir/R4").mock(
+    respx_mock.post("https://api.medplum.com/fhir/R4/").mock(
         return_value=httpx.Response(
             200,
             json={
@@ -340,7 +340,6 @@ def test_upload_binary(client: MedplumClient, respx_mock: MockRouter):
 
 def test_download_binary(client: MedplumClient, respx_mock: MockRouter):
     """Test binary content download."""
-    import base64
 
     pdf_content = b"%PDF-1.4 test content"
 
@@ -348,12 +347,8 @@ def test_download_binary(client: MedplumClient, respx_mock: MockRouter):
     respx_mock.get("https://api.medplum.com/fhir/R4/Binary/binary-123").mock(
         return_value=httpx.Response(
             200,
-            json={
-                "resourceType": "Binary",
-                "id": "binary-123",
-                "contentType": "application/pdf",
-                "data": base64.b64encode(pdf_content).decode("utf-8"),
-            },
+            content=pdf_content,
+            headers={"Content-Type": "application/pdf"},
         )
     )
 

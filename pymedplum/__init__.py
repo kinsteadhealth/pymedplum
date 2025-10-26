@@ -28,31 +28,26 @@ from .helpers import (
 )
 
 __all__ = [
-    # Clients
     "AsyncMedplumClient",
-    "MedplumClient",
-    # Bundle wrapper
-    "FHIRBundle",
-    # Exceptions
-    "MedplumError",
-    "OperationOutcomeError",
     "AuthenticationError",
     "AuthorizationError",
-    "NotFoundError",
-    "ResourceNotFoundError",
-    "ValidationError",
-    "RateLimitError",
-    "ServerError",
+    "FHIRBundle",
+    "MedplumClient",
+    "MedplumError",
     "NetworkError",
-    # Helpers
-    "parse_reference",
+    "NotFoundError",
+    "OperationOutcomeError",
+    "RateLimitError",
+    "ResourceNotFoundError",
+    "ServerError",
+    "ValidationError",
+    "__version__",
     "build_reference",
-    "get_patient_display_name",
+    "decode_jwt_exp",
     "extract_identifier",
     "get_code_display",
+    "get_patient_display_name",
+    "parse_reference",
     "to_fhir_json",
     "to_portable",
-    "decode_jwt_exp",
-    # Version
-    "__version__",
 ]

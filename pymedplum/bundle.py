@@ -4,7 +4,7 @@ Simplifies working with FHIR search results and batch operations.
 """
 
 from collections.abc import Iterator
-from typing import Any, Dict, List, Optional, Type, TypeVar
+from typing import Any, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -16,7 +16,7 @@ class FHIRBundle:
     eliminating boilerplate when working with search results.
     """
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         """Initialize from raw Bundle data.
 
         Args:
@@ -26,14 +26,14 @@ class FHIRBundle:
             ValueError: If data is not a valid Bundle
         """
         if not isinstance(data, dict):
-            raise ValueError("Bundle data must be a dictionary")
+            raise TypeError("Bundle data must be a dictionary")
 
         if data.get("resourceType") != "Bundle":
             raise ValueError(f"Expected Bundle, got {data.get('resourceType')}")
 
         self._data = data
 
-    def get_resources(self) -> List[Dict[str, Any]]:
+    def get_resources(self) -> list[dict[str, Any]]:
         """Extract all resources from Bundle entries.
 
         Returns:
@@ -48,7 +48,7 @@ class FHIRBundle:
         entries = self._data.get("entry", [])
         return [entry["resource"] for entry in entries if "resource" in entry]
 
-    def get_resources_typed(self, resource_class: Type[T]) -> List[T]:
+    def get_resources_typed(self, resource_class: type[T]) -> list[T]:
         """Extract and parse resources to typed Pydantic models.
 
         Args:
@@ -83,7 +83,7 @@ class FHIRBundle:
         """Check if Bundle has no resources."""
         return len(self.get_resources()) == 0
 
-    def __iter__(self) -> Iterator[Dict[str, Any]]:
+    def __iter__(self) -> Iterator[dict[str, Any]]:
         """Iterate over resources directly."""
         return iter(self.get_resources())
 
@@ -96,12 +96,12 @@ class FHIRBundle:
         return not self.is_empty()
 
     @property
-    def raw(self) -> Dict[str, Any]:
+    def raw(self) -> dict[str, Any]:
         """Access underlying Bundle data."""
         return self._data
 
     @property
-    def link(self) -> List[Dict[str, Any]]:
+    def link(self) -> list[dict[str, Any]]:
         """Get Bundle links for pagination."""
         return self._data.get("link", [])
 

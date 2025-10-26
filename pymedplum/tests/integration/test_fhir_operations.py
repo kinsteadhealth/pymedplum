@@ -164,7 +164,7 @@ def test_sync_execute_transaction(medplum_client):
     # but the relationship is correctly stored - verify by checking the observation
     subject_ref = observation["subject"]["reference"]
     # Accept either the resolved reference or the urn:uuid (both are valid)
-    assert subject_ref == f"Patient/{patient_id}" or subject_ref == "urn:uuid:patient-1"
+    assert subject_ref in {f"Patient/{patient_id}", "urn:uuid:patient-1"}
 
 
 @pytest.mark.asyncio

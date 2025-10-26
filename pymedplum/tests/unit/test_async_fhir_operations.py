@@ -340,16 +340,12 @@ async def test_async_download_binary(
     """Test async binary content download."""
     pdf_content = b"%PDF-1.4 test content"
 
-    # Mock the read_resource call that download_binary makes
+    # Mock the GET request with Accept: */* to return raw binary content
     respx_mock.get("https://api.medplum.com/fhir/R4/Binary/binary-123").mock(
         return_value=httpx.Response(
             200,
-            json={
-                "resourceType": "Binary",
-                "id": "binary-123",
-                "contentType": "application/pdf",
-                "data": base64.b64encode(pdf_content).decode("utf-8"),
-            },
+            content=pdf_content,
+            headers={"Content-Type": "application/pdf"},
         )
     )
 
