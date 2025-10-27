@@ -299,6 +299,209 @@ patch_operations = [
 patched_patient = client.patch_resource(f"Patient/{patient_id}", patch_operations)
 ```
 
+### Optimistic Locking for Concurrent Updates
+
+PyMedplum supports optimistic locking through the HTTP `If-Match` header, which prevents lost updates when multiple clients modify the same resource concurrently. This is crucial for scenarios like appointment scheduling, inventory management, or any workflow where concurrent modifications can cause conflicts.
+
+#### How Optimistic Locking Works
+
+1. **Read a resource** - Server returns current version in `meta.versionId`
+2. **Modify the resource** locally
+3. **Update with version check** - Include `If-Match` header with the version
+4. **Server validates** - Update succeeds only if version matches
+5. **Handle conflicts** - If version doesn't match, resource was modified elsewhere
+
+#### Basic Example
+
+```python
+from pymedplum.exceptions import PreconditionFailedError
+
+# Read resource to get current version
+patient = client.read_resource("Patient", "123")
+current_version = patient["meta"]["versionId"]
+
+# Modify the resource
+patient["active"] = False
+
+# Update with version check to prevent concurrent modification
+try:
+    updated = client.update_resource(
+        patient,
+        headers={"If-Match": f'W/"{current_version}"'}
+    )
+    print(f"Successfully updated to version {updated['meta']['versionId']}")
+except PreconditionFailedError:
+    # Resource was modified by another process
+    print("Conflict detected - resource was modified elsewhere")
+    # Refetch and retry
+    patient = client.read_resource("Patient", "123")
+    # ... retry logic
+```
+
+#### Preventing Double-Booking with Optimistic Locking
+
+A common use case is preventing two users from booking the same appointment slot:
+
+```python
+from pymedplum.exceptions import PreconditionFailedError
+
+def try_book_slot(slot_id: str, patient_id: str, max_retries: int = 3) -> dict:
+    """
+    Attempt to book a slot with optimistic locking and retry logic.
+
+    Returns the booked slot or raises an exception if booking fails.
+    """
+    for attempt in range(max_retries):
+        # Read current slot state
+        slot = client.read_resource("Slot", slot_id)
+
+        # Check if slot is still available
+        if slot["status"] != "free":
+            raise ValueError(f"Slot {slot_id} is not available")
+
+        # Get current version for optimistic locking
+        version = slot["meta"]["versionId"]
+
+        # Mark slot as busy
+        slot["status"] = "busy"
+
+        try:
+            # Try to update with version check
+            updated_slot = client.update_resource(
+                slot,
+                headers={"If-Match": f'W/"{version}"'}
+            )
+
+            # Success! Now create the appointment
+            appointment = client.create_resource({
+                "resourceType": "Appointment",
+                "status": "booked",
+                "slot": [{"reference": f"Slot/{slot_id}"}],
+                "participant": [{
+                    "actor": {"reference": f"Patient/{patient_id}"},
+                    "status": "accepted"
+                }]
+            })
+
+            return appointment
+
+        except PreconditionFailedError:
+            # Someone else modified the slot - retry
+            if attempt < max_retries - 1:
+                print(f"Conflict on attempt {attempt + 1}, retrying...")
+                continue
+            else:
+                raise ValueError("Failed to book slot after maximum retries")
+
+    raise ValueError("Booking failed")
+
+# Usage
+try:
+    appointment = try_book_slot("slot-123", "patient-456")
+    print(f"Successfully booked appointment: {appointment['id']}")
+except ValueError as e:
+    print(f"Booking failed: {e}")
+```
+
+#### Using Optimistic Locking with Patch Operations
+
+```python
+# Read resource and get version
+patient = client.read_resource("Patient", "123")
+version = patient["meta"]["versionId"]
+
+# Define patch operations
+operations = [
+    {"op": "replace", "path": "/active", "value": False}
+]
+
+# Apply patch with version check
+try:
+    patched = client.patch_resource(
+        "Patient", "123", operations,
+        headers={"If-Match": f'W/"{version}"'}
+    )
+except PreconditionFailedError:
+    # Handle conflict - resource was modified
+    patient = client.read_resource("Patient", "123")
+    # Decide whether to retry or abort
+```
+
+#### Using Optimistic Locking with Delete
+
+```python
+# Read resource to ensure it exists and get version
+patient = client.read_resource("Patient", "123")
+version = patient["meta"]["versionId"]
+
+# Delete only if version matches (prevents deleting modified resource)
+try:
+    client.delete_resource(
+        "Patient", "123",
+        headers={"If-Match": f'W/"{version}"'}
+    )
+except PreconditionFailedError:
+    print("Resource was modified - cannot delete outdated version")
+```
+
+#### Best Practices for Optimistic Locking
+
+1. **Always use optimistic locking for concurrent workflows**
+   - Appointment booking
+   - Inventory management
+   - Slot/schedule management
+   - Any shared resource updates
+
+2. **Implement retry logic with exponential backoff**
+   ```python
+   import time
+
+   def update_with_retry(resource_type, resource_id, update_fn, max_retries=3):
+       """Generic retry wrapper for optimistic locking conflicts."""
+       for attempt in range(max_retries):
+           resource = client.read_resource(resource_type, resource_id)
+           version = resource["meta"]["versionId"]
+
+           # Apply updates
+           updated_resource = update_fn(resource)
+
+           try:
+               return client.update_resource(
+                   updated_resource,
+                   headers={"If-Match": f'W/"{version}"'}
+               )
+           except PreconditionFailedError:
+               if attempt < max_retries - 1:
+                   # Exponential backoff
+                   time.sleep(2 ** attempt * 0.1)
+                   continue
+               raise
+   ```
+
+3. **Handle `PreconditionFailedError` appropriately**
+   - Refetch the resource to get current state
+   - Re-evaluate if the operation should still proceed
+   - Consider user intent (was the conflict expected?)
+
+4. **Use for all CRUD operations in concurrent contexts**
+   - `create_resource` - Not needed (no existing version)
+   - `read_resource` - Not applicable
+   - `update_resource` - Use for all concurrent updates
+   - `patch_resource` - Use for all concurrent patches
+   - `delete_resource` - Use to prevent deleting modified resources
+
+5. **Version format**
+   - Always use `W/"version"` format (weak ETag)
+   - Example: `W/"1"`, `W/"2"`, etc.
+   - The `W/` prefix indicates a weak validator
+
+#### When NOT to Use Optimistic Locking
+
+- Single-user workflows with no concurrent access
+- Read-only operations
+- Batch operations where conflicts are acceptable
+- Initial resource creation (no version exists yet)
+
 ### Deleting a Resource
 To delete a resource, use the `delete_resource` method.
 

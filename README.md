@@ -10,8 +10,9 @@ This library is inspired by the official Medplum TypeScript SDK and aims to prov
 - **Auto-Authentication**: On-behalf-of operations automatically authenticate when needed
 - **Type Safety**: 209 generated Pydantic models from Medplum's TypeScript definitions
 - **CRUD Operations**: Create, read, update, delete with optional type-safe responses
-- **Advanced Search**: `_include`, `_revinclude`, chaining, modifiers, pagination
-- **FHIR Operations**: 
+- **Optimistic Locking**: Prevent concurrent modification conflicts with HTTP `If-Match` headers
+- **Advanced Search**: `_include`, `_revinclude`, chaining, modifiers, pagination, multi-valued parameters
+- **FHIR Operations**:
   - C-CDA document export
   - Terminology validation (ValueSet and CodeSystem)
   - Transaction bundles (atomic operations)
@@ -23,8 +24,8 @@ This library is inspired by the official Medplum TypeScript SDK and aims to prov
 - **GraphQL**: Execute GraphQL queries
 - **Bot Execution**: Trigger Medplum Bots with custom input
 - **On-Behalf-Of**: Perform operations as another user/ProjectMembership
-- **Async Support**: `AsyncMedplumClient` for `asyncio` applications
-- **Error Handling**: Specific exceptions (401, 403, 404, 429, 500, etc.)
+- **Async Support**: `AsyncMedplumClient` for `asyncio` applications with full CRUD parity
+- **Error Handling**: Specific exceptions (401, 403, 404, 412, 429, 500, etc.)
 - **FHIR Helpers**: Parse references, extract identifiers, get display names
 - **Medplum Extensions**: Full support for Bot, Project, AccessPolicy, etc.
 

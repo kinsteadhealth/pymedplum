@@ -29,7 +29,7 @@ print(f"Authenticated with token: {token[:20]}...")
 
 ### Resource Operations
 
-#### `create_resource(resource, org_mode=None, org_ref=None) -> dict`
+#### `create_resource(resource, org_mode=None, org_ref=None, headers=None) -> dict`
 
 Create a new FHIR resource.
 
@@ -37,6 +37,7 @@ Create a new FHIR resource.
 - `resource` (dict | Pydantic model): The resource to create
 - `org_mode` (OrgMode, optional): Override client org_mode for this request
 - `org_ref` (str, optional): Override client org_ref for this request
+- `headers` (dict[str, str], optional): Additional HTTP headers for the request
 
 **Returns**: dict - The created resource with server-assigned ID
 
@@ -52,9 +53,12 @@ print(f"Created patient with ID: {created['id']}")
 # Using dictionary
 patient_dict = {"resourceType": "Patient", "active": True}
 created = client.create_resource(patient_dict)
+
+# With custom headers
+created = client.create_resource(patient, headers={"X-Custom-Header": "value"})
 ```
 
-#### `read_resource(resource_type, resource_id, as_fhir=None) -> dict | Model`
+#### `read_resource(resource_type, resource_id, as_fhir=None, headers=None) -> dict | Model`
 
 Read a FHIR resource by type and ID.
 
@@ -62,6 +66,7 @@ Read a FHIR resource by type and ID.
 - `resource_type` (str): FHIR resource type (e.g., "Patient")
 - `resource_id` (str): Resource ID
 - `as_fhir` (Type[Model], optional): Pydantic model class to return
+- `headers` (dict[str, str], optional): Additional HTTP headers for the request
 
 **Returns**: dict or Pydantic model instance
 
@@ -80,19 +85,21 @@ patient = client.read_resource("Patient", "123", as_fhir=Patient)
 print(patient.name[0].family)  # Type-safe access
 ```
 
-#### `update_resource(resource, org_mode=None, org_ref=None) -> dict`
+#### `update_resource(resource, org_mode=None, org_ref=None, headers=None) -> dict`
 
 Update an existing FHIR resource (requires id).
 
 **Parameters**:
 - `resource` (dict | Pydantic model): Resource with id field
-- `org_mode` (OrgMode, optional): Override client org_mode  
+- `org_mode` (OrgMode, optional): Override client org_mode
 - `org_ref` (str, optional): Override client org_ref
+- `headers` (dict[str, str], optional): Additional HTTP headers for the request (e.g., `If-Match` for optimistic locking)
 
 **Returns**: dict - The updated resource
 
 **Raises**:
 - `ValueError`: If resource lacks resourceType or id
+- `PreconditionFailedError`: If `If-Match` header version doesn't match current resource version
 
 **Example**:
 ```python
@@ -100,9 +107,19 @@ Update an existing FHIR resource (requires id).
 patient = client.read_resource("Patient", "123", as_fhir=Patient)
 patient.active = False
 updated = client.update_resource(patient)
+
+# With optimistic locking to prevent concurrent modifications
+patient = client.read_resource("Patient", "123")
+version = patient["meta"]["versionId"]
+patient["active"] = False
+try:
+    updated = client.update_resource(patient, headers={"If-Match": f'W/"{version}"'})
+except PreconditionFailedError:
+    # Resource was modified by another process - refetch and retry
+    patient = client.read_resource("Patient", "123")
 ```
 
-#### `patch_resource(resource_type, resource_id, operations) -> dict`
+#### `patch_resource(resource_type, resource_id, operations, headers=None) -> dict`
 
 Apply JSON Patch operations to a resource.
 
@@ -110,8 +127,12 @@ Apply JSON Patch operations to a resource.
 - `resource_type` (str): FHIR resource type
 - `resource_id` (str): Resource ID
 - `operations` (list[PatchOperation]): JSON Patch operations
+- `headers` (dict[str, str], optional): Additional HTTP headers for the request (e.g., `If-Match` for optimistic locking)
 
 **Returns**: dict - The patched resource
+
+**Raises**:
+- `PreconditionFailedError`: If `If-Match` header version doesn't match current resource version
 
 **Example**:
 ```python
@@ -120,21 +141,38 @@ operations = [
     {"op": "add", "path": "/telecom/-", "value": {"system": "email", "value": "new@example.com"}}
 ]
 patched = client.patch_resource("Patient", "123", operations)
+
+# With optimistic locking
+patient = client.read_resource("Patient", "123")
+version = patient["meta"]["versionId"]
+patched = client.patch_resource(
+    "Patient", "123", operations,
+    headers={"If-Match": f'W/"{version}"'}
+)
 ```
 
-#### `delete_resource(resource_type, resource_id) -> None`
+#### `delete_resource(resource_type, resource_id, headers=None) -> None`
 
 Delete a FHIR resource.
 
 **Parameters**:
 - `resource_type` (str): FHIR resource type
 - `resource_id` (str): Resource ID
+- `headers` (dict[str, str], optional): Additional HTTP headers for the request (e.g., `If-Match` for optimistic locking)
 
 **Returns**: None
+
+**Raises**:
+- `PreconditionFailedError`: If `If-Match` header version doesn't match current resource version
 
 **Example**:
 ```python
 client.delete_resource("Patient", "123")
+
+# With optimistic locking to prevent accidental deletion of modified resource
+patient = client.read_resource("Patient", "123")
+version = patient["meta"]["versionId"]
+client.delete_resource("Patient", "123", headers={"If-Match": f'W/"{version}"'})
 ```
 
 ### Search Operations
@@ -322,6 +360,7 @@ All client methods may raise these exceptions:
 - `AuthorizationError` (403): Insufficient permissions
 - `NotFoundError` (404): Resource not found
 - `BadRequestError` (400): Invalid request data
+- `PreconditionFailedError` (412): Precondition failed (e.g., `If-Match` version conflict during optimistic locking)
 - `RateLimitError` (429): Too many requests
 - `ServerError` (500+): Server-side issues
 - `OperationOutcomeError`: FHIR operation outcome errors
