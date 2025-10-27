@@ -364,3 +364,92 @@ async def test_async_token_refresh(respx_mock: MockRouter):
 
         # Token should be refreshed
         assert client.access_token == "refreshed-token"
+
+
+@pytest.mark.asyncio
+async def test_async_patch_resource(respx_mock: MockRouter):
+    """Test async patch_resource method."""
+    respx_mock.patch("https://api.medplum.com/fhir/R4/Patient/123").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "resourceType": "Patient",
+                "id": "123",
+                "active": True,
+                "name": [{"family": "Patched", "given": ["Test"]}],
+            },
+        )
+    )
+
+    async with AsyncMedplumClient(access_token="test-token") as client:
+        operations = [
+            {"op": "replace", "path": "/active", "value": True},
+            {"op": "replace", "path": "/name/0/family", "value": "Patched"},
+        ]
+
+        result = await client.patch_resource("Patient", "123", operations)
+
+        assert result["id"] == "123"
+        assert result["active"] is True
+        assert result["name"][0]["family"] == "Patched"
+
+
+@pytest.mark.asyncio
+async def test_async_patch_resource_with_headers(respx_mock: MockRouter):
+    """Test async patch_resource with custom headers."""
+
+    def check_headers(request: httpx.Request) -> httpx.Response:
+        assert request.headers["Content-Type"] == "application/json-patch+json"
+        assert request.headers["If-Match"] == 'W/"1"'
+        assert request.headers["X-Custom-Header"] == "custom-value"
+        return httpx.Response(
+            200,
+            json={"resourceType": "Patient", "id": "123", "active": True},
+        )
+
+    respx_mock.patch("https://api.medplum.com/fhir/R4/Patient/123").mock(
+        side_effect=check_headers
+    )
+
+    async with AsyncMedplumClient(access_token="test-token") as client:
+        operations = [{"op": "replace", "path": "/active", "value": True}]
+
+        await client.patch_resource(
+            "Patient",
+            "123",
+            operations,
+            headers={"If-Match": 'W/"1"', "X-Custom-Header": "custom-value"},
+        )
+
+
+@pytest.mark.asyncio
+async def test_async_delete_resource(respx_mock: MockRouter):
+    """Test async delete_resource method."""
+    respx_mock.delete("https://api.medplum.com/fhir/R4/Patient/123").mock(
+        return_value=httpx.Response(204)
+    )
+
+    async with AsyncMedplumClient(access_token="test-token") as client:
+        # Should not raise any exception
+        await client.delete_resource("Patient", "123")
+
+
+@pytest.mark.asyncio
+async def test_async_delete_resource_with_headers(respx_mock: MockRouter):
+    """Test async delete_resource with custom headers."""
+
+    def check_headers(request: httpx.Request) -> httpx.Response:
+        assert request.headers["If-Match"] == 'W/"5"'
+        assert request.headers["X-Custom-Header"] == "test-value"
+        return httpx.Response(204)
+
+    respx_mock.delete("https://api.medplum.com/fhir/R4/Patient/123").mock(
+        side_effect=check_headers
+    )
+
+    async with AsyncMedplumClient(access_token="test-token") as client:
+        await client.delete_resource(
+            "Patient",
+            "123",
+            headers={"If-Match": 'W/"5"', "X-Custom-Header": "test-value"},
+        )

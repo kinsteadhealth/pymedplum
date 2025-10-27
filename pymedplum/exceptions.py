@@ -152,6 +152,30 @@ class ServerError(MedplumError):
     pass
 
 
+class PreconditionFailedError(MedplumError):
+    """Precondition failed (HTTP 412).
+
+    Raised when:
+    - If-Match header doesn't match current resource version (optimistic locking)
+    - If-None-Match precondition fails
+    - If-Modified-Since precondition fails
+    - If-Unmodified-Since precondition fails
+    - Server returns 412 Precondition Failed
+
+    Common scenarios:
+    - Version conflict during optimistic locking (concurrent updates)
+    - Conditional request preconditions not met
+    - Resource modified since last retrieval in race conditions
+
+    Recovery:
+    - Re-fetch the resource to get current state
+    - Re-evaluate if operation should still proceed
+    - Retry operation with updated preconditions if appropriate
+    """
+
+    pass
+
+
 class NetworkError(MedplumError):
     """Network communication error.
 

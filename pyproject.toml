@@ -147,7 +147,7 @@ asyncio_mode = "auto"
 [tool.coverage.run]
 source = ["pymedplum"]
 branch = true
-omit = ["*/tests/*", "*/test_*", "setup.py"]
+omit = ["*/tests/*", "*/test_*", "setup.py", "*/fhir/*"]
 
 [tool.coverage.report]
 exclude_lines = [

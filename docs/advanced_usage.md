@@ -20,7 +20,31 @@ patients = client.search_resources("Patient", {
     "given": "John",
     "birthdate": "1980-01-01"
 })
+
+### Multi-Valued Query Parameters
+
+Some FHIR search parameters accept multiple values for the same parameter name. The most common use case is date range searches, where you need to specify both a lower and upper bound.
+
+PyMedplum automatically handles list values in query dictionaries by creating multiple parameters with the same key:
+
+```python
+# Date range search - patients born between 1990 and 2000
+patients = client.search_resources("Patient", {
+    "family": "Smith",
+    "birthdate": ["ge1990-01-01", "le2000-12-31"]
+})
+
+# This generates the query string:
+# birthdate=ge1990-01-01&birthdate=le2000-12-31
+
+# You can also use this for other multi-valued parameters
+observations = client.search_resources("Observation", {
+    "code": ["http://loinc.org|8867-4", "http://loinc.org|2339-0"],  # Multiple LOINC codes
+    "date": ["ge2024-01-01", "le2024-12-31"]
+})
 ```
+
+The library converts list values into separate parameter tuples automatically, ensuring proper URL encoding for FHIR servers.
 
 ### Including Related Resources (`_include`)
 

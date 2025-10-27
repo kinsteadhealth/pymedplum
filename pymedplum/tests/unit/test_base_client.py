@@ -49,6 +49,67 @@ def test_normalize_membership_with_string_id():
     assert result == "ProjectMembership/abc-123"
 
 
+def test_build_query_params_with_dict():
+    """Test _build_query_params with dictionary input."""
+    client = BaseClient()
+
+    # Simple dict
+    params = client._build_query_params({"family": "Smith", "given": "John"})
+    assert params == [("family", "Smith"), ("given", "John")]
+
+
+def test_build_query_params_with_list_values():
+    """Test _build_query_params handles list values for multi-valued parameters.
+
+    This is essential for FHIR date ranges and other multi-valued searches.
+    For example, birthdate with both ge and le prefixes for a date range.
+    """
+    client = BaseClient()
+
+    # Dict with list value - should create multiple params with same key
+    params = client._build_query_params(
+        {"family": "Smith", "birthdate": ["ge1990-01-01", "le2000-12-31"]}
+    )
+
+    # Should have 3 tuples: one for family, two for birthdate
+    assert len(params) == 3
+    assert ("family", "Smith") in params
+    assert ("birthdate", "ge1990-01-01") in params
+    assert ("birthdate", "le2000-12-31") in params
+
+
+def test_build_query_params_with_string():
+    """Test _build_query_params with query string input."""
+    client = BaseClient()
+
+    params = client._build_query_params("family=Smith&given=John")
+    assert params == [("family", "Smith"), ("given", "John")]
+
+
+def test_build_query_params_with_list_of_tuples():
+    """Test _build_query_params with list of tuples input."""
+    client = BaseClient()
+
+    params = client._build_query_params([("family", "Smith"), ("given", "John")])
+    assert params == [("family", "Smith"), ("given", "John")]
+
+
+def test_build_query_params_with_none():
+    """Test _build_query_params with None input."""
+    client = BaseClient()
+
+    params = client._build_query_params(None)
+    assert params == []
+
+
+def test_build_query_params_invalid_type():
+    """Test _build_query_params raises error for invalid input type."""
+    client = BaseClient()
+
+    with pytest.raises(ValueError, match="Invalid query type"):
+        client._build_query_params(12345)
+
+
 def test_normalize_membership_with_full_reference():
     """Test membership normalization with full reference."""
     client = BaseClient()
@@ -283,14 +344,6 @@ def test_build_query_params_none():
     params = client._build_query_params(None)
 
     assert params == []
-
-
-def test_build_query_params_invalid_type():
-    """Test query parameter building rejects invalid type."""
-    client = BaseClient()
-
-    with pytest.raises(ValueError, match="Invalid query type"):
-        client._build_query_params(12345)
 
 
 def test_should_refresh_token_no_expiration():

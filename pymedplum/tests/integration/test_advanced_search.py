@@ -357,3 +357,135 @@ async def test_async_pagination_with_advanced_search(async_medplum_client, test_
     assert len(all_patients) >= 2, (
         "Should find multiple patients through async pagination"
     )
+
+
+def test_multi_valued_parameter_search(medplum_client):
+    """Test searching with multiple parameter values (list-valued parameters).
+
+    This specifically tests the fix for handling list values in query parameters,
+    such as date ranges with both lower and upper bounds.
+    """
+    from pymedplum.fhir import HumanName, Patient
+
+    # Create unique test identifier to avoid collisions with existing data
+    test_id = str(uuid.uuid4())[:8]
+    family_name = f"MultiParamTest_{test_id}"
+    given_name = "SearchTest"
+    birth_date = "1990-05-15"
+
+    # Create a test patient with known attributes
+    patient = Patient(
+        name=[HumanName(family=family_name, given=[given_name])],
+        birthDate=birth_date,
+        active=True,
+    )
+
+    created_patient = None
+    try:
+        created_patient = medplum_client.create_resource(to_fhir_json(patient))
+        patient_id = created_patient["id"]
+
+        # Test 1: Search with multiple string parameters
+        bundle = medplum_client.search_resources(
+            "Patient",
+            {
+                "family": family_name,
+                "given": given_name,
+            },
+        )
+        entries = bundle.get("entry", [])
+        assert len(entries) >= 1, "Should find patient with multiple string params"
+        found = any(e["resource"]["id"] == patient_id for e in entries)
+        assert found, "Should find the created patient"
+
+        # Test 2: Search with date range (list-valued parameter)
+        # This tests the fix for handling list values in _build_query_params
+        bundle = medplum_client.search_resources(
+            "Patient",
+            {
+                "family": family_name,
+                "birthdate": ["ge1985-01-01", "le1995-12-31"],
+            },
+        )
+        entries = bundle.get("entry", [])
+        assert len(entries) >= 1, "Should find patient with date range"
+        found = any(e["resource"]["id"] == patient_id for e in entries)
+        assert found, "Should find patient within date range"
+
+        # Test 3: Verify patient is NOT found outside date range
+        bundle = medplum_client.search_resources(
+            "Patient",
+            {
+                "family": family_name,
+                "birthdate": ["ge2000-01-01", "le2010-12-31"],
+            },
+        )
+        entries = bundle.get("entry", [])
+        found = any(e["resource"]["id"] == patient_id for e in entries)
+        assert not found, "Should NOT find patient outside date range"
+
+        # Test 4: Complex multi-parameter search with mixed types
+        bundle = medplum_client.search_resources(
+            "Patient",
+            {
+                "family": family_name,
+                "given": given_name,
+                "birthdate": ["ge1990-01-01", "le1990-12-31"],
+                "active": "true",
+            },
+        )
+        entries = bundle.get("entry", [])
+        assert len(entries) >= 1, "Should find patient with complex multi-param search"
+        found = any(e["resource"]["id"] == patient_id for e in entries)
+        assert found, "Should find patient with all matching criteria"
+
+    finally:
+        # Cleanup
+        if created_patient:
+            with contextlib.suppress(Exception):
+                medplum_client.delete_resource("Patient", created_patient["id"])
+
+
+@pytest.mark.asyncio
+async def test_async_multi_valued_parameter_search(async_medplum_client):
+    """Test async searching with list-valued parameters like date ranges."""
+    from pymedplum.fhir import HumanName, Patient
+
+    test_id = str(uuid.uuid4())[:8]
+    family_name = f"AsyncMultiParam_{test_id}"
+    birth_date = "1988-07-20"
+
+    patient = Patient(
+        name=[HumanName(family=family_name, given=["AsyncTest"])],
+        birthDate=birth_date,
+        active=True,
+    )
+
+    created_patient = None
+    try:
+        created_patient = await async_medplum_client.create_resource(
+            to_fhir_json(patient)
+        )
+        patient_id = created_patient["id"]
+
+        # Test with date range using list-valued parameter
+        bundle = await async_medplum_client.search_resources(
+            "Patient",
+            {
+                "family": family_name,
+                "birthdate": ["ge1985-01-01", "le1990-12-31"],
+            },
+        )
+
+        entries = bundle.get("entry", [])
+        assert len(entries) >= 1, "Should find patient with async date range search"
+        found = any(e["resource"]["id"] == patient_id for e in entries)
+        assert found, "Should find patient within date range using async client"
+
+    finally:
+        # Cleanup
+        if created_patient:
+            with contextlib.suppress(Exception):
+                await async_medplum_client.delete_resource(
+                    "Patient", created_patient["id"]
+                )
