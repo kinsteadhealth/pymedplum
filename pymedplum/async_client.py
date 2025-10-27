@@ -10,7 +10,7 @@ from .bundle import FHIRBundle
 from .exceptions import MedplumError
 from .fhir.base import MedplumFHIRBase
 from .helpers import decode_jwt_exp, to_fhir_json
-from .types import OrgMode, QueryTypes
+from .types import OrgMode, PatchOperation, QueryTypes
 
 ResourceT = TypeVar("ResourceT", bound=MedplumFHIRBase)
 
@@ -130,8 +130,19 @@ class AsyncMedplumClient(BaseClient):
         resource: dict[str, Any] | Any,
         org_mode: OrgMode | None = None,
         org_ref: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        """Create a FHIR resource"""
+        """Create a FHIR resource.
+
+        Args:
+            resource: FHIR resource dict or Pydantic model
+            org_mode: Override client org_mode for this request
+            org_ref: Override client org_ref for this request
+            headers: Optional HTTP headers to include in the request
+
+        Returns:
+            Created resource with server-assigned id
+        """
         data = to_fhir_json(resource)
         data = self._inject_org_tag(data, org_mode=org_mode, org_ref=org_ref)
 
@@ -140,7 +151,7 @@ class AsyncMedplumClient(BaseClient):
             raise ValueError("Resource must have resourceType")
 
         return await self._request(
-            "POST", f"{self.fhir_base_url}{resource_type}", json=data
+            "POST", f"{self.fhir_base_url}{resource_type}", json=data, headers=headers
         )
 
     @overload
@@ -158,6 +169,7 @@ class AsyncMedplumClient(BaseClient):
         resource_type: str,
         resource_id: str,
         as_fhir: type[ResourceT] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> ResourceT | dict[str, Any]:
         """Read a FHIR resource by type and ID.
 
@@ -165,6 +177,7 @@ class AsyncMedplumClient(BaseClient):
             resource_type: FHIR resource type (e.g., "Patient")
             resource_id: Resource ID
             as_fhir: Optional FHIR resource class for typed response
+            headers: Optional HTTP headers to include in the request
 
         Returns:
             Typed resource if as_fhir provided, else dict
@@ -179,7 +192,7 @@ class AsyncMedplumClient(BaseClient):
             print(patient.name[0].given)  # Full IDE autocomplete and type checking!
         """
         response = await self._request(
-            "GET", f"{self.fhir_base_url}{resource_type}/{resource_id}"
+            "GET", f"{self.fhir_base_url}{resource_type}/{resource_id}", headers=headers
         )
 
         if as_fhir:
@@ -192,8 +205,30 @@ class AsyncMedplumClient(BaseClient):
         resource: dict[str, Any] | Any,
         org_mode: OrgMode | None = None,
         org_ref: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        """Update a FHIR resource"""
+        """Update a FHIR resource (requires id).
+
+        Args:
+            resource: FHIR resource dict or Pydantic model
+            org_mode: Override client org_mode for this request
+            org_ref: Override client org_ref for this request
+            headers: Optional HTTP headers (e.g., If-Match for optimistic locking)
+
+        Returns:
+            Updated resource
+
+        Example with optimistic locking:
+            # Retrieve resource
+            patient = await client.read_resource("Patient", "123")
+
+            # Update with version check to prevent concurrent modifications
+            patient["active"] = True
+            updated = await client.update_resource(
+                patient,
+                headers={"If-Match": f'W/"{patient["meta"]["versionId"]}"'}
+            )
+        """
         data = to_fhir_json(resource)
         data = self._inject_org_tag(data, org_mode=org_mode, org_ref=org_ref)
 
@@ -204,7 +239,58 @@ class AsyncMedplumClient(BaseClient):
             raise ValueError("Resource must have resourceType and id for update")
 
         return await self._request(
-            "PUT", f"{self.fhir_base_url}{resource_type}/{resource_id}", json=data
+            "PUT",
+            f"{self.fhir_base_url}{resource_type}/{resource_id}",
+            json=data,
+            headers=headers,
+        )
+
+    async def patch_resource(
+        self,
+        resource_type: str,
+        resource_id: str,
+        operations: list[PatchOperation],
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Apply JSON Patch operations to a resource.
+
+        Args:
+            resource_type: FHIR resource type (e.g., "Patient")
+            resource_id: Resource ID
+            operations: List of JSON Patch operations
+            headers: Optional HTTP headers (e.g., If-Match for optimistic locking)
+
+        Returns:
+            Patched resource
+        """
+        patch_headers = {"Content-Type": "application/json-patch+json"}
+        if headers:
+            patch_headers.update(headers)
+
+        return await self._request(
+            "PATCH",
+            f"{self.fhir_base_url}{resource_type}/{resource_id}",
+            json=operations,
+            headers=patch_headers,
+        )
+
+    async def delete_resource(
+        self,
+        resource_type: str,
+        resource_id: str,
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        """Delete a FHIR resource.
+
+        Args:
+            resource_type: FHIR resource type (e.g., "Patient")
+            resource_id: Resource ID
+            headers: Optional HTTP headers to include in the request
+        """
+        await self._request(
+            "DELETE",
+            f"{self.fhir_base_url}{resource_type}/{resource_id}",
+            headers=headers,
         )
 
     @overload

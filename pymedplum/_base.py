@@ -13,6 +13,7 @@ from .exceptions import (
     BadRequestError,
     NotFoundError,
     OperationOutcomeError,
+    PreconditionFailedError,
     RateLimitError,
     ServerError,
 )
@@ -36,6 +37,7 @@ def _raise_or_json(response: httpx.Response) -> dict[str, Any | None]:
         AuthenticationError: On 401 Unauthorized
         AuthorizationError: On 403 Forbidden
         NotFoundError: On 404 Not Found
+        PreconditionFailedError: On 412 Precondition Failed
         BadRequestError: On 400 Bad Request
         OperationOutcomeError: On other error responses
     """
@@ -77,6 +79,12 @@ def _raise_or_json(response: httpx.Response) -> dict[str, Any | None]:
     elif response.status_code == 404:
         raise NotFoundError(
             "Resource not found", status_code=404, response_data=outcome
+        )
+    elif response.status_code == 412:
+        raise PreconditionFailedError(
+            "Precondition failed - resource may have been modified by another process",
+            status_code=412,
+            response_data=outcome,
         )
     elif response.status_code == 429:
         raise RateLimitError(
@@ -277,7 +285,14 @@ class BaseClient:
             return [(k, v) for k, v in parse_qsl(query, keep_blank_values=True)]
 
         if isinstance(query, dict):
-            return [(k, str(v)) for k, v in query.items()]
+            params: list[tuple[str, str]] = []
+            for k, v in query.items():
+                # Handle list values by creating multiple params with same key
+                if isinstance(v, list):
+                    params.extend((k, str(item)) for item in v)
+                else:
+                    params.append((k, str(v)))
+            return params
 
         if isinstance(query, list):
             return [(k, str(v)) for k, v in query]

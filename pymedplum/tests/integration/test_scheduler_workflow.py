@@ -909,3 +909,126 @@ def test_06_wave_scheduling_simulation(
         # Cleanup
         for resource_type, resource_id in reversed(created_resources):
             medplum_client.delete_resource(resource_type, resource_id)
+
+
+def test_07_optimistic_locking_prevents_double_booking(
+    medplum_client: MedplumClient,
+    clinic_schedule: dict[str, Any],
+    scheduler_providers: list[dict[str, Any]],
+):
+    """Test that optimistic locking prevents concurrent slot double-booking.
+
+    Validates:
+    - Two users cannot claim the same slot simultaneously
+    - Version checking (If-Match header) detects concurrent modifications
+    - Second user's update fails with ResourceVersionConflictError
+    - Slot remains claimed by first user only
+
+    This simulates the real-world race condition:
+    1. User A retrieves an available slot (version 1)
+    2. User B retrieves the same slot (version 1)
+    3. User A claims the slot (updates to version 2)
+    4. User B attempts to claim with stale version 1 → FAILS
+    5. Slot remains with User A, User B must retry with current version
+    """
+    created_resources = []
+
+    try:
+        tomorrow = datetime.now(timezone.utc) + timedelta(days=1)
+        slot_start = tomorrow.replace(hour=14, minute=0, second=0, microsecond=0)
+
+        # Create an available slot
+        slot = Slot(
+            schedule=Reference(reference=f"Schedule/{clinic_schedule['id']}"),
+            status="free",
+            start=slot_start.isoformat(),
+            end=(slot_start + timedelta(minutes=30)).isoformat(),
+            serviceType=[
+                CodeableConcept(
+                    coding=[
+                        Coding(
+                            system=VISIT_TYPES["annual-physical"]["system"],
+                            code=VISIT_TYPES["annual-physical"]["code"],
+                            display=VISIT_TYPES["annual-physical"]["display"],
+                        )
+                    ]
+                )
+            ],
+        )
+        slot_result = medplum_client.create_resource(to_fhir_json(slot))
+        created_resources.append(("Slot", slot_result["id"]))
+
+        # Both users retrieve the slot (same version)
+        original_version = slot_result["meta"]["versionId"]
+
+        # User A claims the slot successfully
+        user_a_patient = Patient(
+            name=[HumanName(given=["Alice"], family="First", use="official")],
+            birthDate="1985-06-20",
+        )
+        user_a_patient_result = medplum_client.create_resource(
+            to_fhir_json(user_a_patient)
+        )
+        created_resources.append(("Patient", user_a_patient_result["id"]))
+
+        # User A updates slot to busy WITH If-Match header (this changes the version)
+        user_a_slot_update = {**slot_result, "status": "busy"}
+        updated_slot = medplum_client.update_resource(
+            user_a_slot_update, headers={"If-Match": f'W/"{original_version}"'}
+        )
+        new_version = updated_slot["meta"]["versionId"]
+
+        assert new_version != original_version, "Version should change after update"
+        assert updated_slot["status"] == "busy"
+
+        # User B tries to claim with stale version - should fail with 412
+        user_b_patient = Patient(
+            name=[HumanName(given=["Bob"], family="Second", use="official")],
+            birthDate="1990-03-12",
+        )
+        user_b_patient_result = medplum_client.create_resource(
+            to_fhir_json(user_b_patient)
+        )
+        created_resources.append(("Patient", user_b_patient_result["id"]))
+
+        # This should fail: User B is using the original (stale) version
+        from pymedplum.exceptions import PreconditionFailedError
+
+        update_failed = False
+        try:
+            # User B attempts to update using the STALE version in If-Match header
+            # Server will reject this with 412 Precondition Failed
+            user_b_slot_update = {**slot_result, "status": "busy"}
+            medplum_client.update_resource(
+                user_b_slot_update,
+                headers={"If-Match": f'W/"{original_version}"'},  # Stale version!
+            )
+        except PreconditionFailedError as e:
+            # Medplum returns 412 Precondition Failed for precondition failures
+            assert e.status_code == 412
+            update_failed = True
+
+        assert update_failed, (
+            "Update with stale If-Match version should fail with ResourceVersionConflictError"
+        )
+
+        # Verify slot still belongs to User A
+        final_slot = medplum_client.read_resource("Slot", slot_result["id"])
+        assert final_slot["status"] == "busy"
+        assert final_slot["meta"]["versionId"] == new_version
+
+        print(
+            f"""
+✓ Optimistic locking successfully prevented double-booking:
+  - Initial slot version: {original_version}
+  - User A claimed slot (updated to version {new_version})
+  - User B attempted claim with stale version {original_version}
+  - User B's update FAILED (version conflict detected)
+  - Slot remains with User A at version {new_version}
+  - This demonstrates proper concurrent booking protection
+        """
+        )
+
+    finally:
+        for resource_type, resource_id in reversed(created_resources):
+            medplum_client.delete_resource(resource_type, resource_id)

@@ -1,7 +1,7 @@
 __title__ = "pymedplum"
 __description__ = "A basic Medplum REST API client."
 __url__ = "https://github.com/nickcatal/pymedplum"
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 __author__ = "Nick Catalano"
 __author_email__ = "nickcatal@gmail.com"
 __license__ = "Apache-2.0"
