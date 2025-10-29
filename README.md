@@ -12,6 +12,7 @@ This library is inspired by the official Medplum TypeScript SDK and aims to prov
 - **CRUD Operations**: Create, read, update, delete with optional type-safe responses
 - **Optimistic Locking**: Prevent concurrent modification conflicts with HTTP `If-Match` headers
 - **Advanced Search**: `_include`, `_revinclude`, chaining, modifiers, pagination, multi-valued parameters
+- **Bot Management**: Full CRUD + deployment for Medplum Bots (AWS Lambda functions)
 - **FHIR Operations**:
   - C-CDA document export
   - Terminology validation (ValueSet and CodeSystem)
@@ -22,7 +23,6 @@ This library is inspired by the official Medplum TypeScript SDK and aims to prov
 - **Lazy Loading**: FHIR models are loaded on-demand for fast startup times (~50ms for first import vs. 3-5s for all).
 - **Thread-Safe**: Lazy loading is fully thread-safe and tested against experimental "no-GIL" builds of Python.
 - **GraphQL**: Execute GraphQL queries
-- **Bot Execution**: Trigger Medplum Bots with custom input
 - **On-Behalf-Of**: Perform operations as another user/ProjectMembership
 - **Async Support**: `AsyncMedplumClient` for `asyncio` applications with full CRUD parity
 - **Error Handling**: Specific exceptions (401, 403, 404, 412, 429, 500, etc.)
@@ -250,15 +250,28 @@ with client.on_behalf_of("ProjectMembership/membership-123") as patient_client:
 practitioner_note = client.create_resource({"resourceType": "Observation", ...})
 ```
 
-### Bot Execution
+### Bot Management
 
 ```python
-# Execute serverless functions on Medplum
+# Create a bot with AWS Lambda runtime
+bot = client.create_bot(
+    name="Welcome Email Bot",
+    description="Sends welcome emails to new patients",
+    runtime_version="awslambda"  # Required for execution
+)
+
+# Deploy compiled bot code
+with open("dist/welcome-bot.js") as f:
+    client.deploy_bot(bot["id"], f.read())
+
+# Execute the bot
 result = client.execute_bot(
-    bot_id="send-welcome-email",
+    bot_id=bot["id"],
     input_data={"resourceType": "Patient", "id": "patient-123"}
 )
 ```
+
+See the [Bot Management](docs/bots.md) documentation for complete CRUD operations, deployment workflows, and advanced features.
 
 ### Async/Await Support
 
@@ -360,6 +373,7 @@ For complete documentation, see:
 - **[Installation Guide](docs/installation.md)** - Detailed setup instructions
 - **[Quickstart](docs/quickstart.md)** - Get up and running quickly
 - **[Advanced Usage](docs/advanced_usage.md)** - Advanced search, FHIR operations, bundles, binaries
+- **[Bot Management](docs/bots.md)** - Create, deploy, and execute Medplum Bots
 - **[API Reference](docs/api_reference.md)** - Complete API documentation
 - **[FHIR Models](docs/fhir_models.md)** - Type-safe FHIR model usage
 - **[FAQ](docs/faq.md)** - Frequently asked questions

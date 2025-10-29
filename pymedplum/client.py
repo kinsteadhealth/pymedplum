@@ -511,26 +511,6 @@ class MedplumClient(BaseClient):
             json={"account": [{"reference": org_ref}]},
         )
 
-    def execute_bot(
-        self, bot_id: str, input_data: Any, content_type: str = "application/json"
-    ) -> dict[str, Any]:
-        """Execute a Medplum Bot by its ID.
-
-        Args:
-            bot_id: The ID of the Bot to execute.
-            input_data: The input data to pass to the bot.
-            content_type: The content type of the input data.
-
-        Returns:
-            The result of the bot execution.
-        """
-        return self._request(
-            "POST",
-            f"{self.fhir_base_url}Bot/{bot_id}/$execute",
-            json=input_data,
-            headers={"Content-Type": content_type},
-        )
-
     def get(self, path: str, **kwargs) -> dict[str, Any]:
         """GET from any Medplum endpoint (not just FHIR).
 
@@ -937,6 +917,250 @@ class MedplumClient(BaseClient):
 
         return self.create_resource(doc_ref)
 
+    def execute_bot(
+        self,
+        bot_id: str,
+        input_data: Any,
+        content_type: str = "application/json",
+    ) -> dict[str, Any]:
+        """Execute a Medplum Bot by its ID.
+
+        Args:
+            bot_id: The ID of the Bot to execute
+            input_data: The input data to pass to the bot
+            content_type: The content type of the input data (default: "application/json")
+
+        Returns:
+            The result of the bot execution
+
+        Example:
+            result = client.execute_bot(
+                bot_id="bot-id-here",
+                input_data={"resourceType": "Parameters", "parameter": []}
+            )
+        """
+        return self._request(
+            "POST",
+            f"{self.fhir_base_url}Bot/{bot_id}/$execute",
+            json=input_data,
+            headers={"Content-Type": content_type},
+        )
+
+    def deploy_bot(
+        self,
+        bot_id: str,
+        code: str,
+        filename: str = "index.js",
+    ) -> dict[str, Any]:
+        """Deploy bot code to AWS Lambda using the $deploy operation.
+
+        This operation deploys the bot's compiled JavaScript code as an AWS Lambda function
+        within the Medplum infrastructure. The bot code will be executed when the bot is
+        triggered.
+
+        Args:
+            bot_id: The ID of the Bot resource to deploy
+            code: The compiled JavaScript code to deploy
+            filename: The filename for the bot code (default: "index.js")
+
+        Returns:
+            The response from the $deploy operation
+
+        Example:
+            # Read your compiled bot code
+            with open("dist/my-bot.js") as f:
+                bot_code = f.read()
+
+            # Deploy the bot
+            result = client.deploy_bot("bot-id-here", bot_code)
+        """
+        return self.post(
+            f"fhir/R4/Bot/{bot_id}/$deploy",
+            {"code": code, "filename": filename},
+        )
+
+    def save_bot_code(
+        self,
+        bot_id: str,
+        source_code: str,
+    ) -> dict[str, Any]:
+        """Save source code to a Bot resource's code property.
+
+        This updates the Bot resource to store the source code (typically TypeScript)
+        in the `code` property. This is useful for version control and auditing purposes.
+
+        Args:
+            bot_id: The ID of the Bot resource
+            source_code: The source code to save (typically TypeScript)
+
+        Returns:
+            The updated Bot resource
+
+        Example:
+            # Read your bot source code
+            with open("src/my-bot.ts") as f:
+                source_code = f.read()
+
+            # Save the source code to the Bot resource
+            bot = client.save_bot_code("bot-id-here", source_code)
+        """
+        # Read the current bot resource
+        bot = self.read_resource("Bot", bot_id)
+
+        # Update the code property
+        bot["code"] = source_code
+
+        # Update the resource
+        return self.update_resource(bot)
+
+    def save_and_deploy_bot(
+        self,
+        bot_id: str,
+        source_code: str,
+        compiled_code: str,
+        filename: str = "index.js",
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Save source code and deploy compiled code in one operation.
+
+        This convenience function combines save_bot_code and deploy_bot to both
+        save the source code to the Bot resource and deploy the compiled code
+        as an AWS Lambda function.
+
+        Args:
+            bot_id: The ID of the Bot resource
+            source_code: The source code to save (typically TypeScript)
+            compiled_code: The compiled JavaScript code to deploy
+            filename: The filename for the bot code (default: "index.js")
+
+        Returns:
+            A tuple of (updated Bot resource, deploy response)
+
+        Example:
+            # Read source and compiled code
+            with open("src/my-bot.ts") as f:
+                source = f.read()
+            with open("dist/my-bot.js") as f:
+                compiled = f.read()
+
+            # Save and deploy
+            bot, deploy_result = client.save_and_deploy_bot(
+                "bot-id-here", source, compiled
+            )
+        """
+        # Save the source code
+        bot = self.save_bot_code(bot_id, source_code)
+
+        # Deploy the compiled code
+        deploy_result = self.deploy_bot(bot_id, compiled_code, filename)
+
+        return bot, deploy_result
+
+    def create_bot(
+        self,
+        name: str,
+        description: str = "",
+        source_code: str = "",
+        runtime_version: str | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Create a new Bot resource.
+
+        Important: For bots to execute on AWS Lambda, you must specify runtime_version="awslambda".
+        Without a runtime version, the bot cannot be executed.
+
+        Args:
+            name: The name of the bot
+            description: Optional description of the bot
+            source_code: Optional initial source code
+            runtime_version: Runtime environment - either "awslambda" or "vmcontext" (required for execution)
+            **kwargs: Additional Bot resource properties. Common properties include:
+                - timeout: Maximum execution time in seconds
+                - system: Boolean flag for system bot access
+
+        Returns:
+            The created Bot resource
+
+        Example:
+            # Create a bot with AWS Lambda runtime (required for execution)
+            bot = client.create_bot(
+                name="My Bot",
+                description="Processes patient data",
+                runtime_version="awslambda"  # Required for bot execution!
+            )
+        """
+        bot_data: dict[str, Any] = {
+            "resourceType": "Bot",
+            "name": name,
+            "description": description,
+        }
+        if source_code:
+            bot_data["code"] = source_code
+        if runtime_version:
+            bot_data["runtimeVersion"] = runtime_version
+        bot_data.update(kwargs)
+
+        return self.create_resource(bot_data)
+
+    def read_bot(self, bot_id: str) -> dict[str, Any]:
+        """Read a Bot resource by ID.
+
+        Args:
+            bot_id: The ID of the Bot resource
+
+        Returns:
+            The Bot resource
+
+        Example:
+            bot = client.read_bot("bot-id-here")
+            print(bot["name"])
+        """
+        return self.read_resource("Bot", bot_id)
+
+    def update_bot(self, bot: dict[str, Any]) -> dict[str, Any]:
+        """Update a Bot resource.
+
+        Args:
+            bot: The Bot resource with updates
+
+        Returns:
+            The updated Bot resource
+
+        Example:
+            bot = client.read_bot("bot-id-here")
+            bot["description"] = "Updated description"
+            updated = client.update_bot(bot)
+        """
+        return self.update_resource(bot)
+
+    def delete_bot(self, bot_id: str) -> None:
+        """Delete a Bot resource.
+
+        Args:
+            bot_id: The ID of the Bot resource to delete
+
+        Example:
+            client.delete_bot("bot-id-here")
+        """
+        self.delete_resource("Bot", bot_id)
+
+    def list_bots(self, **search_params: Any) -> dict[str, Any]:
+        """List Bot resources with optional search parameters.
+
+        Args:
+            **search_params: Optional FHIR search parameters
+
+        Returns:
+            A Bundle of Bot resources
+
+        Example:
+            # List all bots
+            bots = client.list_bots()
+
+            # Search by name
+            bots = client.list_bots(name="my-bot")
+        """
+        return self.search_resources("Bot", search_params)
+
     # TypeScript-compatible aliases
     createResource = create_resource
     readResource = read_resource
@@ -947,3 +1171,12 @@ class MedplumClient(BaseClient):
     graphql = execute_graphql
     executeBatch = execute_batch
     inviteUser = invite_user
+    executeBot = execute_bot
+    deployBot = deploy_bot
+    saveBotCode = save_bot_code
+    saveAndDeployBot = save_and_deploy_bot
+    createBot = create_bot
+    readBot = read_bot
+    updateBot = update_bot
+    deleteBot = delete_bot
+    listBots = list_bots
