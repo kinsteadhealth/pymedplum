@@ -1088,9 +1088,11 @@ class AsyncMedplumClient(BaseClient):
     createResource = create_resource
     readResource = read_resource
     updateResource = update_resource
+    patchResource = patch_resource
     searchResources = search_resources
     graphql = execute_graphql
     executeBatch = execute_batch
+    inviteUser = invite_user
     executeBot = execute_bot
     deployBot = deploy_bot
     saveBotCode = save_bot_code
