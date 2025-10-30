@@ -940,4 +940,3 @@ export function generateStubFile(
 
   return lines.join("\n") + "\n";
 }
-
