@@ -877,61 +877,46 @@ export function generateInitFile(
 }
 
 /**
- * Generates a .pyi stub file for IDE and type checker support.
- * This provides full type information without runtime overhead.
+ * Generates simplified .pyi stub file for IDE and type checker support.
+ * Uses __all__ list for Pylance autocomplete without complex imports.
  */
 export function generateStubFile(
   resourceNames: string[],
   classesToFiles: Map<string, string>
 ): string {
+  const sortedResources = resourceNames.sort();
+  
   const lines: string[] = [
     '"""Type stubs for pymedplum.fhir module.',
     'This is a generated file.',
     'Do not edit it manually',
     '',
-    "This stub file provides full type information to IDEs and type checkers",
-    "without the runtime cost of importing all FHIR models.",
+    "Pylance uses the __all__ list to provide autocomplete for all FHIR resources.",
+    "The lazy loader (__getattr__) handles actual imports at runtime.",
     '"""',
     "",
-    "from typing import Any, Union, overload",
+    "# ruff: noqa: F822",
     "",
-    "from .base import MedplumFHIRBase",
-    '',
+    "from typing import Any",
+    "",
+    "# Stub for runtime lazy loader",
+    "def __getattr__(name: str) -> Any: ...",
+    "",
+    "# Introspection support",
+    "def __dir__() -> list[str]: ...",
+    "",
+    "# Explicit exports for IDE autocomplete",
+    "__all__ = [",
+    '    "Resource",',
   ];
-
-  // Group classes by their file for organized imports
-  const fileToClasses = new Map<string, string[]>();
-  resourceNames.forEach((className) => {
-    const fileName = classesToFiles.get(className) || className.toLowerCase();
-    if (!fileToClasses.has(fileName)) {
-      fileToClasses.set(fileName, []);
-    }
-    fileToClasses.get(fileName)!.push(className);
+  
+  // Add all resource names to __all__ for autocomplete
+  sortedResources.forEach((name) => {
+    lines.push(`    "${name}",`);
   });
-
-  // Add imports
-  Array.from(fileToClasses.keys())
-    .sort()
-    .forEach((fileName) => {
-      const classes = fileToClasses.get(fileName)!.sort();
-      lines.push(
-        `from pymedplum.fhir.${fileName} import ${classes.join(", ")}`
-      );
-    });
-
-  lines.push("");
-  lines.push("# Full union type for static analysis");
-  const resourceTypesForUnion = resourceNames.sort().join(" | ");
-  lines.push(`Resource = ${resourceTypesForUnion}`);
-  lines.push("");
-  lines.push("# Stub for runtime lazy loader");
-  lines.push("def __getattr__(name: str) -> Any: ...");
-  lines.push("");
-  lines.push("# Introspection support");
-  lines.push("def __dir__() -> list[str]: ...");
-  lines.push("");
-  lines.push("# Exports");
-  lines.push("__all__: list[str]");
+  
+  lines.push("]");
 
   return lines.join("\n") + "\n";
 }
+
