@@ -891,7 +891,7 @@ export function generateStubFile(
     'This is a generated file.',
     'Do not edit it manually',
     '',
-    "Pylance uses the __all__ list to provide autocomplete for all FHIR resources.",
+    "Pylance uses imports to provide autocomplete for all FHIR resources.",
     "The lazy loader (__getattr__) handles actual imports at runtime.",
     '"""',
     "",
@@ -899,16 +899,37 @@ export function generateStubFile(
     "",
     "from typing import Any",
     "",
-    "# Stub for runtime lazy loader",
-    "def __getattr__(name: str) -> Any: ...",
-    "",
-    "# Introspection support",
-    "def __dir__() -> list[str]: ...",
-    "",
-    "# Explicit exports for IDE autocomplete",
-    "__all__ = [",
-    '    "Resource",',
   ];
+  
+  // Group classes by file for organized imports
+  const fileToClasses = new Map<string, string[]>();
+  sortedResources.forEach((className) => {
+    const fileName = classesToFiles.get(className) || className.toLowerCase();
+    if (!fileToClasses.has(fileName)) {
+      fileToClasses.set(fileName, []);
+    }
+    fileToClasses.get(fileName)!.push(className);
+  });
+
+  // Add all imports at module level for Pylance autocomplete
+  lines.push("# Type imports for IDE autocomplete");
+  Array.from(fileToClasses.keys())
+    .sort()
+    .forEach((fileName) => {
+      const classes = fileToClasses.get(fileName)!.sort();
+      lines.push(`from .${fileName} import ${classes.join(", ")}`);
+    });
+
+  lines.push("");
+  lines.push("# Stub for runtime lazy loader");
+  lines.push("def __getattr__(name: str) -> Any: ...");
+  lines.push("");
+  lines.push("# Introspection support");
+  lines.push("def __dir__() -> list[str]: ...");
+  lines.push("");
+  lines.push("# Explicit exports for IDE autocomplete");
+  lines.push("__all__ = [");
+  lines.push('    "Resource",');
   
   // Add all resource names to __all__ for autocomplete
   sortedResources.forEach((name) => {
@@ -919,4 +940,3 @@ export function generateStubFile(
 
   return lines.join("\n") + "\n";
 }
-
