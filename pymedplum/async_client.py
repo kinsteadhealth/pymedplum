@@ -134,7 +134,8 @@ class AsyncMedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         *,
         as_fhir: type[ResourceT],
-    ) -> ResourceT: ...
+    ) -> ResourceT:
+        pass
 
     @overload
     async def create_resource(
@@ -145,7 +146,8 @@ class AsyncMedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         *,
         as_fhir: None = None,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any]:
+        pass
 
     async def create_resource(
         self,
@@ -202,12 +204,14 @@ class AsyncMedplumClient(BaseClient):
     @overload
     async def read_resource(
         self, resource_type: str, resource_id: str, as_fhir: type[ResourceT]
-    ) -> ResourceT: ...
+    ) -> ResourceT:
+        pass
 
     @overload
     async def read_resource(
         self, resource_type: str, resource_id: str, as_fhir: None = None
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any]:
+        pass
 
     async def read_resource(
         self,
@@ -254,7 +258,8 @@ class AsyncMedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         *,
         as_fhir: type[ResourceT],
-    ) -> ResourceT: ...
+    ) -> ResourceT:
+        pass
 
     @overload
     async def update_resource(
@@ -265,7 +270,8 @@ class AsyncMedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         *,
         as_fhir: None = None,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any]:
+        pass
 
     async def update_resource(
         self,
@@ -340,7 +346,8 @@ class AsyncMedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         *,
         as_fhir: type[ResourceT],
-    ) -> ResourceT: ...
+    ) -> ResourceT:
+        pass
 
     @overload
     async def patch_resource(
@@ -351,7 +358,8 @@ class AsyncMedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         *,
         as_fhir: None = None,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any]:
+        pass
 
     async def patch_resource(
         self,
@@ -427,7 +435,8 @@ class AsyncMedplumClient(BaseClient):
         query: QueryTypes | None = None,
         return_bundle: Literal[False] = False,
         as_fhir: None = None,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any]:
+        pass
 
     @overload
     async def search_resources(
@@ -436,7 +445,8 @@ class AsyncMedplumClient(BaseClient):
         query: QueryTypes | None = None,
         return_bundle: Literal[True] = ...,
         as_fhir: None = None,
-    ) -> FHIRBundle[dict[str, Any]]: ...
+    ) -> FHIRBundle[dict[str, Any]]:
+        pass
 
     @overload
     async def search_resources(
@@ -445,7 +455,8 @@ class AsyncMedplumClient(BaseClient):
         query: QueryTypes | None = None,
         return_bundle: Literal[True] = ...,
         as_fhir: type[ResourceT] = ...,
-    ) -> FHIRBundle[ResourceT]: ...
+    ) -> FHIRBundle[ResourceT]:
+        pass
 
     async def search_resources(
         self,

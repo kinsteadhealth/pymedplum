@@ -152,7 +152,8 @@ class MedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         *,
         as_fhir: type[ResourceT],
-    ) -> ResourceT: ...
+    ) -> ResourceT:
+        pass
 
     @overload
     def create_resource(
@@ -163,7 +164,8 @@ class MedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         *,
         as_fhir: None = None,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any]:
+        pass
 
     def create_resource(
         self,
@@ -221,12 +223,14 @@ class MedplumClient(BaseClient):
     @overload
     def read_resource(
         self, resource_type: str, resource_id: str, as_fhir: type[ResourceT]
-    ) -> ResourceT: ...
+    ) -> ResourceT:
+        pass
 
     @overload
     def read_resource(
         self, resource_type: str, resource_id: str, as_fhir: None = None
-    ) -> dict[str, Any]: ...  # type: ignore[overload-cannot-match]
+    ) -> dict[str, Any]:  # type: ignore[overload-cannot-match]
+        pass
 
     def read_resource(
         self,
@@ -273,7 +277,8 @@ class MedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         *,
         as_fhir: type[ResourceT],
-    ) -> ResourceT: ...
+    ) -> ResourceT:
+        pass
 
     @overload
     def update_resource(
@@ -284,7 +289,8 @@ class MedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         *,
         as_fhir: None = None,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any]:
+        pass
 
     def update_resource(
         self,
@@ -356,7 +362,8 @@ class MedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         *,
         as_fhir: type[ResourceT],
-    ) -> ResourceT: ...
+    ) -> ResourceT:
+        pass
 
     @overload
     def patch_resource(
@@ -367,7 +374,8 @@ class MedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         *,
         as_fhir: None = None,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any]:
+        pass
 
     def patch_resource(
         self,
@@ -443,7 +451,8 @@ class MedplumClient(BaseClient):
         query: QueryTypes | None = None,
         return_bundle: Literal[False] = False,
         as_fhir: None = None,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any]:
+        pass
 
     @overload
     def search_resources(
@@ -452,7 +461,8 @@ class MedplumClient(BaseClient):
         query: QueryTypes | None = None,
         return_bundle: Literal[True] = ...,
         as_fhir: None = None,
-    ) -> FHIRBundle[dict[str, Any]]: ...
+    ) -> FHIRBundle[dict[str, Any]]:
+        pass
 
     @overload
     def search_resources(
@@ -461,7 +471,8 @@ class MedplumClient(BaseClient):
         query: QueryTypes | None = None,
         return_bundle: Literal[True] = ...,
         as_fhir: type[ResourceT] = ...,
-    ) -> FHIRBundle[ResourceT]: ...
+    ) -> FHIRBundle[ResourceT]:
+        pass
 
     def search_resources(
         self,
