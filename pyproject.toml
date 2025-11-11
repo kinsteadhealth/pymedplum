@@ -37,9 +37,9 @@ lint = ["ruff>=0.8.0", "mypy>=1.11.0"]
 dev = ["pymedplum[test,lint]", "pre-commit>=4.0.0"]
 
 [project.urls]
-Homepage = "https://github.com/nickcatal/pymedplum"
-Repository = "https://github.com/nickcatal/pymedplum.git"
-"Bug Tracker" = "https://github.com/nickcatal/pymedplum/issues"
+Homepage = "https://github.com/kinsteadhealth/pymedplum"
+Repository = "https://github.com/kinsteadhealth/pymedplum.git"
+"Bug Tracker" = "https://github.com/kinsteadhealth/pymedplum/issues"
 
 [tool.setuptools]
 packages = ["pymedplum", "pymedplum.fhir"]
