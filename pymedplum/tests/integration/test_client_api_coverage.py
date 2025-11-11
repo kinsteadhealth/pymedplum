@@ -88,6 +88,67 @@ def test_sync_patch_resource(medplum_client):
     assert patched["name"][0]["given"] == ["After"]
 
 
+def test_sync_create_resource_with_as_fhir(medplum_client):
+    """Test sync client create_resource with as_fhir parameter."""
+    patient_data = {
+        "resourceType": "Patient",
+        "name": [{"family": "SyncTypedCreate", "given": ["Typed"]}],
+        "gender": "female",
+    }
+
+    # Create with type-safe response
+    result = medplum_client.create_resource(patient_data, as_fhir=Patient)
+
+    # Verify we got a Pydantic model back
+    assert isinstance(result, Patient)
+    assert result.resource_type == "Patient"
+    assert result.name[0].family == "SyncTypedCreate"
+    assert result.id is not None
+
+
+def test_sync_update_resource_with_as_fhir(medplum_client):
+    """Test sync client update_resource with as_fhir parameter."""
+    # Create a patient
+    patient = Patient(
+        name=[{"family": "SyncTypedUpdate", "given": ["Original"]}],
+        gender="male",
+    )
+    created = medplum_client.create_resource(patient)
+
+    # Update with type-safe response
+    created["name"][0]["given"] = ["Modified"]
+    updated = medplum_client.update_resource(created, as_fhir=Patient)
+
+    # Verify we got a Pydantic model back
+    assert isinstance(updated, Patient)
+    assert updated.name[0].given == ["Modified"]
+    assert updated.id == created["id"]
+
+
+def test_sync_patch_resource_with_as_fhir(medplum_client):
+    """Test sync client patch_resource with as_fhir parameter."""
+    # Create a patient
+    patient = Patient(
+        name=[{"family": "SyncTypedPatch", "given": ["Before"]}],
+        gender="female",
+        active=True,
+    )
+    created = medplum_client.create_resource(patient)
+
+    # Patch with type-safe response
+    patches = [
+        {"op": "replace", "path": "/active", "value": False},
+    ]
+    patched = medplum_client.patch_resource(
+        "Patient", created["id"], patches, as_fhir=Patient
+    )
+
+    # Verify we got a Pydantic model back
+    assert isinstance(patched, Patient)
+    assert patched.active is False
+    assert patched.id == created["id"]
+
+
 def test_sync_search_resources(medplum_client):
     """Test sync client search_resources method."""
     import uuid
@@ -307,6 +368,92 @@ async def test_async_update_resource(async_medplum_client):
 
     assert updated["id"] == created["id"]
     assert updated["name"][0]["given"] == ["Updated"]
+
+
+@pytest.mark.asyncio
+async def test_async_patch_resource(async_medplum_client):
+    """Test async client patch_resource method (JSON Patch)."""
+    # Create a patient
+    patient = Patient(
+        name=[{"family": "AsyncTestPatch", "given": ["Before"]}],
+        gender="male",
+    )
+    created = await async_medplum_client.create_resource(patient)
+
+    # Patch it
+    patches = [
+        {"op": "replace", "path": "/name/0/given/0", "value": "After"},
+    ]
+    patched = await async_medplum_client.patch_resource(
+        "Patient", created["id"], patches
+    )
+
+    assert patched["id"] == created["id"]
+    assert patched["name"][0]["given"] == ["After"]
+
+
+@pytest.mark.asyncio
+async def test_async_create_resource_with_as_fhir(async_medplum_client):
+    """Test async client create_resource with as_fhir parameter."""
+    patient_data = {
+        "resourceType": "Patient",
+        "name": [{"family": "AsyncTypedCreate", "given": ["Typed"]}],
+        "gender": "female",
+    }
+
+    # Create with type-safe response
+    result = await async_medplum_client.create_resource(patient_data, as_fhir=Patient)
+
+    # Verify we got a Pydantic model back
+    assert isinstance(result, Patient)
+    assert result.resource_type == "Patient"
+    assert result.name[0].family == "AsyncTypedCreate"
+    assert result.id is not None
+
+
+@pytest.mark.asyncio
+async def test_async_update_resource_with_as_fhir(async_medplum_client):
+    """Test async client update_resource with as_fhir parameter."""
+    # Create a patient
+    patient = Patient(
+        name=[{"family": "AsyncTypedUpdate", "given": ["Original"]}],
+        gender="male",
+    )
+    created = await async_medplum_client.create_resource(patient)
+
+    # Update with type-safe response
+    created["name"][0]["given"] = ["Modified"]
+    updated = await async_medplum_client.update_resource(created, as_fhir=Patient)
+
+    # Verify we got a Pydantic model back
+    assert isinstance(updated, Patient)
+    assert updated.name[0].given == ["Modified"]
+    assert updated.id == created["id"]
+
+
+@pytest.mark.asyncio
+async def test_async_patch_resource_with_as_fhir(async_medplum_client):
+    """Test async client patch_resource with as_fhir parameter."""
+    # Create a patient
+    patient = Patient(
+        name=[{"family": "AsyncTypedPatch", "given": ["Before"]}],
+        gender="female",
+        active=True,
+    )
+    created = await async_medplum_client.create_resource(patient)
+
+    # Patch with type-safe response
+    patches = [
+        {"op": "replace", "path": "/active", "value": False},
+    ]
+    patched = await async_medplum_client.patch_resource(
+        "Patient", created["id"], patches, as_fhir=Patient
+    )
+
+    # Verify we got a Pydantic model back
+    assert isinstance(patched, Patient)
+    assert patched.active is False
+    assert patched.id == created["id"]
 
 
 @pytest.mark.asyncio

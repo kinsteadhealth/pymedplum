@@ -29,7 +29,7 @@ print(f"Authenticated with token: {token[:20]}...")
 
 ### Resource Operations
 
-#### `create_resource(resource, org_mode=None, org_ref=None, headers=None) -> dict`
+#### `create_resource(resource, org_mode=None, org_ref=None, headers=None, *, as_fhir=None) -> dict | Model`
 
 Create a new FHIR resource.
 
@@ -38,14 +38,15 @@ Create a new FHIR resource.
 - `org_mode` (OrgMode, optional): Override client org_mode for this request
 - `org_ref` (str, optional): Override client org_ref for this request
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request
+- `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 
-**Returns**: dict - The created resource with server-assigned ID
+**Returns**: dict or Pydantic model instance - The created resource with server-assigned ID
 
 **Example**:
 ```python
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import Patient
 
-# Using Pydantic model
+# Using Pydantic model - returns dict
 patient = Patient(name=[{"family": "Smith", "given": ["John"]}])
 created = client.create_resource(patient)
 print(f"Created patient with ID: {created['id']}")
@@ -53,6 +54,10 @@ print(f"Created patient with ID: {created['id']}")
 # Using dictionary
 patient_dict = {"resourceType": "Patient", "active": True}
 created = client.create_resource(patient_dict)
+
+# With type-safe response
+created_patient = client.create_resource(patient_dict, as_fhir=Patient)
+print(created_patient.name[0].family)  # Full IDE autocomplete!
 
 # With custom headers
 created = client.create_resource(patient, headers={"X-Custom-Header": "value"})
@@ -85,7 +90,7 @@ patient = client.read_resource("Patient", "123", as_fhir=Patient)
 print(patient.name[0].family)  # Type-safe access
 ```
 
-#### `update_resource(resource, org_mode=None, org_ref=None, headers=None) -> dict`
+#### `update_resource(resource, org_mode=None, org_ref=None, headers=None, *, as_fhir=None) -> dict | Model`
 
 Update an existing FHIR resource (requires id).
 
@@ -94,8 +99,9 @@ Update an existing FHIR resource (requires id).
 - `org_mode` (OrgMode, optional): Override client org_mode
 - `org_ref` (str, optional): Override client org_ref
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request (e.g., `If-Match` for optimistic locking)
+- `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 
-**Returns**: dict - The updated resource
+**Returns**: dict or Pydantic model instance - The updated resource
 
 **Raises**:
 - `ValueError`: If resource lacks resourceType or id
@@ -103,23 +109,35 @@ Update an existing FHIR resource (requires id).
 
 **Example**:
 ```python
+from pymedplum.fhir import Patient
+
 # Read, modify, update pattern
 patient = client.read_resource("Patient", "123", as_fhir=Patient)
 patient.active = False
 updated = client.update_resource(patient)
+
+# With type-safe response
+patient = client.read_resource("Patient", "123")
+patient["active"] = False
+updated_patient = client.update_resource(patient, as_fhir=Patient)
+print(updated_patient.active)  # Full IDE autocomplete!
 
 # With optimistic locking to prevent concurrent modifications
 patient = client.read_resource("Patient", "123")
 version = patient["meta"]["versionId"]
 patient["active"] = False
 try:
-    updated = client.update_resource(patient, headers={"If-Match": f'W/"{version}"'})
+    updated = client.update_resource(
+        patient,
+        headers={"If-Match": f'W/"{version}"'},
+        as_fhir=Patient
+    )
 except PreconditionFailedError:
     # Resource was modified by another process - refetch and retry
     patient = client.read_resource("Patient", "123")
 ```
 
-#### `patch_resource(resource_type, resource_id, operations, headers=None) -> dict`
+#### `patch_resource(resource_type, resource_id, operations, headers=None, *, as_fhir=None) -> dict | Model`
 
 Apply JSON Patch operations to a resource.
 
@@ -128,39 +146,49 @@ Apply JSON Patch operations to a resource.
 - `resource_id` (str): Resource ID
 - `operations` (list[PatchOperation]): JSON Patch operations
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request (e.g., `If-Match` for optimistic locking)
+- `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 
-**Returns**: dict - The patched resource
+**Returns**: dict or Pydantic model instance - The patched resource
 
 **Raises**:
 - `PreconditionFailedError`: If `If-Match` header version doesn't match current resource version
 
 **Example**:
 ```python
+from pymedplum.fhir import Patient
+
+# Patch and get as dict
 operations = [
     {"op": "replace", "path": "/active", "value": False},
     {"op": "add", "path": "/telecom/-", "value": {"system": "email", "value": "new@example.com"}}
 ]
 patched = client.patch_resource("Patient", "123", operations)
 
+# With type-safe response
+operations = [{"op": "replace", "path": "/active", "value": True}]
+patched_patient = client.patch_resource("Patient", "123", operations, as_fhir=Patient)
+print(patched_patient.active)  # Full IDE autocomplete!
+
 # With optimistic locking
 patient = client.read_resource("Patient", "123")
 version = patient["meta"]["versionId"]
 patched = client.patch_resource(
     "Patient", "123", operations,
-    headers={"If-Match": f'W/"{version}"'}
+    headers={"If-Match": f'W/"{version}"'},
+    as_fhir=Patient
 )
 ```
 
 #### `delete_resource(resource_type, resource_id, headers=None) -> None`
 
-Delete a FHIR resource.
+Delete a FHIR resource. Per the FHIR specification, successful deletion returns HTTP 204 No Content with no response body.
 
 **Parameters**:
 - `resource_type` (str): FHIR resource type
 - `resource_id` (str): Resource ID
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request (e.g., `If-Match` for optimistic locking)
 
-**Returns**: None
+**Returns**: None (FHIR delete operations return HTTP 204 with no content)
 
 **Raises**:
 - `PreconditionFailedError`: If `If-Match` header version doesn't match current resource version
@@ -174,6 +202,8 @@ patient = client.read_resource("Patient", "123")
 version = patient["meta"]["versionId"]
 client.delete_resource("Patient", "123", headers={"If-Match": f'W/"{version}"'})
 ```
+
+**Note**: Deletion in FHIR is a logical delete, not a physical delete. The resource is marked as deleted but previous versions remain accessible in the resource's history. After deletion, attempting to read the resource by its ID will return HTTP 410 Gone with a Location header pointing to the deleted version.
 
 ### Search Operations
 

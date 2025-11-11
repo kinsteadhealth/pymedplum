@@ -99,14 +99,23 @@ updated = client.update_resource(patient)
 from pymedplum.fhir import Patient, HumanName
 
 # Create with full type safety and IDE autocomplete
-patient = Patient(
+patient_data = Patient(
     name=[HumanName(given=["Alice"], family="Smith")],
     gender="female"
 )
 
+# Create and get typed response
+created_patient = client.create_resource(patient_data, as_fhir=Patient)
+print(created_patient.id)  # Server-assigned ID with full type safety!
+
 # Read with type safety
 typed_patient = client.read_resource("Patient", "123", as_fhir=Patient)
 print(typed_patient.name[0].family)  # IDE autocomplete works!
+
+# Update with type safety
+typed_patient.active = False
+updated_patient = client.update_resource(typed_patient, as_fhir=Patient)
+print(updated_patient.active)  # False, with full IDE autocomplete!
 ```
 
 ### Advanced Search Features
