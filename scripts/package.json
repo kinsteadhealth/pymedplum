@@ -10,7 +10,7 @@
     "test": "ts-node src/test.ts"
   },
   "dependencies": {
-    "@medplum/fhirtypes": "^3.3.0",
+    "@medplum/fhirtypes": "^5.0.10",
     "@types/node": "^20.0.0",
     "prettier": "^3.0.0",
     "ts-node": "^10.9.0",

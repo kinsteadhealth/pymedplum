@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-pre-commit test test-unit test-integration lint format type-check check clean build publish
+.PHONY: help install install-dev install-pre-commit test test-unit test-integration lint format type-check check clean build publish generate generate-no-update
 
 # Default target
 help:
@@ -20,6 +20,10 @@ help:
 	@echo "  make format               Run ruff formatter"
 	@echo "  make type-check           Run mypy type checker"
 	@echo "  make check                Run all code quality checks"
+	@echo ""
+	@echo "Code Generation:"
+	@echo "  make generate             Update FHIR types from npm and regenerate models"
+	@echo "  make generate-no-update   Regenerate models without npm update"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make clean                Remove build artifacts and cache"
@@ -80,3 +84,10 @@ build: clean
 
 publish: build
 	python -m twine upload dist/*
+
+# Code generation targets
+generate:
+	./scripts/generate.sh
+
+generate-no-update:
+	./scripts/generate.sh --no-update

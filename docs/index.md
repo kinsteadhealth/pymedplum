@@ -1,6 +1,6 @@
 # Welcome to pymedplum!
 
-`pymedplum` is the official Python SDK for Medplum, providing a convenient interface for interacting with a Medplum server's FHIR API. It is designed to be intuitive, robust, and fully typed.
+`pymedplum` is an unofficial Python SDK for Medplum, providing a convenient interface for interacting with a Medplum server's FHIR API. It is designed to be intuitive, robust, and fully typed.
 
 This library allows you to:
 - Authenticate with a Medplum server.

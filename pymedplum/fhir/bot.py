@@ -68,7 +68,7 @@ class Bot(MedplumFHIRBase):
         default=None,
         description="A summary, characterization or explanation of the Bot.",
     )
-    runtime_version: Literal["awslambda", "vmcontext"] | None = Field(
+    runtime_version: Literal["awslambda", "vmcontext", "fission"] | None = Field(
         default=None,
         alias="runtimeVersion",
         description="The identifier of the bot runtime environment (i.e., vmcontext, awslambda, etc).",
@@ -101,6 +101,11 @@ class Bot(MedplumFHIRBase):
         alias="runAsUser",
         description="Optional flag to indicate that the bot should be run as the user.",
     )
+    public_webhook: bool | None = Field(
+        default=None,
+        alias="publicWebhook",
+        description="Optional flag to indicate that the bot can be used as an unauthenticated public webhook. Note that this is a security risk and should only be used for public bots that do not require authentication.",
+    )
     audit_event_trigger: Literal["always", "never", "on-error", "on-output"] | None = (
         Field(
             default=None,
@@ -123,4 +128,51 @@ class Bot(MedplumFHIRBase):
         alias="executableCode",
         description="Bot logic in executable form as a result of compiling and bundling source code.",
     )
+    cds_service: BotCdsService | None = Field(
+        default=None,
+        alias="cdsService",
+        description="CDS service definition if the bot is used as a CDS Hooks service. See https://cds-hooks.hl7.org/ for more details.",
+    )
     code: str | None = Field(default=None)
+
+
+class BotCdsService(MedplumFHIRBase):
+    """CDS service definition if the bot is used as a CDS Hooks service. See
+    https://cds-hooks.hl7.org/ for more details.
+    """
+
+    hook: str = Field(
+        default=...,
+        description="The hook this service should be invoked on. See https://cds-hooks.hl7.org/#hooks for possible values.",
+    )
+    title: str = Field(
+        default=..., description="The human-friendly name of this CDS service."
+    )
+    description: str = Field(
+        default=..., description="The description of this CDS service."
+    )
+    usage_requirements: str | None = Field(
+        default=None,
+        alias="usageRequirements",
+        description="Optional human-friendly description of any preconditions for the use of this CDS Service.",
+    )
+    prefetch: list[BotCdsServicePrefetch] | None = Field(
+        default=None,
+        description="An object containing key/value pairs of FHIR queries that this service is requesting the CDS Client to perform and provide on each service call.",
+    )
+
+
+class BotCdsServicePrefetch(MedplumFHIRBase):
+    """An object containing key/value pairs of FHIR queries that this service
+    is requesting the CDS Client to perform and provide on each service
+    call.
+    """
+
+    key: str = Field(
+        default=...,
+        description="The type of data being requested. See https://cds-hooks.hl7.org/#prefetch-template",
+    )
+    query: str = Field(
+        default=...,
+        description="The FHIR query used to retrieve the requested data. See https://cds-hooks.hl7.org/#prefetch-template",
+    )

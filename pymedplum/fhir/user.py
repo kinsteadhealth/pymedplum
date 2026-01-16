@@ -89,6 +89,11 @@ class User(MedplumFHIRBase):
         alias="mfaSecret",
         description="Shared secret for MFA authenticator applications.",
     )
+    mfa_required: bool | None = Field(
+        default=None,
+        alias="mfaRequired",
+        description="Whether the user is required to complete MFA enrollment. If true, the user must complete MFA enrollment before they can log in.",
+    )
     mfa_enrolled: bool | None = Field(
         default=None,
         alias="mfaEnrolled",
