@@ -78,15 +78,21 @@ class ClientApplication(MedplumFHIRBase):
         default=None,
         description="Client secret string used to verify the identity of a client.",
     )
+    retiring_secret: str | None = Field(
+        default=None,
+        alias="retiringSecret",
+        description="Old version of the client secret that is being rotated out. Instances of the client using this value should update to use the value in ClientApplication.secret",
+    )
     jwks_uri: str | None = Field(
         default=None,
         alias="jwksUri",
         description="Optional JWKS URI for public key verification of JWTs issued by the authorization server (client_secret_jwt).",
     )
-    redirect_uri: str | None = Field(
+    redirect_uri: str | None = Field(default=None, alias="redirectUri")
+    redirect_uris: list[str] | None = Field(
         default=None,
-        alias="redirectUri",
-        description="Optional redirect URI used when redirecting a client back to the client application.",
+        alias="redirectUris",
+        description="Optional redirect URI array used when redirecting a client back to the client application.",
     )
     launch_uri: str | None = Field(
         default=None,
@@ -112,6 +118,16 @@ class ClientApplication(MedplumFHIRBase):
         default=None,
         alias="refreshTokenLifetime",
         description="Optional configuration to set the refresh token duration",
+    )
+    allowed_origin: list[str] | None = Field(
+        default=None,
+        alias="allowedOrigin",
+        description="Optional CORS allowed origin for the client application. By default, all origins are allowed.",
+    )
+    default_scope: list[str] | None = Field(
+        default=None,
+        alias="defaultScope",
+        description="Optional default OAuth scope for the client application. This scope is used when the client application does not specify a scope in the authorization request.",
     )
 
 

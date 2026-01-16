@@ -51,7 +51,7 @@ from .biologicallyderivedproduct import (
     BiologicallyDerivedProductStorage,
 )
 from .bodystructure import BodyStructure
-from .bot import Bot
+from .bot import Bot, BotCdsService, BotCdsServicePrefetch
 from .bulkdataexport import (
     BulkDataExport,
     BulkDataExportDeleted,
@@ -563,7 +563,6 @@ from .organization import Organization, OrganizationContact
 from .organizationaffiliation import OrganizationAffiliation
 from .parameterdefinition import ParameterDefinition
 from .parameters import Parameters, ParametersParameter
-from .passwordchangerequest import PasswordChangeRequest
 from .patient import Patient, PatientCommunication, PatientContact, PatientLink
 from .paymentnotice import PaymentNotice
 from .paymentreconciliation import (
@@ -883,6 +882,8 @@ __all__ = [
     "BiologicallyDerivedProductStorage",
     "BodyStructure",
     "Bot",
+    "BotCdsService",
+    "BotCdsServicePrefetch",
     "BulkDataExport",
     "BulkDataExportDeleted",
     "BulkDataExportError",
@@ -1320,7 +1321,6 @@ __all__ = [
     "ParameterDefinition",
     "Parameters",
     "ParametersParameter",
-    "PasswordChangeRequest",
     "Patient",
     "PatientCommunication",
     "PatientContact",

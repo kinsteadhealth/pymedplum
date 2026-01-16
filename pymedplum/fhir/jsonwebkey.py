@@ -61,12 +61,12 @@ class JsonWebKey(MedplumFHIRBase):
     active: bool | None = Field(
         default=None, description="Whether this key is in active use."
     )
-    alg: str | None = Field(
-        default=None,
+    alg: str = Field(
+        default=...,
         description="The specific cryptographic algorithm used with the key.",
     )
-    kty: str | None = Field(
-        default=None,
+    kty: str = Field(
+        default=...,
         description="The family of cryptographic algorithms used with the key.",
     )
     use: str | None = Field(
@@ -101,3 +101,15 @@ class JsonWebKey(MedplumFHIRBase):
     dp: str | None = Field(default=None, description="The first factor CRT exponent.")
     dq: str | None = Field(default=None, description="The second factor CRT exponent.")
     qi: str | None = Field(default=None, description="The first CRT coefficient.")
+    x: str | None = Field(
+        default=None,
+        description="The x coordinate of the elliptic curve point (base64url encoded).",
+    )
+    y: str | None = Field(
+        default=None,
+        description="The y coordinate of the elliptic curve point (base64url encoded).",
+    )
+    crv: str | None = Field(
+        default=None,
+        description="The cryptographic curve identifier (e.g., 'P-256', 'P-384', 'P-521').",
+    )

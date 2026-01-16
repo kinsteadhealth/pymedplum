@@ -138,3 +138,8 @@ class Login(MedplumFHIRBase):
         alias="userAgent",
         description="The User-Agent request header as sent by the client.",
     )
+    picture_url: str | None = Field(
+        default=None,
+        alias="pictureUrl",
+        description="Optional picture URL from the external identity provider.",
+    )

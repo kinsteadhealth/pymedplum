@@ -102,6 +102,8 @@ REGISTRY: dict[str, str] = {
     "BiologicallyDerivedProductStorage": "pymedplum.fhir.biologicallyderivedproduct:BiologicallyDerivedProductStorage",
     "BodyStructure": "pymedplum.fhir.bodystructure:BodyStructure",
     "Bot": "pymedplum.fhir.bot:Bot",
+    "BotCdsService": "pymedplum.fhir.bot:BotCdsService",
+    "BotCdsServicePrefetch": "pymedplum.fhir.bot:BotCdsServicePrefetch",
     "BulkDataExport": "pymedplum.fhir.bulkdataexport:BulkDataExport",
     "BulkDataExportDeleted": "pymedplum.fhir.bulkdataexport:BulkDataExportDeleted",
     "BulkDataExportError": "pymedplum.fhir.bulkdataexport:BulkDataExportError",
@@ -539,7 +541,6 @@ REGISTRY: dict[str, str] = {
     "ParameterDefinition": "pymedplum.fhir.parameterdefinition:ParameterDefinition",
     "Parameters": "pymedplum.fhir.parameters:Parameters",
     "ParametersParameter": "pymedplum.fhir.parameters:ParametersParameter",
-    "PasswordChangeRequest": "pymedplum.fhir.passwordchangerequest:PasswordChangeRequest",
     "Patient": "pymedplum.fhir.patient:Patient",
     "PatientCommunication": "pymedplum.fhir.patient:PatientCommunication",
     "PatientContact": "pymedplum.fhir.patient:PatientContact",
@@ -1076,7 +1077,7 @@ if TYPE_CHECKING:
         BiologicallyDerivedProductStorage,
     )
     from pymedplum.fhir.bodystructure import BodyStructure
-    from pymedplum.fhir.bot import Bot
+    from pymedplum.fhir.bot import Bot, BotCdsService, BotCdsServicePrefetch
     from pymedplum.fhir.bulkdataexport import (
         BulkDataExport,
         BulkDataExportDeleted,
@@ -1625,7 +1626,6 @@ if TYPE_CHECKING:
     from pymedplum.fhir.organizationaffiliation import OrganizationAffiliation
     from pymedplum.fhir.parameterdefinition import ParameterDefinition
     from pymedplum.fhir.parameters import Parameters, ParametersParameter
-    from pymedplum.fhir.passwordchangerequest import PasswordChangeRequest
     from pymedplum.fhir.patient import (
         Patient,
         PatientCommunication,
@@ -1961,6 +1961,8 @@ if TYPE_CHECKING:
         | BiologicallyDerivedProductStorage
         | BodyStructure
         | Bot
+        | BotCdsService
+        | BotCdsServicePrefetch
         | BulkDataExport
         | BulkDataExportDeleted
         | BulkDataExportError
@@ -2398,7 +2400,6 @@ if TYPE_CHECKING:
         | ParameterDefinition
         | Parameters
         | ParametersParameter
-        | PasswordChangeRequest
         | Patient
         | PatientCommunication
         | PatientContact
@@ -2687,6 +2688,8 @@ if TYPE_CHECKING:
         "BiologicallyDerivedProductStorage",
         "BodyStructure",
         "Bot",
+        "BotCdsService",
+        "BotCdsServicePrefetch",
         "BulkDataExport",
         "BulkDataExportDeleted",
         "BulkDataExportError",
@@ -3124,7 +3127,6 @@ if TYPE_CHECKING:
         "ParameterDefinition",
         "Parameters",
         "ParametersParameter",
-        "PasswordChangeRequest",
         "Patient",
         "PatientCommunication",
         "PatientContact",

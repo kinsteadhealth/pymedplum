@@ -113,9 +113,14 @@ class AccessPolicyResource(MedplumFHIRBase):
         default=None,
         description="The rules that the server should use to determine which resources to allow.",
     )
-    readonly: bool | None = Field(
-        default=None,
-        description="Optional flag to indicate that the resource type is read-only.",
+    readonly: bool | None = Field(default=None)
+    interaction: (
+        list[
+            Literal["read", "vread", "update", "delete", "history", "create", "search"]
+        ]
+        | None
+    ) = Field(
+        default=None, description="Permitted FHIR interactions with this resource type"
     )
     hidden_fields: list[str] | None = Field(
         default=None,

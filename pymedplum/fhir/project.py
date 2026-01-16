@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from pymedplum.fhir.meta import Meta
     from pymedplum.fhir.narrative import Narrative
     from pymedplum.fhir.reference import Reference
+    from pymedplum.fhir.resourcetype import ResourceType
 
 
 class Project(MedplumFHIRBase):
@@ -87,6 +88,7 @@ class Project(MedplumFHIRBase):
     features: (
         list[
             Literal[
+                "ai",
                 "aws-comprehend",
                 "aws-textract",
                 "bots",
@@ -94,10 +96,9 @@ class Project(MedplumFHIRBase):
                 "email",
                 "google-auth-required",
                 "graphql-introspection",
-                "terminology",
                 "websocket-subscriptions",
-                "reference-lookups",
                 "transaction-bundles",
+                "validate-terminology",
             ]
         ]
         | None
@@ -140,6 +141,11 @@ class Project(MedplumFHIRBase):
         default=None,
         alias="defaultProfile",
         description="Default profiles to apply to resources in this project that do not individually specify profiles",
+    )
+    exported_resource_type: list[ResourceType] | None = Field(
+        default=None,
+        alias="exportedResourceType",
+        description="The resource types exported by the project when linked",
     )
 
 
