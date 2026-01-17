@@ -26,6 +26,7 @@ from .helpers import (
     to_fhir_json,
     to_portable,
 )
+from .types import OrgMode, PatchOperation, SummaryMode, TotalMode
 
 __all__ = [
     "AsyncMedplumClient",
@@ -37,9 +38,13 @@ __all__ = [
     "NetworkError",
     "NotFoundError",
     "OperationOutcomeError",
+    "OrgMode",
+    "PatchOperation",
     "RateLimitError",
     "ResourceNotFoundError",
     "ServerError",
+    "SummaryMode",
+    "TotalMode",
     "ValidationError",
     "__version__",
     "build_reference",

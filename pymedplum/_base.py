@@ -17,6 +17,7 @@ from .exceptions import (
     RateLimitError,
     ServerError,
 )
+from .helpers import decode_jwt_exp
 from .types import DEFAULT_ORG_EXTENSION_URL, BeforeRequestCallback, OrgMode
 
 if TYPE_CHECKING:
@@ -131,6 +132,39 @@ class BaseClient:
 
         self.token_expires_at: datetime | None = None
         self._obo_stack: list[str] = []
+
+        # If access_token was provided, try to extract expiry from JWT
+        if self.access_token:
+            self.token_expires_at = decode_jwt_exp(self.access_token)
+
+    def set_access_token(self, token: str, expires_at: datetime | None = None) -> None:
+        """Set the access token explicitly.
+
+        This allows using an externally-acquired access token instead of
+        authenticating with client credentials. If expires_at is not provided,
+        the method will attempt to decode the expiration from the JWT.
+
+        Args:
+            token: The access token string
+            expires_at: Optional expiration datetime. If not provided and the
+                token is a valid JWT, expiration will be decoded from it.
+
+        Example:
+            # Create client without credentials
+            client = MedplumClient(base_url="https://api.medplum.com/")
+
+            # Set externally-acquired token
+            client.set_access_token(my_token)
+
+            # Now client can make authenticated requests
+            patient = client.read_resource("Patient", "123")
+        """
+        self.access_token = token
+        if expires_at is not None:
+            self.token_expires_at = expires_at
+        else:
+            # Try to decode expiry from JWT
+            self.token_expires_at = decode_jwt_exp(token)
 
     def _obo_current(self) -> str | None:
         """Get current on-behalf-of membership (top of stack)."""

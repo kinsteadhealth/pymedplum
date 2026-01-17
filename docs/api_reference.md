@@ -63,6 +63,58 @@ print(created_patient.name[0].family)  # Full IDE autocomplete!
 created = client.create_resource(patient, headers={"X-Custom-Header": "value"})
 ```
 
+#### `create_resource_if_none_exist(resource, if_none_exist, org_mode=None, org_ref=None, headers=None, *, as_fhir=None) -> dict | Model`
+
+Conditionally create a FHIR resource only if no matching resource exists (If-None-Exist).
+
+This method uses FHIR's conditional create mechanism via the `If-None-Exist` header. If a resource matching the search criteria already exists, the existing resource is returned (HTTP 200). If no match is found, a new resource is created (HTTP 201).
+
+**Parameters**:
+- `resource` (dict | Pydantic model): The resource to create
+- `if_none_exist` (str): FHIR search query string (e.g., "identifier=MRN|12345"). Accepts plain query strings or strings with a leading `?` (which is automatically stripped). Full URLs are also accepted and the query portion is extracted.
+- `org_mode` (OrgMode, optional): Override client org_mode for this request
+- `org_ref` (str, optional): Override client org_ref for this request
+- `headers` (dict[str, str], optional): Additional HTTP headers for the request
+- `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
+
+**Returns**: dict or Pydantic model instance - The created or existing resource
+
+**Note**: The method returns only the resource. The HTTP status code (201 Created vs 200 OK) is not exposed. If you need to determine whether a resource was newly created, compare the returned ID against expected values or check timestamps.
+
+**Raises**:
+- `PreconditionFailedError`: If multiple resources match the search criteria (HTTP 412)
+
+**Example**:
+```python
+from pymedplum.fhir import Patient
+
+# Create patient only if no matching identifier exists
+patient = Patient(
+    identifier=[{"system": "http://hospital.org/mrn", "value": "12345"}],
+    name=[{"family": "Smith", "given": ["John"]}]
+)
+
+resource = client.create_resource_if_none_exist(
+    patient,
+    if_none_exist="identifier=http://hospital.org/mrn|12345"
+)
+print(f"Patient ID: {resource['id']}")
+
+# With type-safe response
+resource = client.create_resource_if_none_exist(
+    patient,
+    if_none_exist="identifier=http://hospital.org/mrn|12345",
+    as_fhir=Patient
+)
+print(resource.name[0].family)  # Type-safe access
+
+# Leading ? is automatically stripped (both forms work)
+resource = client.create_resource_if_none_exist(
+    patient,
+    if_none_exist="?identifier=http://hospital.org/mrn|12345"  # Also valid
+)
+```
+
 #### `read_resource(resource_type, resource_id, as_fhir=None, headers=None) -> dict | Model`
 
 Read a FHIR resource by type and ID.
@@ -278,6 +330,85 @@ for obs in client.search_resource_pages("Observation", {"patient": "Patient/123"
     print(f"Observation {obs.id}: {obs.status}")  # Full IDE autocomplete!
 ```
 
+#### `search_with_options(resource_type, query=None, *, summary=None, elements=None, total=None, at=None, count=None, offset=None, sort=None, include=None, include_iterate=None, revinclude=None, revinclude_iterate=None, return_bundle=False, as_fhir=None) -> dict | FHIRBundle`
+
+Search for FHIR resources with named parameters for common FHIR search modifiers.
+
+This method provides an ergonomic interface for FHIR search parameters like `_summary`, `_elements`, `_total`, `_include`, and `_at`. An alias `searchWithOptions` is also available for developers familiar with the Medplum TypeScript SDK naming conventions.
+
+**Parameters**:
+- `resource_type` (str): FHIR resource type to search
+- `query` (dict | list[tuple], optional): Additional search parameters
+- `summary` (SummaryMode, optional): Controls how much data is returned per resource:
+  - `"true"` - Return only summary elements (id, meta, and elements marked as summary)
+  - `"text"` - Return text summary plus id, meta, and top-level mandatory elements
+  - `"data"` - Return all data elements but no text
+  - `"count"` - Return just the count with no resources (use `bundle.total` or `result.get("total")`)
+  - `"false"` - Return complete resources (default behavior)
+- `elements` (list[str], optional): Specific elements to include in response
+- `total` (TotalMode, optional): Controls how the total count is computed:
+  - `"none"` - Do not include total (fastest)
+  - `"estimate"` - Include an estimated total (fast but approximate)
+  - `"accurate"` - Include an accurate total (slower, requires counting all matches)
+- `at` (str, optional): Point-in-time snapshot (ISO datetime)
+- `count` (int, optional): Number of results per page (alias for _count)
+- `offset` (int, optional): Starting offset for pagination (alias for _offset)
+- `sort` (str | list[str], optional): Sort field(s), prefix with - for descending
+- `include` (str | list[str], optional): Related resources to include (_include)
+- `include_iterate` (str | list[str], optional): Recursive includes (_include:iterate) - follows references on included resources
+- `revinclude` (str | list[str], optional): Reverse includes (_revinclude)
+- `revinclude_iterate` (str | list[str], optional): Recursive reverse includes (_revinclude:iterate)
+- `return_bundle` (bool): Return FHIRBundle wrapper if True
+- `as_fhir` (Type[Model], optional): Pydantic model class for typed resources
+
+**Alias**: `searchWithOptions` - identical method with camelCase naming
+
+**Returns**: dict or FHIRBundle
+
+**Example**:
+```python
+from pymedplum.fhir import Patient
+
+# Get just a count of matching resources
+result = client.search_with_options("Patient", {"family": "Smith"}, summary="count")
+print(f"Total patients: {result.get('total', 0)}")
+
+# Request specific elements only
+result = client.search_with_options(
+    "Patient",
+    {"active": "true"},
+    elements=["id", "name", "birthDate"]
+)
+
+# Get accurate total count (may be slower)
+bundle = client.search_with_options(
+    "Patient",
+    {"family": "Smith"},
+    total="accurate",
+    return_bundle=True
+)
+print(f"Accurate count: {bundle.total}")
+
+# Point-in-time query (historical data)
+result = client.search_with_options(
+    "Patient",
+    {"family": "Smith"},
+    at="2024-01-01T00:00:00Z"
+)
+
+# Pagination and sorting with includes
+bundle = client.search_with_options(
+    "Observation",
+    {"patient": "Patient/123"},
+    count=50,
+    offset=100,
+    sort=["-date", "code"],
+    include="Observation:patient",
+    return_bundle=True,
+    as_fhir=Observation
+)
+```
+
 ### GraphQL
 
 #### `execute_graphql(query, variables=None, operation_name=None) -> dict`
@@ -352,6 +483,135 @@ Create context manager for on-behalf-of operations.
 with client.on_behalf_of("ProjectMembership/123") as obo_client:
     # Operations here execute with the permissions of membership 123
     patient = obo_client.read_resource("Patient", "456")
+```
+
+### Terminology Operations
+
+PyMedplum provides methods for FHIR terminology operations including ValueSet expansion, CodeSystem lookup, and ConceptMap translation.
+
+#### `expand_valueset(valueset_url=None, valueset_id=None, filter=None, offset=None, count=None, include_designations=None, active_only=None, exclude_nested=None, exclude_not_for_ui=None, exclude_post_coordinated=None, display_language=None, property=None) -> dict`
+
+Expand a ValueSet to get all matching codes.
+
+**Parameters**:
+- `valueset_url` (str, optional): Canonical URL of the ValueSet
+- `valueset_id` (str, optional): ID of a specific ValueSet resource
+- `filter` (str, optional): Text filter to apply (substring match on display)
+- `offset` (int, optional): Starting index for paging (0-based)
+- `count` (int, optional): Maximum number of concepts to return
+- `include_designations` (bool, optional): Include code system designations
+- `active_only` (bool, optional): Only include active codes
+- `exclude_nested` (bool, optional): Exclude nested codes
+- `exclude_not_for_ui` (bool, optional): Exclude codes marked as notSelectable
+- `exclude_post_coordinated` (bool, optional): Exclude post-coordinated codes
+- `display_language` (str, optional): Language for display text (e.g., "en", "de")
+- `property` (list[str], optional): Properties to include for each concept
+
+**Returns**: dict - Expanded ValueSet with contains array
+
+**Example**:
+```python
+# Expand by URL
+expansion = client.expand_valueset(
+    valueset_url="http://hl7.org/fhir/ValueSet/observation-status"
+)
+for concept in expansion.get("expansion", {}).get("contains", []):
+    print(f"{concept['code']}: {concept['display']}")
+
+# Expand with filter and pagination
+expansion = client.expand_valueset(
+    valueset_url="http://hl7.org/fhir/ValueSet/condition-code",
+    filter="diabetes",
+    count=20,
+    offset=0
+)
+
+# Expand a specific ValueSet by ID
+expansion = client.expand_valueset(valueset_id="my-custom-valueset")
+```
+
+#### `lookup_concept(code, system=None, codesystem_id=None, version=None, coding=None, date=None, display_language=None, property=None) -> dict`
+
+Look up details about a code in a CodeSystem.
+
+**Parameters**:
+- `code` (str): Code to look up
+- `system` (str, optional): Code system URL (required unless using codesystem_id)
+- `codesystem_id` (str, optional): ID of a specific CodeSystem resource
+- `version` (str, optional): Specific version of the code system
+- `coding` (dict, optional): Full Coding object (alternative to code+system)
+- `date` (str, optional): Date for which the code should be valid
+- `display_language` (str, optional): Language for display text
+- `property` (list[str], optional): Properties to return for the code
+
+**Returns**: dict - Parameters resource with code details (name, display, version, etc.)
+
+**Example**:
+```python
+# Look up a LOINC code
+result = client.lookup_concept(
+    code="8867-4",
+    system="http://loinc.org"
+)
+
+# Extract display name from parameters
+for param in result.get("parameter", []):
+    if param.get("name") == "display":
+        print(f"Display: {param.get('valueString')}")
+
+# Look up with specific properties
+result = client.lookup_concept(
+    code="38341003",
+    system="http://snomed.info/sct",
+    property=["parent", "child", "designation"]
+)
+```
+
+#### `translate_concept(code=None, system=None, conceptmap_url=None, conceptmap_id=None, version=None, source=None, target=None, coding=None, codeable_concept=None, target_system=None, reverse=None) -> dict`
+
+Translate a code from one code system to another using a ConceptMap.
+
+**Parameters**:
+- `code` (str, optional): Code to translate
+- `system` (str, optional): Source code system URL
+- `conceptmap_url` (str, optional): Canonical URL of the ConceptMap
+- `conceptmap_id` (str, optional): ID of a specific ConceptMap resource
+- `version` (str, optional): Version of the ConceptMap
+- `source` (str, optional): Source value set URL (filter for mappings)
+- `target` (str, optional): Target value set URL (filter for mappings)
+- `coding` (dict, optional): Full Coding object (alternative to code+system)
+- `codeable_concept` (dict, optional): CodeableConcept to translate
+- `target_system` (str, optional): Target code system URL
+- `reverse` (bool, optional): Reverse the direction of the mapping
+
+**Returns**: dict - Parameters resource with translation results
+
+**Example**:
+```python
+# Translate using a ConceptMap URL
+result = client.translate_concept(
+    code="final",
+    system="http://hl7.org/fhir/observation-status",
+    conceptmap_url="http://example.org/ConceptMap/status-mapping",
+    target_system="http://example.org/local-codes"
+)
+
+# Check if translation found matches
+for param in result.get("parameter", []):
+    if param.get("name") == "result" and param.get("valueBoolean"):
+        print("Translation found!")
+    elif param.get("name") == "match":
+        for part in param.get("part", []):
+            if part.get("name") == "concept":
+                coding = part.get("valueCoding", {})
+                print(f"Mapped to: {coding.get('code')} ({coding.get('display')})")
+
+# Translate using a specific ConceptMap by ID
+result = client.translate_concept(
+    code="active",
+    system="http://hl7.org/fhir/patient-status",
+    conceptmap_id="my-status-map"
+)
 ```
 
 ## Asynchronous Client (`AsyncMedplumClient`)

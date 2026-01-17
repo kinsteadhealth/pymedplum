@@ -2,6 +2,17 @@
 
 This section covers more advanced features of the `pymedplum` library, including detailed CRUD operations, GraphQL, and administrative functions.
 
+## Table of Contents
+
+- [Advanced FHIR Search](#advanced-fhir-search) - Includes, reverse includes, chaining, modifiers, pagination
+- [Conditional Create (If-None-Exist)](#conditional-create-if-none-exist) - Idempotent resource creation
+- [Advanced CRUD Operations](#advanced-crud-operations) - Update, patch, optimistic locking, delete
+- [FHIR Operations and Special Workflows](#fhir-operations-and-special-workflows) - Execute operations, C-CDA export, terminology, bundles, binaries
+- [GraphQL Queries](#graphql-queries)
+- ["On-Behalf-Of" Operations](#on-behalf-of-operations) - Act as another user
+- [Administrative Features](#administrative-features) - Project secrets, sites
+- [Interacting with Private Medplum APIs](#interacting-with-private-medplum-apis)
+
 ## Advanced FHIR Search
 
 FHIR provides powerful search capabilities beyond basic parameter matching. This section covers advanced search features including joins, reverse includes, chaining, and search modifiers.
@@ -121,6 +132,50 @@ bundle = client.search_resources("Patient", {
     ]
 })
 ```
+
+### Recursive Includes (`_include:iterate` / `_revinclude:iterate`)
+
+The `:iterate` modifier allows you to recursively follow references on resources that were themselves included. This is useful when you need to traverse multiple levels of references.
+
+```python
+# Get MedicationRequest with Medication, then the manufacturer of the Medication
+bundle = client.search_with_options(
+    "MedicationRequest",
+    {"patient": "Patient/123"},
+    include="MedicationRequest:medication",
+    include_iterate="Medication:manufacturer"
+)
+
+# The bundle now contains:
+# - MedicationRequest resources
+# - Medication resources (from _include)
+# - Organization resources (manufacturers, from _include:iterate)
+```
+
+You can also use `_revinclude:iterate` for recursive reverse includes:
+
+```python
+# Get Patient, then Observations, then any Provenance records for those Observations
+bundle = client.search_with_options(
+    "Patient",
+    {"identifier": "MRN|12345"},
+    revinclude="Observation:patient",
+    revinclude_iterate="Provenance:target"
+)
+```
+
+Multiple iterate values are supported:
+
+```python
+bundle = client.search_with_options(
+    "MedicationRequest",
+    {"patient": "Patient/123"},
+    include="MedicationRequest:medication",
+    include_iterate=["Medication:manufacturer", "Organization:partof"]
+)
+```
+
+**Note**: The iterate behavior depends on server support. Not all FHIR servers implement recursive includes identically.
 
 ### Search Parameter Chaining
 
@@ -269,6 +324,256 @@ for observation in client.search_resource_pages("Observation", {
     # Each observation is a dict, process as needed
 
 print(f"Found {len(all_observations)} total observations")
+```
+
+### Using `search_with_options` for TypeScript SDK Parity
+
+The `search_with_options` method provides a more ergonomic interface for FHIR search parameters, matching the patterns used in the Medplum TypeScript SDK:
+
+```python
+from pymedplum.fhir import Patient, Observation
+
+# Get just the count of matching resources (efficient for dashboards)
+result = client.search_with_options(
+    "Patient",
+    {"active": "true"},
+    summary="count"
+)
+print(f"Active patients: {result.get('total', 0)}")
+
+# Request only specific elements (bandwidth optimization)
+result = client.search_with_options(
+    "Patient",
+    {"family": "Smith"},
+    elements=["id", "name", "birthDate", "identifier"]
+)
+
+# Get accurate total count (useful for pagination UI)
+bundle = client.search_with_options(
+    "Observation",
+    {"patient": "Patient/123"},
+    total="accurate",
+    return_bundle=True
+)
+print(f"Total observations: {bundle.total}")
+
+# Point-in-time query for historical analysis
+historical = client.search_with_options(
+    "Patient",
+    {"family": "Smith"},
+    at="2024-01-01T00:00:00Z"  # Query data as of this timestamp
+)
+```
+
+#### Summary Modes
+
+The `summary` parameter controls what data is returned:
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| `"count"` | Only return the total count | Dashboard metrics, pagination |
+| `"true"` | Return summary elements only | List views, quick overviews |
+| `"text"` | Return text and mandatory elements | Display purposes |
+| `"data"` | Remove text from response | Data processing |
+| `"false"` | Return full resources | Full resource access |
+
+```python
+# Get summary for list display
+bundle = client.search_with_options(
+    "Patient",
+    {"active": "true"},
+    summary="true",
+    count=50,
+    return_bundle=True
+)
+```
+
+#### Total Count Modes
+
+The `total` parameter controls total count calculation:
+
+| Mode | Description | Performance |
+|------|-------------|-------------|
+| `"none"` | Don't calculate total | Fastest |
+| `"estimate"` | Return estimated count | Fast |
+| `"accurate"` | Return exact count | Slower (full scan) |
+
+```python
+# For infinite scroll (don't need exact total)
+bundle = client.search_with_options(
+    "Observation",
+    {"patient": "Patient/123"},
+    total="none",
+    count=20,
+    return_bundle=True
+)
+
+# For pagination with page numbers (need accurate total)
+bundle = client.search_with_options(
+    "Patient",
+    {"organization": "Organization/456"},
+    total="accurate",
+    count=20,
+    offset=40,  # Page 3
+    return_bundle=True
+)
+print(f"Showing page 3 of {(bundle.total + 19) // 20} pages")
+```
+
+#### Combining Multiple Options
+
+```python
+# Complex search with all options
+bundle = client.search_with_options(
+    "Observation",
+    {"code": "http://loinc.org|8867-4"},  # Heart rate
+    elements=["id", "effectiveDateTime", "valueQuantity", "subject"],
+    total="accurate",
+    count=100,
+    sort=["-effectiveDateTime"],  # Most recent first
+    include="Observation:patient",  # Include referenced patients
+    return_bundle=True,
+    as_fhir=Observation
+)
+
+# Process results
+for obs in bundle.get_resources():
+    print(f"{obs.effective_date_time}: {obs.value_quantity.value} bpm")
+```
+
+## Conditional Create (If-None-Exist)
+
+The conditional create mechanism allows you to create a resource only if no matching resource already exists. This is essential for preventing duplicate resources and implementing idempotent operations.
+
+### Basic Usage
+
+```python
+from pymedplum.fhir import Patient
+
+# Create a patient with an identifier
+patient = Patient(
+    identifier=[{"system": "http://hospital.org/mrn", "value": "MRN-12345"}],
+    name=[{"family": "Smith", "given": ["John"]}]
+)
+
+# Only create if no patient with this identifier exists
+# Returns the created or existing resource
+resource = client.create_resource_if_none_exist(
+    patient,
+    if_none_exist="identifier=http://hospital.org/mrn|MRN-12345"
+)
+
+print(f"Patient ID: {resource['id']}")
+```
+
+**Note:** The method returns the resource directly. The server returns HTTP 201 for newly created resources and HTTP 200 for existing matches, but this status is not exposed in the return value. If you need to know whether a resource was created, compare the returned ID with the input (if provided) or check a timestamp.
+
+### Use Cases
+
+#### Preventing Duplicate Patient Records
+
+```python
+def ensure_patient_exists(mrn: str, name: dict) -> dict:
+    """
+    Ensure a patient with the given MRN exists.
+    Returns the existing patient or creates a new one.
+    """
+    patient = Patient(
+        identifier=[{"system": "http://hospital.org/mrn", "value": mrn}],
+        name=[name]
+    )
+
+    return client.create_resource_if_none_exist(
+        patient,
+        if_none_exist=f"identifier=http://hospital.org/mrn|{mrn}"
+    )
+
+# Safe to call multiple times - won't create duplicates
+patient = ensure_patient_exists("12345", {"family": "Smith", "given": ["John"]})
+```
+
+#### Idempotent Device Registration
+
+```python
+def register_device(device_serial: str, device_type: str) -> dict:
+    """
+    Register a device, returning existing if already registered.
+    """
+    device = {
+        "resourceType": "Device",
+        "identifier": [{"system": "http://example.org/devices", "value": device_serial}],
+        "type": {"text": device_type}
+    }
+
+    return client.create_resource_if_none_exist(
+        device,
+        if_none_exist=f"identifier=http://example.org/devices|{device_serial}"
+    )
+```
+
+#### Ensuring Reference Data Exists
+
+```python
+def ensure_organization_exists(npi: str, name: str) -> dict:
+    """
+    Ensure an organization with the given NPI exists.
+    """
+    org = {
+        "resourceType": "Organization",
+        "identifier": [{"system": "http://hl7.org/fhir/sid/us-npi", "value": npi}],
+        "name": name
+    }
+
+    return client.create_resource_if_none_exist(
+        org,
+        if_none_exist=f"identifier=http://hl7.org/fhir/sid/us-npi|{npi}"
+    )
+```
+
+### Error Handling
+
+If multiple resources match the search criteria, the server returns HTTP 412 (Precondition Failed):
+
+```python
+from pymedplum.exceptions import PreconditionFailedError
+
+try:
+    resource = client.create_resource_if_none_exist(
+        patient,
+        if_none_exist="family=Smith"  # Too broad - may match multiple
+    )
+except PreconditionFailedError:
+    # Multiple patients matched - need more specific criteria
+    print("Search criteria matched multiple resources")
+```
+
+### Best Practices
+
+1. **Use specific identifiers**: Search by unique identifiers (MRN, NPI, UUID) rather than broad criteria
+2. **Include system in identifier searches**: Use `identifier=system|value` format for precision
+3. **Consider race conditions**: In high-concurrency scenarios, use transactions for related resources
+4. **Query string formats**: The `if_none_exist` parameter accepts multiple formats:
+   - Plain query strings: `"identifier=http://example.org|12345"` (recommended)
+   - With leading `?`: `"?identifier=http://example.org|12345"` (automatically stripped)
+   - Full URLs: `"https://example.com/fhir/R4/Patient?identifier=..."` (query portion extracted)
+   - Empty strings or just `"?"` will raise `ValueError`
+
+### Async Usage
+
+```python
+async def ensure_patient_async(mrn: str):
+    patient = Patient(
+        identifier=[{"system": "http://hospital.org/mrn", "value": mrn}],
+        name=[{"family": "Doe"}]
+    )
+
+    # With type-safe response
+    resource = await async_client.create_resource_if_none_exist(
+        patient,
+        if_none_exist=f"identifier=http://hospital.org/mrn|{mrn}",
+        as_fhir=Patient
+    )
+    return resource
 ```
 
 ## Advanced CRUD Operations
@@ -508,9 +813,183 @@ To delete a resource, use the `delete_resource` method.
 ```python
 client.delete_resource("Patient/some-patient-id")
 ```
+
 ## FHIR Operations and Special Workflows
 
 PyMedplum provides dedicated methods for specialized FHIR operations beyond standard CRUD, including clinical document export, terminology validation, atomic transactions, and binary file handling.
+
+### Execute FHIR Operations
+
+The `execute_operation` method provides a generic way to invoke any FHIR operation, including standard operations (like `$match`, `$everything`, `$validate`) and custom Medplum operations.
+
+#### Type-Level Operations
+
+Operations that apply to a resource type (e.g., `Patient/$match`):
+
+```python
+# Patient matching using $match operation
+result = client.execute_operation(
+    "Patient",
+    "match",
+    params={
+        "resourceType": "Parameters",
+        "parameter": [
+            {
+                "name": "resource",
+                "resource": {
+                    "resourceType": "Patient",
+                    "name": [{"family": "Smith", "given": ["John"]}],
+                    "birthDate": "1990-01-15"
+                }
+            }
+        ]
+    }
+)
+
+# Result is a Bundle with matching patients and scores
+for entry in result.get("entry", []):
+    patient = entry["resource"]
+    score = entry.get("search", {}).get("score", 0)
+    print(f"Match: {patient['id']} (score: {score})")
+```
+
+#### Instance-Level Operations
+
+Operations that apply to a specific resource instance (e.g., `Patient/123/$everything`):
+
+```python
+# Get all resources related to a patient
+bundle = client.execute_operation(
+    "Patient",
+    "everything",
+    resource_id="patient-123"
+)
+
+# Bundle contains Patient plus all related resources
+for entry in bundle.get("entry", []):
+    resource = entry["resource"]
+    print(f"{resource['resourceType']}: {resource['id']}")
+```
+
+#### Custom Medplum Operations
+
+Invoke custom operations defined via Medplum Bots and OperationDefinitions:
+
+```python
+# Call a custom operation with a full Parameters resource
+result = client.execute_operation(
+    "MedicationRequest",
+    "calculate-dose",
+    resource_id="med-req-456",
+    params={
+        "resourceType": "Parameters",
+        "parameter": [
+            {"name": "weight", "valueDecimal": 70},
+            {"name": "unit", "valueString": "kg"}
+        ]
+    }
+)
+
+# With custom headers
+result = client.execute_operation(
+    "Patient",
+    "my-custom-operation",
+    params={
+        "resourceType": "Parameters",
+        "parameter": [{"name": "family", "valueString": "Doe"}]
+    },
+    headers={"X-Custom-Header": "value"}
+)
+```
+
+#### Using GET Method for Simple Lookups
+
+Many FHIR operations support both GET (with query parameters) and POST (with a Parameters body). Use `method="GET"` for simple lookups:
+
+```python
+# GET with query parameters - simpler for lookups
+result = client.execute_operation(
+    "CodeSystem",
+    "lookup",
+    params={"code": "12345", "system": "http://loinc.org"},
+    method="GET"  # Parameters become query string
+)
+
+# ValueSet expansion with filter
+expansion = client.execute_operation(
+    "ValueSet",
+    "$expand",
+    params={"url": "http://hl7.org/fhir/ValueSet/observation-status", "filter": "fin"},
+    method="GET"
+)
+```
+
+#### Auto-Wrapping Parameters
+
+For convenience, you can use `wrap_params=True` to automatically convert a simple dict into a FHIR Parameters resource:
+
+```python
+# Without wrap_params - you must build the Parameters resource manually
+result = client.execute_operation(
+    "Patient",
+    "match",
+    params={
+        "resourceType": "Parameters",
+        "parameter": [
+            {"name": "onlyCertainMatches", "valueBoolean": True},
+            {"name": "count", "valueInteger": 10}
+        ]
+    }
+)
+
+# With wrap_params=True - dict is auto-converted
+result = client.execute_operation(
+    "Patient",
+    "custom-operation",
+    params={"onlyCertainMatches": True, "count": 10},
+    wrap_params=True  # Converts to Parameters resource
+)
+```
+
+**Limitations of `wrap_params`:** The auto-conversion handles basic types (string→valueString, int→valueInteger, bool→valueBoolean, float→valueDecimal) and recognizes Coding/Reference dicts. However, for operations requiring specific value types like `valueCode`, `valueUri`, or `valueCanonical`, you should build the Parameters resource manually.
+
+#### Async Usage
+
+```python
+# All operations work with AsyncMedplumClient
+async def get_patient_everything(patient_id: str):
+    bundle = await async_client.execute_operation(
+        "Patient",
+        "everything",
+        resource_id=patient_id
+    )
+    return bundle
+```
+
+**Note:** The operation name can be specified with or without the `$` prefix - both `"match"` and `"$match"` work.
+
+### Setting Resource Accounts (Multi-Compartment Access)
+
+The `set_accounts` method manages `meta.accounts` on FHIR resources using Medplum's `$set-accounts` operation. This is the recommended way to control which organizations have access to a resource when using AccessPolicies.
+
+```python
+# Assign an organization to a patient's accounts
+result = client.set_accounts(
+    resource_ref="Patient/patient-123",
+    org_ref="Organization/org-456"
+)
+
+# The operation returns a Parameters resource with update count
+print(f"Resources updated: {result['parameter'][0]['valueInteger']}")
+```
+
+**When to use `set_accounts`:**
+
+- When using compartment-based AccessPolicies that filter by `meta.accounts`
+- To grant an organization access to a resource and its compartment
+- When you need consistent access control across related resources
+
+**Note:** This method is preferred over automatic organization tagging (`org_mode`) when using AccessPolicies, as it ensures the `meta.accounts` field is properly set for access control checks. The operation can optionally propagate account changes to all resources in a patient's compartment (see Medplum documentation for the `propagate` parameter).
 
 ### C-CDA Document Export
 
@@ -597,6 +1076,260 @@ async def validate_code():
         code="15074-8"
     )
     return result
+```
+
+### ValueSet Expansion (`$expand`)
+
+Expand a ValueSet to retrieve all codes it contains. This is useful for building dropdown menus, typeahead searches, and populating code pickers.
+
+```python
+# Expand a standard FHIR ValueSet
+expansion = client.expand_valueset(
+    valueset_url="http://hl7.org/fhir/ValueSet/observation-status"
+)
+
+# Extract codes from expansion
+for concept in expansion.get("expansion", {}).get("contains", []):
+    print(f"{concept['code']}: {concept['display']}")
+```
+
+#### Filtering and Pagination
+
+For large ValueSets, use filtering and pagination to limit results:
+
+```python
+# Search for codes matching a filter
+expansion = client.expand_valueset(
+    valueset_url="http://hl7.org/fhir/ValueSet/condition-code",
+    filter="diabetes",  # Substring match on display
+    count=20,           # Max 20 results
+    offset=0            # Start from beginning
+)
+
+# Build a code picker with pagination
+def get_codes_page(filter_text: str, page: int, page_size: int = 20):
+    return client.expand_valueset(
+        valueset_url="http://hl7.org/fhir/ValueSet/condition-code",
+        filter=filter_text,
+        count=page_size,
+        offset=page * page_size
+    )
+```
+
+#### Expansion Options
+
+```python
+# Expand with all options
+expansion = client.expand_valueset(
+    valueset_url="http://hl7.org/fhir/ValueSet/condition-severity",
+    include_designations=True,    # Include alternate names/translations
+    active_only=True,             # Only active codes
+    exclude_nested=True,          # Flatten hierarchy
+    exclude_not_for_ui=True,      # Only selectable codes
+    display_language="en",        # English display text
+    property=["definition"]       # Include code definitions
+)
+```
+
+#### Expanding by ValueSet ID
+
+```python
+# Expand a custom ValueSet stored in Medplum
+expansion = client.expand_valueset(valueset_id="my-custom-valueset")
+```
+
+### CodeSystem Lookup (`$lookup`)
+
+Look up detailed information about a code in a CodeSystem, including display names, definitions, properties, and designations.
+
+```python
+# Look up a LOINC code
+result = client.lookup_concept(
+    code="8867-4",
+    system="http://loinc.org"
+)
+
+# Extract information from Parameters response
+for param in result.get("parameter", []):
+    name = param.get("name")
+    if name == "display":
+        print(f"Display: {param.get('valueString')}")
+    elif name == "name":
+        print(f"Code System: {param.get('valueString')}")
+    elif name == "version":
+        print(f"Version: {param.get('valueString')}")
+```
+
+#### Looking Up with Properties
+
+Request specific properties about the code:
+
+```python
+# Get SNOMED CT code with hierarchical properties
+result = client.lookup_concept(
+    code="38341003",  # Hypertension
+    system="http://snomed.info/sct",
+    property=["parent", "child", "definition"]
+)
+
+# Extract properties
+for param in result.get("parameter", []):
+    if param.get("name") == "property":
+        for part in param.get("part", []):
+            if part.get("name") == "code":
+                prop_code = part.get("valueCode")
+            elif part.get("name") == "value":
+                prop_value = part.get("valueCode") or part.get("valueString")
+        print(f"Property {prop_code}: {prop_value}")
+```
+
+#### Looking Up with Display Language
+
+```python
+# Get display in specific language
+result = client.lookup_concept(
+    code="38341003",
+    system="http://snomed.info/sct",
+    display_language="es"  # Spanish
+)
+```
+
+### ConceptMap Translation (`$translate`)
+
+Translate codes between different code systems using ConceptMaps. This is essential for interoperability when mapping between local codes and standard terminologies.
+
+```python
+# Translate using a ConceptMap URL
+result = client.translate_concept(
+    code="final",
+    system="http://hl7.org/fhir/observation-status",
+    conceptmap_url="http://example.org/ConceptMap/obs-status-to-local",
+    target_system="http://example.org/local-codes"
+)
+
+# Check translation results
+for param in result.get("parameter", []):
+    if param.get("name") == "result":
+        found = param.get("valueBoolean")
+        print(f"Translation found: {found}")
+    elif param.get("name") == "match":
+        # Extract matched concept
+        for part in param.get("part", []):
+            if part.get("name") == "concept":
+                coding = part.get("valueCoding", {})
+                print(f"Mapped to: {coding.get('code')} ({coding.get('display')})")
+            elif part.get("name") == "equivalence":
+                equiv = part.get("valueCode")
+                print(f"Equivalence: {equiv}")
+```
+
+#### Translation Helpers
+
+```python
+def translate_to_local_code(
+    code: str,
+    source_system: str,
+    target_system: str
+) -> str | None:
+    """
+    Translate a standard code to a local system code.
+    Returns None if no translation found.
+    """
+    result = client.translate_concept(
+        code=code,
+        system=source_system,
+        target_system=target_system
+    )
+
+    # Check if translation was successful
+    for param in result.get("parameter", []):
+        if param.get("name") == "result" and not param.get("valueBoolean"):
+            return None
+        if param.get("name") == "match":
+            for part in param.get("part", []):
+                if part.get("name") == "concept":
+                    return part.get("valueCoding", {}).get("code")
+
+    return None
+
+
+# Usage
+local_code = translate_to_local_code(
+    code="final",
+    source_system="http://hl7.org/fhir/observation-status",
+    target_system="http://hospital.org/codes"
+)
+```
+
+#### Reverse Translation
+
+Translate from target back to source system:
+
+```python
+# Reverse translation (target to source)
+result = client.translate_concept(
+    code="LOC-001",
+    system="http://hospital.org/local-codes",
+    conceptmap_url="http://example.org/ConceptMap/status-mapping",
+    reverse=True  # Reverse direction
+)
+```
+
+#### Using Full Coding or CodeableConcept
+
+```python
+# Translate using a Coding object
+result = client.translate_concept(
+    coding={
+        "system": "http://hl7.org/fhir/observation-status",
+        "code": "final",
+        "display": "Final"
+    },
+    target_system="http://hospital.org/local-codes"
+)
+
+# Translate using a CodeableConcept
+result = client.translate_concept(
+    codeable_concept={
+        "coding": [{
+            "system": "http://snomed.info/sct",
+            "code": "38341003",
+            "display": "Hypertensive disorder"
+        }],
+        "text": "Hypertension"
+    },
+    target_system="http://hl7.org/fhir/sid/icd-10"
+)
+```
+
+#### Async Terminology Operations
+
+All terminology operations are available in async form:
+
+```python
+async def get_condition_codes(filter_text: str):
+    """Search for condition codes asynchronously."""
+    expansion = await async_client.expand_valueset(
+        valueset_url="http://hl7.org/fhir/ValueSet/condition-code",
+        filter=filter_text,
+        count=20
+    )
+    return [
+        {"code": c["code"], "display": c["display"]}
+        for c in expansion.get("expansion", {}).get("contains", [])
+    ]
+
+
+async def lookup_snomed_code(code: str):
+    """Look up SNOMED code details asynchronously."""
+    result = await async_client.lookup_concept(
+        code=code,
+        system="http://snomed.info/sct"
+    )
+    for param in result.get("parameter", []):
+        if param.get("name") == "display":
+            return param.get("valueString")
+    return None
 ```
 
 ### Transaction and Batch Bundles

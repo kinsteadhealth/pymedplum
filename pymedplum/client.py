@@ -2,15 +2,25 @@ import random
 import time
 from collections.abc import Iterator
 from typing import Any, Literal, TypeVar, overload
+from urllib.parse import urlparse
 
 import httpx
 
 from ._base import BaseClient, OnBehalfOfContext, _raise_or_json
+from ._fhir_ops import (
+    build_codesystem_lookup_params,
+    build_codesystem_validate_params,
+    build_conceptmap_translate_params,
+    build_valueset_expand_params,
+    build_valueset_validate_params,
+    dict_to_parameters,
+    is_parameters_resource,
+)
 from .bundle import FHIRBundle
 from .exceptions import MedplumError
 from .fhir.base import MedplumFHIRBase
 from .helpers import decode_jwt_exp, to_fhir_json
-from .types import OrgMode, PatchOperation, QueryTypes
+from .types import OrgMode, PatchOperation, QueryTypes, SummaryMode, TotalMode
 
 ResourceT = TypeVar("ResourceT", bound=MedplumFHIRBase)
 
@@ -221,6 +231,119 @@ class MedplumClient(BaseClient):
         return response
 
     @overload
+    def create_resource_if_none_exist(
+        self,
+        resource: dict[str, Any] | Any,
+        if_none_exist: str,
+        org_mode: OrgMode | None = None,
+        org_ref: str | None = None,
+        headers: dict[str, str] | None = None,
+        *,
+        as_fhir: type[ResourceT],
+    ) -> ResourceT:
+        pass
+
+    @overload
+    def create_resource_if_none_exist(
+        self,
+        resource: dict[str, Any] | Any,
+        if_none_exist: str,
+        org_mode: OrgMode | None = None,
+        org_ref: str | None = None,
+        headers: dict[str, str] | None = None,
+        *,
+        as_fhir: None = None,
+    ) -> dict[str, Any]:
+        pass
+
+    def create_resource_if_none_exist(
+        self,
+        resource: dict[str, Any] | Any,
+        if_none_exist: str,
+        org_mode: OrgMode | None = None,
+        org_ref: str | None = None,
+        headers: dict[str, str] | None = None,
+        *,
+        as_fhir: type[ResourceT] | None = None,
+    ) -> ResourceT | dict[str, Any]:
+        """Conditionally create a resource only if no matching resource exists.
+
+        Uses the FHIR conditional create pattern with the If-None-Exist header.
+        This enables idempotent resource creation - calling multiple times with
+        the same search criteria returns the same resource without duplicates.
+
+        Args:
+            resource: FHIR resource dict or Pydantic model to create
+            if_none_exist: Search query string for matching existing resources
+                (e.g., "identifier=http://example.org|12345")
+            org_mode: Override client org_mode for this request
+            org_ref: Override client org_ref for this request
+            headers: Optional HTTP headers to include in the request
+            as_fhir: Optional FHIR resource class for typed response
+
+        Returns:
+            Created or existing resource (as dict or typed model if as_fhir provided)
+
+        Note:
+            - Returns HTTP 201 Created with new resource if no match found
+            - Returns HTTP 200 OK with existing resource if exactly one match
+            - Returns HTTP 412 Precondition Failed if multiple matches exist
+
+        Examples:
+            # Create patient only if identifier doesn't exist
+            patient = client.create_resource_if_none_exist(
+                {"resourceType": "Patient", "identifier": [
+                    {"system": "http://example.org/mrn", "value": "12345"}
+                ]},
+                if_none_exist="identifier=http://example.org/mrn|12345"
+            )
+
+            # Type-safe conditional creation
+            from pymedplum.fhir import Patient
+            patient = client.create_resource_if_none_exist(
+                {"resourceType": "Patient", "identifier": [...]},
+                if_none_exist="identifier=http://example.org/mrn|12345",
+                as_fhir=Patient
+            )
+        """
+        data = to_fhir_json(resource)
+
+        data = self._inject_org_tag(data, org_mode=org_mode, org_ref=org_ref)
+
+        resource_type = data.get("resourceType")
+        if not resource_type:
+            raise ValueError("Resource must have resourceType")
+
+        # Normalize query string: handle full URLs, ?-prefixed, or plain query strings
+        if if_none_exist.startswith(("http://", "https://")):
+            # Full URL - extract just the query portion
+            parsed = urlparse(if_none_exist)
+            normalized_query = parsed.query
+        else:
+            # Plain query string - just strip leading ? if present
+            normalized_query = if_none_exist.lstrip("?")
+
+        normalized_query = normalized_query.strip()
+        if not normalized_query:
+            raise ValueError("if_none_exist query string cannot be empty")
+
+        request_headers = {"If-None-Exist": normalized_query}
+        if headers:
+            request_headers.update(headers)
+
+        response = self._request(
+            "POST",
+            f"{self.fhir_base_url}{resource_type}",
+            json=data,
+            headers=request_headers,
+        )
+
+        if as_fhir:
+            return as_fhir(**response)
+
+        return response
+
+    @overload
     def read_resource(
         self, resource_type: str, resource_id: str, as_fhir: type[ResourceT]
     ) -> ResourceT:
@@ -261,6 +384,73 @@ class MedplumClient(BaseClient):
         """
         response = self._request(
             "GET", f"{self.fhir_base_url}{resource_type}/{resource_id}", headers=headers
+        )
+
+        if as_fhir:
+            return as_fhir(**response)
+
+        return response
+
+    @overload
+    def vread_resource(
+        self,
+        resource_type: str,
+        resource_id: str,
+        version_id: str,
+        as_fhir: type[ResourceT],
+    ) -> ResourceT:
+        pass
+
+    @overload
+    def vread_resource(
+        self,
+        resource_type: str,
+        resource_id: str,
+        version_id: str,
+        as_fhir: None = None,
+    ) -> dict[str, Any]:  # type: ignore[overload-cannot-match]
+        pass
+
+    def vread_resource(
+        self,
+        resource_type: str,
+        resource_id: str,
+        version_id: str,
+        as_fhir: type[ResourceT] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> ResourceT | dict[str, Any]:
+        """Read a specific version of a FHIR resource (vread).
+
+        The vread operation retrieves a specific historical version of a resource.
+        This is useful for auditing, comparing versions, or restoring previous states.
+
+        Args:
+            resource_type: FHIR resource type (e.g., "Patient")
+            resource_id: Resource ID
+            version_id: Version ID (found in meta.versionId)
+            as_fhir: Optional FHIR resource class for typed response
+            headers: Optional HTTP headers to include in the request
+
+        Returns:
+            Typed resource if as_fhir provided, else dict
+
+        Examples:
+            # Get a specific version as dict
+            patient_v1 = client.vread_resource("Patient", "123", "1")
+
+            # Type-safe versioned read
+            from pymedplum.fhir import Patient
+            patient_v1 = client.vread_resource("Patient", "123", "1", as_fhir=Patient)
+
+            # Compare versions
+            current = client.read_resource("Patient", "123")
+            version_id = current["meta"]["versionId"]
+            previous = client.vread_resource("Patient", "123", str(int(version_id) - 1))
+        """
+        response = self._request(
+            "GET",
+            f"{self.fhir_base_url}{resource_type}/{resource_id}/_history/{version_id}",
+            headers=headers,
         )
 
         if as_fhir:
@@ -594,6 +784,232 @@ class MedplumClient(BaseClient):
 
             bundle = self._request("GET", next_url)
 
+    @overload
+    def search_with_options(
+        self,
+        resource_type: str,
+        query: QueryTypes | None = None,
+        *,
+        summary: SummaryMode | None = None,
+        elements: list[str] | None = None,
+        total: TotalMode | None = None,
+        at: str | None = None,
+        count: int | None = None,
+        offset: int | None = None,
+        sort: str | list[str] | None = None,
+        include: str | list[str] | None = None,
+        include_iterate: str | list[str] | None = None,
+        revinclude: str | list[str] | None = None,
+        revinclude_iterate: str | list[str] | None = None,
+        return_bundle: Literal[False] = False,
+        as_fhir: None = None,
+    ) -> dict[str, Any]:
+        pass
+
+    @overload
+    def search_with_options(
+        self,
+        resource_type: str,
+        query: QueryTypes | None = None,
+        *,
+        summary: SummaryMode | None = None,
+        elements: list[str] | None = None,
+        total: TotalMode | None = None,
+        at: str | None = None,
+        count: int | None = None,
+        offset: int | None = None,
+        sort: str | list[str] | None = None,
+        include: str | list[str] | None = None,
+        include_iterate: str | list[str] | None = None,
+        revinclude: str | list[str] | None = None,
+        revinclude_iterate: str | list[str] | None = None,
+        return_bundle: Literal[True] = ...,
+        as_fhir: None = None,
+    ) -> FHIRBundle[dict[str, Any]]:
+        pass
+
+    @overload
+    def search_with_options(
+        self,
+        resource_type: str,
+        query: QueryTypes | None = None,
+        *,
+        summary: SummaryMode | None = None,
+        elements: list[str] | None = None,
+        total: TotalMode | None = None,
+        at: str | None = None,
+        count: int | None = None,
+        offset: int | None = None,
+        sort: str | list[str] | None = None,
+        include: str | list[str] | None = None,
+        include_iterate: str | list[str] | None = None,
+        revinclude: str | list[str] | None = None,
+        revinclude_iterate: str | list[str] | None = None,
+        return_bundle: Literal[True] = ...,
+        as_fhir: type[ResourceT] = ...,
+    ) -> FHIRBundle[ResourceT]:
+        pass
+
+    def search_with_options(
+        self,
+        resource_type: str,
+        query: QueryTypes | None = None,
+        *,
+        summary: SummaryMode | None = None,
+        elements: list[str] | None = None,
+        total: TotalMode | None = None,
+        at: str | None = None,
+        count: int | None = None,
+        offset: int | None = None,
+        sort: str | list[str] | None = None,
+        include: str | list[str] | None = None,
+        include_iterate: str | list[str] | None = None,
+        revinclude: str | list[str] | None = None,
+        revinclude_iterate: str | list[str] | None = None,
+        return_bundle: bool = False,
+        as_fhir: type[ResourceT] | None = None,
+    ) -> FHIRBundle[ResourceT] | FHIRBundle[dict[str, Any]] | dict[str, Any]:
+        """Search for FHIR resources with explicit search parameter helpers.
+
+        This method provides named parameters for common FHIR search modifiers,
+        making it easier to construct complex queries without manually building
+        query strings.
+
+        Args:
+            resource_type: FHIR resource type to search
+            query: Base search parameters (dict, list of tuples, or query string)
+            summary: Return summary of results (_summary parameter)
+                - "true": Return only mandatory elements
+                - "text": Return text, id, meta, and top-level mandatory elements
+                - "data": Remove text element from returned resources
+                - "count": Return only count (Bundle.total), no resources
+                - "false": Return full resources (default)
+            elements: Specific elements to return (_elements parameter)
+            total: How to calculate Bundle.total (_total parameter)
+                - "none": Don't include total
+                - "estimate": Provide estimated count
+                - "accurate": Provide exact count (may be slow)
+            at: Point-in-time search - search historical versions (_at parameter)
+                Format: "2024-01-15" or "2024-01-15T10:30:00Z"
+            count: Maximum number of results per page (_count parameter)
+            offset: Starting offset for pagination (_offset parameter)
+            sort: Sort order (_sort parameter), e.g., "-date" or ["status", "-date"]
+            include: Resources to include (_include parameter)
+            include_iterate: Recursive includes (_include:iterate parameter) - follows
+                references on included resources to include additional related resources
+            revinclude: Reverse includes (_revinclude parameter)
+            revinclude_iterate: Recursive reverse includes (_revinclude:iterate parameter) -
+                follows references on reverse-included resources
+            return_bundle: If True, wrap result in FHIRBundle helper
+            as_fhir: Optional FHIR resource class for typed responses
+
+        Returns:
+            FHIRBundle wrapper or raw dict based on return_bundle parameter
+
+        Examples:
+            # Get count only (fast)
+            result = client.search_with_options(
+                "Observation",
+                {"patient": "Patient/123"},
+                summary="count"
+            )
+            print(f"Total observations: {result.get('total')}")
+
+            # Get specific elements only
+            result = client.search_with_options(
+                "Patient",
+                {"family": "Smith"},
+                elements=["id", "name", "birthDate"],
+                total="accurate"
+            )
+
+            # Point-in-time search (historical data)
+            result = client.search_with_options(
+                "Observation",
+                {"patient": "Patient/123"},
+                at="2024-01-15T00:00:00Z"
+            )
+
+            # Complex search with sorting and pagination
+            bundle = client.search_with_options(
+                "Observation",
+                {"patient": "Patient/123", "code": "29463-7"},
+                sort=["-date", "status"],
+                count=50,
+                offset=100,
+                include=["Observation:subject"],
+                return_bundle=True
+            )
+        """
+        params = self._build_query_params(query)
+
+        if summary:
+            params.append(("_summary", summary))
+
+        if elements:
+            params.append(("_elements", ",".join(elements)))
+
+        if total:
+            params.append(("_total", total))
+
+        if at:
+            params.append(("_at", at))
+
+        if count is not None:
+            params.append(("_count", str(count)))
+
+        if offset is not None:
+            params.append(("_offset", str(offset)))
+
+        if sort:
+            if isinstance(sort, list):
+                params.append(("_sort", ",".join(sort)))
+            else:
+                params.append(("_sort", sort))
+
+        if include:
+            if isinstance(include, list):
+                for inc in include:
+                    params.append(("_include", inc))
+            else:
+                params.append(("_include", include))
+
+        if include_iterate:
+            if isinstance(include_iterate, list):
+                for inc in include_iterate:
+                    params.append(("_include:iterate", inc))
+            else:
+                params.append(("_include:iterate", include_iterate))
+
+        if revinclude:
+            if isinstance(revinclude, list):
+                for rev in revinclude:
+                    params.append(("_revinclude", rev))
+            else:
+                params.append(("_revinclude", revinclude))
+
+        if revinclude_iterate:
+            if isinstance(revinclude_iterate, list):
+                for rev in revinclude_iterate:
+                    params.append(("_revinclude:iterate", rev))
+            else:
+                params.append(("_revinclude:iterate", revinclude_iterate))
+
+        response = self._request(
+            "GET", f"{self.fhir_base_url}{resource_type}", params=params
+        )
+
+        if return_bundle:
+            bundle_obj: FHIRBundle[Any] = FHIRBundle(response)
+            if as_fhir:
+                bundle_obj._resource_class = as_fhir
+            return bundle_obj
+
+        return response
+
+    # Alias for TypeScript compatibility
+    searchWithOptions = search_with_options
+
     def execute_graphql(
         self, query: str, variables: dict | None = None
     ) -> dict[str, Any]:
@@ -632,17 +1048,33 @@ class MedplumClient(BaseClient):
             org_ref: Organization reference like "Organization/ORG_A"
 
         Returns:
-            Updated resource
+            FHIR Parameters resource with operation results
+
+        Example:
+            result = client.set_accounts("Patient/123", "Organization/org-456")
+            # Returns: {"resourceType": "Parameters", "parameter": [{"name": "resourcesUpdated", "valueInteger": 1}]}
         """
         if "/" not in resource_ref:
             raise ValueError(f"Invalid resource reference: {resource_ref}")
 
         resource_type, resource_id = resource_ref.split("/", 1)
 
-        return self._request(
-            "POST",
-            f"{self.fhir_base_url}{resource_type}/{resource_id}/$set-accounts",
-            json={"account": [{"reference": org_ref}]},
+        # Build the FHIR Parameters resource as per Medplum documentation
+        params = {
+            "resourceType": "Parameters",
+            "parameter": [
+                {
+                    "name": "accounts",
+                    "valueReference": {"reference": org_ref},
+                }
+            ],
+        }
+
+        return self.execute_operation(
+            resource_type,
+            "set-accounts",
+            resource_id=resource_id,
+            params=params,
         )
 
     def get(self, path: str, **kwargs) -> dict[str, Any]:
@@ -805,8 +1237,6 @@ class MedplumClient(BaseClient):
             )
             is_valid = result["parameter"][0]["valueBoolean"]  # True
         """
-        from ._fhir_ops import build_valueset_validate_params
-
         # Build parameters using helper
         params_resource = build_valueset_validate_params(
             valueset_url=valueset_url,
@@ -819,13 +1249,12 @@ class MedplumClient(BaseClient):
             abstract=abstract,
         )
 
-        # Build endpoint
-        if valueset_id:
-            endpoint = f"{self.fhir_base_url}ValueSet/{valueset_id}/$validate-code"
-        else:
-            endpoint = f"{self.fhir_base_url}ValueSet/$validate-code"
-
-        return self._request("POST", endpoint, json=params_resource)
+        return self.execute_operation(
+            "ValueSet",
+            "validate-code",
+            resource_id=valueset_id,
+            params=params_resource,
+        )
 
     def validate_codesystem_code(
         self,
@@ -858,8 +1287,6 @@ class MedplumClient(BaseClient):
             )
             is_valid = result["parameter"][0]["valueBoolean"]  # True
         """
-        from ._fhir_ops import build_codesystem_validate_params
-
         # Build parameters using helper
         params_resource = build_codesystem_validate_params(
             codesystem_url=codesystem_url,
@@ -869,13 +1296,377 @@ class MedplumClient(BaseClient):
             version=version,
         )
 
-        # Build endpoint
-        if codesystem_id:
-            endpoint = f"{self.fhir_base_url}CodeSystem/{codesystem_id}/$validate-code"
-        else:
-            endpoint = f"{self.fhir_base_url}CodeSystem/$validate-code"
+        return self.execute_operation(
+            "CodeSystem",
+            "validate-code",
+            resource_id=codesystem_id,
+            params=params_resource,
+        )
 
-        return self._request("POST", endpoint, json=params_resource)
+    def expand_valueset(
+        self,
+        valueset_url: str | None = None,
+        valueset_id: str | None = None,
+        filter: str | None = None,
+        offset: int | None = None,
+        count: int | None = None,
+        include_designations: bool | None = None,
+        active_only: bool | None = None,
+        exclude_nested: bool | None = None,
+        exclude_not_for_ui: bool | None = None,
+        exclude_post_coordinated: bool | None = None,
+        display_language: str | None = None,
+        property: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Expand a ValueSet into its list of codes.
+
+        The $expand operation returns the full set of concepts that belong
+        to the ValueSet. This is useful for populating UI dropdowns or
+        validating codes against a value set.
+
+        Must provide either valueset_url or valueset_id.
+
+        Args:
+            valueset_url: Canonical URL of the ValueSet to expand
+            valueset_id: ID of a specific ValueSet resource
+            filter: Text filter to apply (substring match on display)
+            offset: Starting index for paging (0-based)
+            count: Maximum number of concepts to return
+            include_designations: Include code system designations
+            active_only: Only include active codes
+            exclude_nested: Exclude nested codes from expansion
+            exclude_not_for_ui: Exclude codes marked as notSelectable
+            exclude_post_coordinated: Exclude post-coordinated codes
+            display_language: Language for display text (e.g., "en", "de")
+            property: List of properties to include for each concept
+
+        Returns:
+            Expanded ValueSet resource with expansion.contains listing codes
+
+        Example:
+            # Expand a standard value set
+            result = client.expand_valueset(
+                valueset_url="http://hl7.org/fhir/ValueSet/administrative-gender"
+            )
+            for concept in result.get("expansion", {}).get("contains", []):
+                print(f"{concept['code']}: {concept['display']}")
+
+            # Expand with filtering
+            result = client.expand_valueset(
+                valueset_url="http://hl7.org/fhir/ValueSet/condition-code",
+                filter="diabetes",
+                count=10
+            )
+        """
+        params_resource = build_valueset_expand_params(
+            valueset_url=valueset_url,
+            valueset_id=valueset_id,
+            filter=filter,
+            offset=offset,
+            count=count,
+            include_designations=include_designations,
+            active_only=active_only,
+            exclude_nested=exclude_nested,
+            exclude_not_for_ui=exclude_not_for_ui,
+            exclude_post_coordinated=exclude_post_coordinated,
+            display_language=display_language,
+            property=property,
+        )
+
+        return self.execute_operation(
+            "ValueSet",
+            "expand",
+            resource_id=valueset_id,
+            params=params_resource,
+        )
+
+    def lookup_concept(
+        self,
+        code: str,
+        system: str | None = None,
+        codesystem_id: str | None = None,
+        version: str | None = None,
+        coding: dict | None = None,
+        date: str | None = None,
+        display_language: str | None = None,
+        property: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Look up details about a code in a CodeSystem.
+
+        The $lookup operation returns detailed information about a code,
+        including its display name, definition, and properties.
+
+        Args:
+            code: Code to look up
+            system: Code system URL (required if not using instance-level operation)
+            codesystem_id: ID of a specific CodeSystem resource
+            version: Specific version of the code system
+            coding: Full Coding object (alternative to code+system)
+            date: Date for which the code should be valid
+            display_language: Language for display text (e.g., "en", "de")
+            property: List of properties to return for the code
+
+        Returns:
+            Parameters resource with code details (display, definition, properties)
+
+        Example:
+            # Look up a SNOMED CT code
+            result = client.lookup_concept(
+                code="73211009",
+                system="http://snomed.info/sct"
+            )
+            # Extract display name
+            for param in result.get("parameter", []):
+                if param.get("name") == "display":
+                    print(f"Display: {param.get('valueString')}")
+
+            # Look up with specific properties
+            result = client.lookup_concept(
+                code="73211009",
+                system="http://snomed.info/sct",
+                property=["inactive", "parent"]
+            )
+        """
+        params_resource = build_codesystem_lookup_params(
+            code=code,
+            system=system,
+            codesystem_id=codesystem_id,
+            version=version,
+            coding=coding,
+            date=date,
+            display_language=display_language,
+            property=property,
+        )
+
+        return self.execute_operation(
+            "CodeSystem",
+            "lookup",
+            resource_id=codesystem_id,
+            params=params_resource,
+        )
+
+    def translate_concept(
+        self,
+        code: str | None = None,
+        system: str | None = None,
+        conceptmap_url: str | None = None,
+        conceptmap_id: str | None = None,
+        version: str | None = None,
+        source: str | None = None,
+        target: str | None = None,
+        coding: dict | None = None,
+        codeable_concept: dict | None = None,
+        target_system: str | None = None,
+        reverse: bool | None = None,
+    ) -> dict[str, Any]:
+        """Translate a code from one code system to another.
+
+        The $translate operation uses ConceptMap resources to map codes
+        between different code systems (e.g., SNOMED CT to ICD-10).
+
+        Args:
+            code: Code to translate
+            system: Code system URL of the source code
+            conceptmap_url: Canonical URL of the ConceptMap to use
+            conceptmap_id: ID of a specific ConceptMap resource
+            version: Version of the ConceptMap
+            source: Source value set URL (filter for applicable mappings)
+            target: Target value set URL (filter for applicable mappings)
+            coding: Full Coding object (alternative to code+system)
+            codeable_concept: CodeableConcept to translate
+            target_system: Target code system URL
+            reverse: Reverse the direction of the mapping
+
+        Returns:
+            Parameters resource with translation results including matches
+
+        Example:
+            # Translate using a specific ConceptMap
+            result = client.translate_concept(
+                code="73211009",
+                system="http://snomed.info/sct",
+                target_system="http://hl7.org/fhir/sid/icd-10"
+            )
+
+            # Check if translation was successful
+            for param in result.get("parameter", []):
+                if param.get("name") == "result":
+                    if param.get("valueBoolean"):
+                        print("Translation found!")
+                elif param.get("name") == "match":
+                    # Extract matched concepts
+                    for part in param.get("part", []):
+                        if part.get("name") == "concept":
+                            coding = part.get("valueCoding", {})
+                            print(f"Match: {coding.get('code')} - {coding.get('display')}")
+        """
+        params_resource = build_conceptmap_translate_params(
+            code=code,
+            system=system,
+            conceptmap_url=conceptmap_url,
+            conceptmap_id=conceptmap_id,
+            version=version,
+            source=source,
+            target=target,
+            coding=coding,
+            codeable_concept=codeable_concept,
+            target_system=target_system,
+            reverse=reverse,
+        )
+
+        return self.execute_operation(
+            "ConceptMap",
+            "translate",
+            resource_id=conceptmap_id,
+            params=params_resource,
+        )
+
+    def clone_resource(
+        self,
+        resource_type: str,
+        resource_id: str,
+    ) -> dict[str, Any]:
+        """Clone a resource using the Medplum $clone operation.
+
+        Creates a deep copy of a resource with a new ID. The cloned resource
+        will have all the same data as the original, but with a new identity.
+
+        Args:
+            resource_type: FHIR resource type (e.g., "Patient", "Questionnaire")
+            resource_id: ID of the resource to clone
+
+        Returns:
+            The cloned resource with a new ID
+
+        Example:
+            # Clone a Questionnaire for modification
+            original = client.read_resource("Questionnaire", "template-123")
+            cloned = client.clone_resource("Questionnaire", "template-123")
+            print(f"Cloned questionnaire ID: {cloned['id']}")
+
+            # Clone a Patient resource
+            cloned_patient = client.clone_resource("Patient", "patient-456")
+        """
+        return self.execute_operation(
+            resource_type,
+            "clone",
+            resource_id=resource_id,
+        )
+
+    def expunge_resource(
+        self,
+        resource_type: str,
+        resource_id: str,
+        everything: bool = False,
+    ) -> None:
+        """Permanently delete a resource using the Medplum $expunge operation.
+
+        Unlike regular delete (which is a soft delete), $expunge permanently removes
+        the resource and all its history from the database. This operation cannot
+        be undone.
+
+        Args:
+            resource_type: FHIR resource type (e.g., "Patient")
+            resource_id: ID of the resource to expunge
+            everything: If True, also expunge all resources in the resource's
+                compartment (only valid for Patient resources)
+
+        Warning:
+            This operation permanently deletes data and cannot be undone.
+            Use with extreme caution.
+
+        Example:
+            # Permanently delete a single resource
+            client.expunge_resource("Observation", "obs-123")
+
+            # Permanently delete a patient and all related resources
+            client.expunge_resource("Patient", "patient-456", everything=True)
+        """
+        url = f"{self.fhir_base_url}{resource_type}/{resource_id}/$expunge"
+        if everything:
+            url += "?everything=true"
+
+        self._request("POST", url)
+
+    def get_async_job_status(
+        self,
+        job_id: str,
+    ) -> dict[str, Any]:
+        """Get the status of an async job (BulkDataExport).
+
+        Medplum uses the BulkDataExport resource to track the status of
+        long-running operations like bulk exports. This method retrieves
+        the current status of such a job.
+
+        Args:
+            job_id: The ID of the BulkDataExport resource
+
+        Returns:
+            BulkDataExport resource with current status
+
+        Example:
+            # Start a bulk export (returns immediately with job ID)
+            # Then poll for status
+            job = client.get_async_job_status("export-job-123")
+
+            if job.get("status") == "completed":
+                # Get output files
+                for output in job.get("output", []):
+                    print(f"File: {output['url']}")
+            elif job.get("status") == "error":
+                print(f"Export failed: {job.get('error')}")
+        """
+        return self.read_resource("BulkDataExport", job_id)
+
+    def wait_for_async_job(
+        self,
+        job_id: str,
+        poll_interval: float = 1.0,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
+        """Wait for an async job to complete, polling at regular intervals.
+
+        Polls the job status until it reaches a terminal state (completed, error)
+        or until the timeout is reached.
+
+        Args:
+            job_id: The ID of the BulkDataExport resource
+            poll_interval: Seconds between status checks (default: 1.0)
+            timeout: Maximum seconds to wait (default: None = wait indefinitely)
+
+        Returns:
+            BulkDataExport resource with final status
+
+        Raises:
+            TimeoutError: If timeout is reached before job completes
+
+        Example:
+            # Wait for a bulk export to complete
+            job = client.wait_for_async_job("export-job-123", timeout=300)
+
+            if job.get("status") == "completed":
+                for output in job.get("output", []):
+                    # Download output files
+                    content = client.get(output["url"].replace(client.base_url, ""))
+        """
+        start_time = time.time()
+        terminal_statuses = {"completed", "error", "stopped"}
+
+        while True:
+            job = self.get_async_job_status(job_id)
+            status = job.get("status", "")
+
+            if status in terminal_statuses:
+                return job
+
+            if timeout is not None:
+                elapsed = time.time() - start_time
+                if elapsed >= timeout:
+                    raise TimeoutError(
+                        f"Async job {job_id} did not complete within {timeout} seconds"
+                    )
+
+            time.sleep(poll_interval)
 
     def execute_transaction(self, bundle: dict | Any) -> dict[str, Any]:
         """Execute a transaction bundle atomically.
@@ -1073,12 +1864,105 @@ class MedplumClient(BaseClient):
                 input_data={"resourceType": "Parameters", "parameter": []}
             )
         """
-        return self._request(
-            "POST",
-            f"{self.fhir_base_url}Bot/{bot_id}/$execute",
-            json=input_data,
+        return self.execute_operation(
+            resource_type="Bot",
+            operation="execute",
+            resource_id=bot_id,
+            params=input_data,
             headers={"Content-Type": content_type},
         )
+
+    def execute_operation(
+        self,
+        resource_type: str,
+        operation: str,
+        resource_id: str | None = None,
+        params: dict[str, Any] | Any | None = None,
+        headers: dict[str, str] | None = None,
+        method: Literal["GET", "POST"] = "POST",
+        wrap_params: bool = False,
+    ) -> dict[str, Any]:
+        """Execute a FHIR operation (standard or custom).
+
+        Supports both type-level operations (e.g., Patient/$match) and
+        instance-level operations (e.g., Patient/123/$everything).
+
+        Args:
+            resource_type: FHIR resource type (e.g., "Patient", "MedicationRequest")
+            operation: Operation name without $ prefix (e.g., "match", "calculate-dose")
+            resource_id: Optional resource ID for instance-level operations
+            params: Optional Parameters resource or dict to send as request body/query
+            headers: Optional additional HTTP headers for the request
+            method: HTTP method - "GET" for query params, "POST" for body (default)
+            wrap_params: If True and params is a simple dict (not Parameters),
+                auto-wrap it into a Parameters resource for POST requests
+
+        Returns:
+            Operation response (typically Parameters or resource-specific)
+
+        Note:
+            Many FHIR operations accept both GET (with query params) and POST (with
+            Parameters body). Use method="GET" for simple lookups like $lookup,
+            $expand, and $translate. Use method="POST" (default) when passing
+            complex data or when the server requires a Parameters resource.
+
+        Examples:
+            # Type-level operation with Parameters: Patient/$match
+            result = client.execute_operation(
+                "Patient",
+                "match",
+                params={
+                    "resourceType": "Parameters",
+                    "parameter": [
+                        {"name": "resource", "resource": {"resourceType": "Patient", ...}}
+                    ]
+                }
+            )
+
+            # Instance-level operation: Patient/123/$everything
+            bundle = client.execute_operation("Patient", "everything", resource_id="123")
+
+            # GET operation with query params (simpler for lookups)
+            result = client.execute_operation(
+                "CodeSystem",
+                "lookup",
+                params={"code": "12345", "system": "http://loinc.org"},
+                method="GET"
+            )
+
+            # Auto-wrap simple dict into Parameters resource
+            result = client.execute_operation(
+                "MedicationRequest",
+                "calculate-dose",
+                resource_id="med-req-456",
+                params={"weight": 70, "unit": "kg"},
+                wrap_params=True  # Converts to Parameters resource
+            )
+        """
+        # Build the URL
+        operation_name = operation.lstrip("$")  # Allow both "match" and "$match"
+        if resource_id:
+            url = f"{self.fhir_base_url}{resource_type}/{resource_id}/${operation_name}"
+        else:
+            url = f"{self.fhir_base_url}{resource_type}/${operation_name}"
+
+        if method == "GET":
+            # Convert params to query string
+            if params:
+                query_params = self._build_query_params(params)
+                return self._request("GET", url, params=query_params, headers=headers)
+            return self._request("GET", url, headers=headers)
+        else:
+            # POST with body
+            body = None
+            if params is not None:
+                body = to_fhir_json(params)
+                # Auto-wrap if requested and not already a Parameters resource
+                if wrap_params and isinstance(body, dict):
+                    if not is_parameters_resource(body):
+                        body = dict_to_parameters(body)
+
+            return self._request("POST", url, json=body, headers=headers)
 
     def deploy_bot(
         self,
@@ -1108,9 +1992,11 @@ class MedplumClient(BaseClient):
             # Deploy the bot
             result = client.deploy_bot("bot-id-here", bot_code)
         """
-        return self.post(
-            f"fhir/R4/Bot/{bot_id}/$deploy",
-            {"code": code, "filename": filename},
+        return self.execute_operation(
+            "Bot",
+            "deploy",
+            resource_id=bot_id,
+            params={"code": code, "filename": filename},
         )
 
     def save_bot_code(
@@ -1297,7 +2183,9 @@ class MedplumClient(BaseClient):
 
     # TypeScript-compatible aliases
     createResource = create_resource
+    createResourceIfNoneExist = create_resource_if_none_exist
     readResource = read_resource
+    vreadResource = vread_resource
     updateResource = update_resource
     patchResource = patch_resource
     deleteResource = delete_resource
@@ -1306,6 +2194,7 @@ class MedplumClient(BaseClient):
     executeBatch = execute_batch
     inviteUser = invite_user
     executeBot = execute_bot
+    executeOperation = execute_operation
     deployBot = deploy_bot
     saveBotCode = save_bot_code
     saveAndDeployBot = save_and_deploy_bot
@@ -1314,3 +2203,10 @@ class MedplumClient(BaseClient):
     updateBot = update_bot
     deleteBot = delete_bot
     listBots = list_bots
+    expandValueSet = expand_valueset
+    lookupConcept = lookup_concept
+    translateConcept = translate_concept
+    cloneResource = clone_resource
+    expungeResource = expunge_resource
+    getAsyncJobStatus = get_async_job_status
+    waitForAsyncJob = wait_for_async_job

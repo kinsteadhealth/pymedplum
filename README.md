@@ -14,6 +14,7 @@ This library is inspired by the official Medplum TypeScript SDK and aims to prov
 - **Advanced Search**: `_include`, `_revinclude`, chaining, modifiers, pagination, multi-valued parameters
 - **Bot Management**: Full CRUD + deployment for Medplum Bots (AWS Lambda functions)
 - **FHIR Operations**:
+  - Standard and custom FHIR operations (`execute_operation`)
   - C-CDA document export
   - Terminology validation (ValueSet and CodeSystem)
   - Transaction bundles (atomic operations)
@@ -281,6 +282,36 @@ result = client.execute_bot(
 ```
 
 See the [Bot Management](docs/bots.md) documentation for complete CRUD operations, deployment workflows, and advanced features.
+
+### FHIR Operations (Standard & Custom)
+
+```python
+# Type-level operation: Patient/$match
+result = client.execute_operation(
+    "Patient",
+    "match",
+    params={
+        "resourceType": "Parameters",
+        "parameter": [
+            {"name": "resource", "resource": {"resourceType": "Patient", "name": [{"family": "Doe"}]}}
+        ]
+    }
+)
+
+# Instance-level operation: Patient/123/$everything
+bundle = client.execute_operation("Patient", "everything", resource_id="123")
+
+# Custom Medplum operation with headers
+result = client.execute_operation(
+    "MedicationRequest",
+    "calculate-dose",  # Custom operation
+    resource_id="med-req-456",
+    params={"weight": 70, "unit": "kg"},
+    headers={"X-Custom-Header": "value"}
+)
+```
+
+**Note:** Operation names can be specified with or without the `$` prefix - both `"match"` and `"$match"` work. See [Advanced Usage](docs/advanced_usage.md#execute-fhir-operations) for GET method support and auto-wrapping parameters.
 
 ### Async/Await Support
 
