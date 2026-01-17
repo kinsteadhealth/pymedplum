@@ -91,7 +91,7 @@ async def test_async_execute_operation_everything(async_medplum_client):
             "clinicalStatus": {
                 "coding": [
                     {
-                        "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",  # noqa: E501
+                        "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
                         "code": "active",
                     }
                 ]

@@ -395,13 +395,15 @@ def test_set_accounts_operation(medplum_client, mco_setup):
         # Helper to extract organization references from meta
         def extract_org_refs(meta: dict) -> list[str]:
             """Extract organization references from meta.account or meta.accounts."""
-            org_refs = []
+            org_refs: list[str] = []
 
             # meta.accounts is a list of Reference objects
             accounts_list = meta.get("accounts", [])
-            for acc in accounts_list:
-                if isinstance(acc, dict) and "reference" in acc:
-                    org_refs.append(acc["reference"])
+            org_refs.extend(
+                acc["reference"]
+                for acc in accounts_list
+                if isinstance(acc, dict) and "reference" in acc
+            )
 
             # meta.account can be a single Reference object (not a list)
             account_obj = meta.get("account")

@@ -267,8 +267,7 @@ def build_valueset_expand_params(
         params.append({"name": "displayLanguage", "valueCode": display_language})
 
     if property:
-        for prop in property:
-            params.append({"name": "property", "valueString": prop})
+        params.extend({"name": "property", "valueString": prop} for prop in property)
 
     return {"resourceType": "Parameters", "parameter": params}
 
@@ -321,8 +320,7 @@ def build_codesystem_lookup_params(
         params.append({"name": "displayLanguage", "valueCode": display_language})
 
     if property:
-        for prop in property:
-            params.append({"name": "property", "valueCode": prop})
+        params.extend({"name": "property", "valueCode": prop} for prop in property)
 
     return {"resourceType": "Parameters", "parameter": params}
 

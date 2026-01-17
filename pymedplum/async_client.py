@@ -1873,9 +1873,12 @@ class AsyncMedplumClient(BaseClient):
             if params is not None:
                 body = to_fhir_json(params)
                 # Auto-wrap if requested and not already a Parameters resource
-                if wrap_params and isinstance(body, dict):
-                    if not is_parameters_resource(body):
-                        body = dict_to_parameters(body)
+                if (
+                    wrap_params
+                    and isinstance(body, dict)
+                    and not is_parameters_resource(body)
+                ):
+                    body = dict_to_parameters(body)
 
             return await self._request("POST", url, json=body, headers=headers)
 
