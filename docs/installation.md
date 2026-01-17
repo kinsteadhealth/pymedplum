@@ -16,7 +16,7 @@ If you are contributing to `pymedplum`, you will need to install the package in 
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-org/pymedplum.git
+    git clone https://github.com/kinsteadhealth/pymedplum.git
     cd pymedplum
     ```
 

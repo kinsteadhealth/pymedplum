@@ -223,7 +223,7 @@ bundle = client.search_resources("Patient", {
 })
 ```
 
-See [Advanced Search](advanced_usage.md#advanced-fhir-search) for more examples.
+See [Advanced Search](advanced/search.md) for more examples.
 
 ### Q: Search returns too many/few results
 
@@ -425,7 +425,7 @@ with client.on_behalf_of(membership_id) as obo_client:
     result = obo_client.read_resource("Questionnaire", "456")
 ```
 
-See [On-Behalf-Of Operations](advanced_usage.md#on-behalf-of-operations) for details.
+See [On-Behalf-Of](advanced/on_behalf_of.md) for details.
 
 ### Q: How do I access admin APIs?
 
@@ -442,11 +442,11 @@ membership = client.invite_user(
 )
 ```
 
-See [Administrative Features](advanced_usage.md#administrative-features) for more examples.
+See [Administration](advanced/admin.md) for more examples.
 
 ## Still Need Help?
 
 - Check the [API Reference](api_reference.md) for detailed method documentation
 - Review [Advanced Usage](advanced_usage.md) for complex scenarios
 - Consult the [FHIR Specification](https://hl7.org/fhir/) for FHIR-specific questions
-- Open an issue on [GitHub](https://github.com/medplum/pymedplum) for bugs or feature requests
+- Open an issue on [GitHub](https://github.com/kinsteadhealth/pymedplum) for bugs or feature requests
