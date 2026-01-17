@@ -11,40 +11,25 @@ This library allows you to:
 
 ---
 
-```{toctree}
-:maxdepth: 2
-:caption: 'Getting Started'
+## Start here
 
-installation.md
-quickstart.md
-```
+- [Installation](installation.md)
+- [Quickstart](quickstart.md)
 
-```{toctree}
-:maxdepth: 2
-:caption: 'Core Concepts'
+## Core concepts
 
-fhir_models.md
-client_design.md
-```
+- [FHIR Models](fhir_models.md)
+- [Client Design](client_design.md)
 
-```{toctree}
-:maxdepth: 2
-:caption: 'Guides'
+## Advanced
 
-advanced_usage.md
-```
+- [Advanced Usage (overview)](advanced_usage.md)
 
-```{toctree}
-:maxdepth: 2
-:caption: 'API Reference'
+## Reference
 
-api_reference.md
-utils.md
-```
+- [Client API Reference](api_reference.md)
+- [Utility Functions](utils.md)
 
-```{toctree}
-:maxdepth: 2
-:caption: 'Help'
+## Help
 
-faq.md
-```
+- [FAQ & Troubleshooting](faq.md)

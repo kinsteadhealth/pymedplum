@@ -4,6 +4,12 @@ from typing import Any, Literal, TypedDict
 QueryTypes = str | dict[str, Any] | list[tuple]
 OrgMode = Literal["accounts", "extension"]
 
+# Search result summary modes per FHIR spec
+SummaryMode = Literal["true", "text", "data", "count", "false"]
+
+# Search total count modes per FHIR spec
+TotalMode = Literal["none", "estimate", "accurate"]
+
 DEFAULT_ORG_EXTENSION_URL = "https://medplum.com/fhir/StructureDefinition/organization"
 
 

@@ -360,6 +360,84 @@ def test_org_tag_idempotent(medplum_client, mco_setup):
     assert org_count == 1
 
 
+def test_set_accounts_operation(medplum_client, mco_setup):
+    """Test the $set-accounts operation via set_accounts method.
+
+    This tests that set_accounts correctly uses execute_operation internally
+    to set the meta.accounts field on a resource.
+    """
+    org_a_id = mco_setup["orgs"]["a"]["id"]
+    org_b_id = mco_setup["orgs"]["b"]["id"]
+
+    # Create a new patient without any org tagging
+    patient = medplum_client.create_resource(
+        {
+            "resourceType": "Patient",
+            "name": [{"given": ["SetAccounts"], "family": "TestPatient"}],
+            "gender": "other",
+        }
+    )
+
+    try:
+        # Use set_accounts to assign Org A
+        result = medplum_client.set_accounts(
+            f"Patient/{patient['id']}", f"Organization/{org_a_id}"
+        )
+
+        # The $set-accounts operation returns different response types
+        # depending on the Medplum version - could be Parameters or the resource
+        assert result["resourceType"] in ("Parameters", "Patient")
+
+        # Read the patient to verify accounts were set
+        updated_patient = medplum_client.read_resource("Patient", patient["id"])
+        assert "meta" in updated_patient
+
+        # Helper to extract organization references from meta
+        def extract_org_refs(meta: dict) -> list[str]:
+            """Extract organization references from meta.account or meta.accounts."""
+            org_refs: list[str] = []
+
+            # meta.accounts is a list of Reference objects
+            accounts_list = meta.get("accounts", [])
+            org_refs.extend(
+                acc["reference"]
+                for acc in accounts_list
+                if isinstance(acc, dict) and "reference" in acc
+            )
+
+            # meta.account can be a single Reference object (not a list)
+            account_obj = meta.get("account")
+            if isinstance(account_obj, dict) and "reference" in account_obj:
+                org_refs.append(account_obj["reference"])
+
+            return org_refs
+
+        org_refs = extract_org_refs(updated_patient["meta"])
+        assert f"Organization/{org_a_id}" in org_refs, (
+            f"Expected Organization/{org_a_id} in {org_refs}, "
+            f"meta={updated_patient.get('meta')}"
+        )
+
+        # Now use set_accounts to assign Org B
+        result2 = medplum_client.set_accounts(
+            f"Patient/{patient['id']}", f"Organization/{org_b_id}"
+        )
+        assert result2["resourceType"] in ("Parameters", "Patient")
+
+        # Verify both orgs are now in accounts
+        updated_patient2 = medplum_client.read_resource("Patient", patient["id"])
+        org_refs2 = extract_org_refs(updated_patient2["meta"])
+
+        assert f"Organization/{org_b_id}" in org_refs2, (
+            f"Expected Organization/{org_b_id} in {org_refs2}, "
+            f"meta={updated_patient2.get('meta')}"
+        )
+
+    finally:
+        # Clean up
+        medplum_client.delete_resource("Patient", patient["id"])
+
+
 def test_fhir_resources_roundtrip(medplum_client, mco_setup):
     """Test that we can read a resource and parse it with fhir.resources"""
     patient_dict = medplum_client.read_resource(

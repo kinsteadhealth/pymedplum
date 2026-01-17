@@ -6,7 +6,7 @@ site_description: >-
   synchronous and asynchronous operations, multi-tenancy, and comprehensive
   FHIR resource management.
 
-repo_url: https://github.com/yourusername/pymedplum
+repo_url: https://github.com/kinsteadhealth/pymedplum
 repo_name: pymedplum
 
 theme:
@@ -21,26 +21,27 @@ nav:
   - Home: index.md
   - Getting Started:
       - Installation: installation.md
-      - Quick Start: quickstart.md
-  - User Guide:
-      - Basic Usage: usage/basic.md
-      - Async Client: usage/async.md
-      - Multi-Tenancy: usage/multi-tenancy.md
-      - On-Behalf-Of: usage/on-behalf-of.md
-      - GraphQL: usage/graphql.md
-      - Batch Operations: usage/batch.md
+      - Quickstart: quickstart.md
+  - Core Concepts:
+      - FHIR Models: fhir_models.md
+      - Client Design: client_design.md
+  - Guides:
+      - Advanced Usage (Overview): advanced_usage.md
+      - Advanced Search: advanced/search.md
+      - Conditional Create: advanced/conditional_create.md
+      - CRUD & Concurrency: advanced/crud.md
+      - FHIR Operations & Terminology: advanced/operations.md
+      - Transactions & Batch Bundles: advanced/bundles.md
+      - Binary & DocumentReference: advanced/binary_and_documents.md
+      - GraphQL: advanced/graphql.md
+      - On-Behalf-Of: advanced/on_behalf_of.md
+      - Administration: advanced/admin.md
+      - Bot Management: bots.md
   - API Reference:
-      - Client: api/client.md
-      - Async Client: api/async-client.md
-      - Helper Functions: api/helpers.md
-      - Types: api/types.md
-      - Exceptions: api/exceptions.md
-  - Advanced Topics:
-      - Project Administration: advanced/admin.md
-      - Access Policies: advanced/access-policies.md
-      - Bot Execution: advanced/bots.md
-  - Contributing: contributing.md
-  - Changelog: changelog.md
+      - Client API Reference: api_reference.md
+      - Utility Functions: utils.md
+  - Help:
+      - FAQ & Troubleshooting: faq.md
 
 markdown_extensions:
   - admonition

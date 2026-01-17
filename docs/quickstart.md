@@ -28,11 +28,11 @@ new_patient = Patient(
     birth_date="1990-05-20"
 )
 
-# Pass the model directly to the client
-created_patient = client.create_resource(new_patient)
+# Pass the model directly to the client and get a typed response
+created_patient = client.create_resource(new_patient, as_fhir=Patient)
 
 print(f"Created patient {created_patient.id} for {created_patient.name[0].given[0]}")
-assert isinstance(created_patient, Patient)
+assert isinstance(created_patient, Patient)  # as_fhir=Patient ensures static type checkers treat this as a Patient
 ```
 The client accepts the model instance and returns a new instance representing the resource as it was stored on the server, now including its server-assigned `id`.
 

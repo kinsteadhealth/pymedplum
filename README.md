@@ -1,33 +1,22 @@
-# PyMedplum: The Unofficial Python SDK for Medplum
+# PyMedplum: Unofficial Python SDK for Medplum
 
-PyMedplum is a Python client for the Medplum open-source, headless EHR. It provides a convenient and easy-to-use interface for interacting with a Medplum server, allowing developers to build healthcare applications in Python.
+PyMedplum is a Python client for the Medplum headless EHR / FHIR platform. It focuses on a Pythonic API with strong typing (Pydantic models) while keeping full access to the underlying FHIR REST surface.
 
-This library is inspired by the official Medplum TypeScript SDK and aims to provide a similar developer experience for Python developers.
+If you like the official Medplum TypeScript SDK experience, this aims to feel familiar in Python.
 
-## Features
+## The heavy hitters
 
-- **Authentication**: Client credentials with automatic token refresh
-- **Auto-Authentication**: On-behalf-of operations automatically authenticate when needed
-- **Type Safety**: 209 generated Pydantic models from Medplum's TypeScript definitions
-- **CRUD Operations**: Create, read, update, delete with optional type-safe responses
-- **Optimistic Locking**: Prevent concurrent modification conflicts with HTTP `If-Match` headers
-- **Advanced Search**: `_include`, `_revinclude`, chaining, modifiers, pagination, multi-valued parameters
-- **Bot Management**: Full CRUD + deployment for Medplum Bots (AWS Lambda functions)
-- **FHIR Operations**:
-  - C-CDA document export
-  - Terminology validation (ValueSet and CodeSystem)
-  - Transaction bundles (atomic operations)
-  - Batch bundles (independent operations)
-  - Binary file upload/download
-  - DocumentReference creation
-- **Lazy Loading**: FHIR models are loaded on-demand for fast startup times (~50ms for first import vs. 3-5s for all).
-- **Thread-Safe**: Lazy loading is fully thread-safe and tested against experimental "no-GIL" builds of Python.
-- **GraphQL**: Execute GraphQL queries
-- **On-Behalf-Of**: Perform operations as another user/ProjectMembership
-- **Async Support**: `AsyncMedplumClient` for `asyncio` applications with full CRUD parity
-- **Error Handling**: Specific exceptions (401, 403, 404, 412, 429, 500, etc.)
-- **FHIR Helpers**: Parse references, extract identifiers, get display names
-- **Medplum Extensions**: Full support for Bot, Project, AccessPolicy, etc.
+- **Auth + refresh**: Client credentials flow with automatic token refresh
+- **Typed models (Pydantic v2)**: Auto-generated FHIR models with IDE autocomplete
+- **CRUD + patching**: Create/read/update/delete + JSON Patch
+- **Safe concurrency**: Optimistic locking via `If-Match`
+- **Real-world search**: `_include`, `_revinclude`, chaining, modifiers, paging
+- **FHIR operations**: `execute_operation` + terminology helpers + C-CDA export
+- **Bundles**: Transactions (atomic) and batch bundles (independent)
+- **Binary + DocumentReference**: Upload/download and clinical document linking
+- **GraphQL**: GraphQL query execution
+- **On-behalf-of (OBO)**: Act as a `ProjectMembership` (sync + async context managers)
+- **Bot management**: CRUD + deploy + execute Medplum Bots
 
 ## Installation
 
@@ -66,7 +55,7 @@ pip install pymedplum
 ```python
 from pymedplum import MedplumClient
 
-# Create client - authentication happens automatically!
+# Create client
 client = MedplumClient(
     client_id="YOUR_CLIENT_ID",
     client_secret="YOUR_CLIENT_SECRET",
@@ -91,7 +80,7 @@ patient["active"] = True
 updated = client.update_resource(patient)
 ```
 
-## Showcase: What You Can Do
+## Showcase: common workflows
 
 ### Type-Safe FHIR Models
 
@@ -282,6 +271,36 @@ result = client.execute_bot(
 
 See the [Bot Management](docs/bots.md) documentation for complete CRUD operations, deployment workflows, and advanced features.
 
+### FHIR Operations (Standard & Custom)
+
+```python
+# Type-level operation: Patient/$match
+result = client.execute_operation(
+    "Patient",
+    "match",
+    params={
+        "resourceType": "Parameters",
+        "parameter": [
+            {"name": "resource", "resource": {"resourceType": "Patient", "name": [{"family": "Doe"}]}}
+        ]
+    }
+)
+
+# Instance-level operation: Patient/123/$everything
+bundle = client.execute_operation("Patient", "everything", resource_id="123")
+
+# Custom Medplum operation with headers
+result = client.execute_operation(
+    "MedicationRequest",
+    "calculate-dose",  # Custom operation
+    resource_id="med-req-456",
+    params={"weight": 70, "unit": "kg"},
+    headers={"X-Custom-Header": "value"}
+)
+```
+
+**Note:** Operation names can be specified with or without the `$` prefix - both `"match"` and `"$match"` work. See [FHIR Operations & Terminology](docs/advanced/operations.md) for GET method support and auto-wrapping parameters.
+
 ### Async/Await Support
 
 ```python
@@ -377,15 +396,15 @@ display = get_code_display(concept)
 
 ## Documentation
 
-For complete documentation, see:
+Docs live in the repository under [`docs/`](docs/index.md).
 
-- **[Installation Guide](docs/installation.md)** - Detailed setup instructions
-- **[Quickstart](docs/quickstart.md)** - Get up and running quickly
-- **[Advanced Usage](docs/advanced_usage.md)** - Advanced search, FHIR operations, bundles, binaries
-- **[Bot Management](docs/bots.md)** - Create, deploy, and execute Medplum Bots
-- **[API Reference](docs/api_reference.md)** - Complete API documentation
-- **[FHIR Models](docs/fhir_models.md)** - Type-safe FHIR model usage
-- **[FAQ](docs/faq.md)** - Frequently asked questions
+Start here:
+
+- **[Quickstart](docs/quickstart.md)**
+- **[API Reference](docs/api_reference.md)**
+- **[Advanced Usage (overview)](docs/advanced_usage.md)**
+- **[Bot Management](docs/bots.md)**
+- **[FAQ](docs/faq.md)**
 
 ## Contributing
 
