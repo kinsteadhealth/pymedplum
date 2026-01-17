@@ -1048,11 +1048,13 @@ class MedplumClient(BaseClient):
             org_ref: Organization reference like "Organization/ORG_A"
 
         Returns:
-            FHIR Parameters resource with operation results
+            FHIR Parameters or Patient resource with operation results
+            (response type depends on Medplum server version).
 
         Example:
             result = client.set_accounts("Patient/123", "Organization/org-456")
-            # Returns: {"resourceType": "Parameters", "parameter": [{"name": "resourcesUpdated", "valueInteger": 1}]}
+            # Example response (Parameters variant):
+            # {"resourceType": "Parameters", "parameter": [{"name": "resourcesUpdated", "valueInteger": 1}]}
         """
         if "/" not in resource_ref:
             raise ValueError(f"Invalid resource reference: {resource_ref}")
@@ -1768,9 +1770,13 @@ class MedplumClient(BaseClient):
         # Request raw binary content using Accept: */*
         # This is FHIR-compliant and more efficient than fetching the resource
         # and decoding base64 (Medplum correctly implements this per FHIR spec)
+        # Use _get_headers() to ensure token refresh and on-behalf-of handling
+        headers = self._get_headers()
+        headers["Accept"] = "*/*"
+        headers.pop("Content-Type", None)  # Not needed for GET
         response = self._http.get(
             f"{self.fhir_base_url}Binary/{binary_id}",
-            headers={"Accept": "*/*", "Authorization": f"Bearer {self.access_token}"},
+            headers=headers,
         )
         if response.status_code >= 400:
             from ._base import _raise_or_json

@@ -70,14 +70,30 @@ def dict_to_parameters(params: dict[str, Any]) -> dict[str, Any]:
             for item in value:
                 if isinstance(item, str):
                     parameter_list.append({"name": name, "valueString": item})
-                elif isinstance(item, dict) and "resourceType" in item:
-                    parameter_list.append({"name": name, "resource": item})
-                else:
-                    import json
+                elif isinstance(item, dict):
+                    if "resourceType" in item:
+                        # It's a FHIR resource
+                        parameter_list.append({"name": name, "resource": item})
+                    elif "system" in item and "code" in item:
+                        # It's a Coding
+                        parameter_list.append({"name": name, "valueCoding": item})
+                    elif "reference" in item:
+                        # It's a Reference
+                        parameter_list.append({"name": name, "valueReference": item})
+                    else:
+                        import json
 
-                    parameter_list.append(
-                        {"name": name, "valueString": json.dumps(item)}
-                    )
+                        parameter_list.append(
+                            {"name": name, "valueString": json.dumps(item)}
+                        )
+                elif isinstance(item, bool):
+                    parameter_list.append({"name": name, "valueBoolean": item})
+                elif isinstance(item, int):
+                    parameter_list.append({"name": name, "valueInteger": item})
+                elif isinstance(item, float):
+                    parameter_list.append({"name": name, "valueDecimal": item})
+                else:
+                    parameter_list.append({"name": name, "valueString": str(item)})
             continue  # Already added to list
         else:
             # Fallback: convert to string

@@ -1689,9 +1689,13 @@ class AsyncMedplumClient(BaseClient):
         # Request raw binary content using Accept: */*
         # This is FHIR-compliant and more efficient than fetching the resource
         # and decoding base64 (Medplum correctly implements this per FHIR spec)
+        # Use _get_headers() to ensure token refresh and on-behalf-of handling
+        headers = self._get_headers()
+        headers["Accept"] = "*/*"
+        headers.pop("Content-Type", None)  # Not needed for GET
         response = await self._http.get(
             f"{self.fhir_base_url}Binary/{binary_id}",
-            headers={"Accept": "*/*", "Authorization": f"Bearer {self.access_token}"},
+            headers=headers,
         )
         if response.status_code >= 400:
             from ._base import _raise_or_json

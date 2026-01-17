@@ -1620,10 +1620,9 @@ def test_sync_set_access_token(medplum_credentials):
     auth_client.close()
 
     # Create a new client without credentials and set the token
-    token_client = MedplumClient()
-    token_client.set_access_token(token)
+    with MedplumClient() as token_client:
+        token_client.set_access_token(token)
 
-    try:
         # Verify the client can make authenticated requests
         result = token_client.search_resources("Patient", {"_count": "1"})
         assert result["resourceType"] == "Bundle"
@@ -1632,8 +1631,6 @@ def test_sync_set_access_token(medplum_credentials):
         assert token_client.access_token == token
         # token_expires_at should be set from JWT
         assert token_client.token_expires_at is not None
-    finally:
-        token_client.close()
 
 
 def test_sync_client_with_access_token_in_constructor(medplum_credentials):
@@ -1649,9 +1646,7 @@ def test_sync_client_with_access_token_in_constructor(medplum_credentials):
     auth_client.close()
 
     # Create a new client directly with the access_token
-    token_client = MedplumClient(access_token=token)
-
-    try:
+    with MedplumClient(access_token=token) as token_client:
         # Verify the client can make authenticated requests
         result = token_client.search_resources("Patient", {"_count": "1"})
         assert result["resourceType"] == "Bundle"
@@ -1659,8 +1654,6 @@ def test_sync_client_with_access_token_in_constructor(medplum_credentials):
         # Verify the token and expiry were set
         assert token_client.access_token == token
         assert token_client.token_expires_at is not None
-    finally:
-        token_client.close()
 
 
 @pytest.mark.asyncio
@@ -1736,16 +1729,13 @@ def test_sync_set_access_token_with_explicit_expiry(medplum_credentials):
     auth_client.close()
 
     # Create a new client and set token with explicit expiry
-    token_client = MedplumClient()
-    custom_expiry = datetime.now(timezone.utc) + timedelta(hours=1)
-    token_client.set_access_token(token, expires_at=custom_expiry)
+    with MedplumClient() as token_client:
+        custom_expiry = datetime.now(timezone.utc) + timedelta(hours=1)
+        token_client.set_access_token(token, expires_at=custom_expiry)
 
-    try:
         # Verify the client can make authenticated requests
         result = token_client.search_resources("Patient", {"_count": "1"})
         assert result["resourceType"] == "Bundle"
 
         # Verify the custom expiry was used (not JWT-decoded one)
         assert token_client.token_expires_at == custom_expiry
-    finally:
-        token_client.close()
