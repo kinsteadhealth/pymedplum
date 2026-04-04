@@ -116,24 +116,30 @@ class TestAnnotateResponse:
 
 class TestValidateResource:
     def test_valid_patient_passes(self):
-        _validate_resource({
-            "resourceType": "Patient",
-            "name": [{"given": ["Alice"], "family": "Smith"}],
-        })
+        _validate_resource(
+            {
+                "resourceType": "Patient",
+                "name": [{"given": ["Alice"], "family": "Smith"}],
+            }
+        )
 
     def test_invalid_gender_raises(self):
         with pytest.raises(ValueError, match="FHIR Patient validation failed"):
-            _validate_resource({
-                "resourceType": "Patient",
-                "gender": "invalid_value",
-            })
+            _validate_resource(
+                {
+                    "resourceType": "Patient",
+                    "gender": "invalid_value",
+                }
+            )
 
     def test_error_includes_schema_hint(self):
         with pytest.raises(ValueError, match="get_resource_schema"):
-            _validate_resource({
-                "resourceType": "Patient",
-                "birthDate": 12345,
-            })
+            _validate_resource(
+                {
+                    "resourceType": "Patient",
+                    "birthDate": 12345,
+                }
+            )
 
     def test_unknown_type_passes_silently(self):
         _validate_resource({"resourceType": "UnknownType", "foo": "bar"})
@@ -157,9 +163,7 @@ class TestValidateOnBehalfOf:
         assert result == "ProjectMembership/550e8400-e29b-41d4-a716-446655440000"
 
     def test_strips_whitespace(self):
-        result = _validate_on_behalf_of(
-            "  550e8400-e29b-41d4-a716-446655440000  "
-        )
+        result = _validate_on_behalf_of("  550e8400-e29b-41d4-a716-446655440000  ")
         assert result == "ProjectMembership/550e8400-e29b-41d4-a716-446655440000"
 
     def test_case_insensitive_uuid(self):
@@ -302,22 +306,25 @@ class TestReadOnlyEnforcement:
 
     @pytest.mark.asyncio
     async def test_create_blocked_in_read_only(self):
-        with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}), pytest.raises(
-            PermissionError, match="read-only mode"
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            pytest.raises(PermissionError, match="read-only mode"),
         ):
             await create_resource({"resourceType": "Patient"})
 
     @pytest.mark.asyncio
     async def test_update_blocked_in_read_only(self):
-        with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}), pytest.raises(
-            PermissionError, match="read-only mode"
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            pytest.raises(PermissionError, match="read-only mode"),
         ):
             await update_resource({"resourceType": "Patient", "id": "123"})
 
     @pytest.mark.asyncio
     async def test_conditional_create_blocked_in_read_only(self):
-        with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}), pytest.raises(
-            PermissionError, match="read-only mode"
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            pytest.raises(PermissionError, match="read-only mode"),
         ):
             await create_resource_if_none_exist(
                 {"resourceType": "Patient"},
@@ -333,15 +340,17 @@ class TestReadOnlyEnforcement:
 
     @pytest.mark.asyncio
     async def test_delete_blocked_in_read_only(self):
-        with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}), pytest.raises(
-            PermissionError, match="read-only mode"
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            pytest.raises(PermissionError, match="read-only mode"),
         ):
             await delete_resource("Patient", "123")
 
     @pytest.mark.asyncio
     async def test_execute_bot_blocked_in_read_only(self):
-        with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}), pytest.raises(
-            PermissionError, match="read-only mode"
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            pytest.raises(PermissionError, match="read-only mode"),
         ):
             await execute_bot(
                 "bot-123", {"resourceType": "Parameters", "parameter": []}
@@ -349,22 +358,25 @@ class TestReadOnlyEnforcement:
 
     @pytest.mark.asyncio
     async def test_create_bot_blocked_in_read_only(self):
-        with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}), pytest.raises(
-            PermissionError, match="read-only mode"
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            pytest.raises(PermissionError, match="read-only mode"),
         ):
             await create_bot("Test Bot")
 
     @pytest.mark.asyncio
     async def test_save_and_deploy_bot_blocked_in_read_only(self):
-        with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}), pytest.raises(
-            PermissionError, match="read-only mode"
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            pytest.raises(PermissionError, match="read-only mode"),
         ):
             await save_and_deploy_bot("bot-123", "source", "compiled")
 
     @pytest.mark.asyncio
     async def test_execute_operation_blocks_unknown_ops(self):
-        with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}), pytest.raises(
-            PermissionError, match="read-only allowlist"
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            pytest.raises(PermissionError, match="read-only allowlist"),
         ):
             await execute_operation("Patient", "some-write-op")
 
@@ -378,8 +390,9 @@ class TestReadOnlyEnforcement:
         async def fake_obo(obo=None):
             yield mock_client
 
-        with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}), patch.object(
-            srv, "_with_obo", fake_obo
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch.object(srv, "_with_obo", fake_obo),
         ):
             result = await execute_operation(
                 "Patient", "everything", resource_id="123", method="GET"
@@ -400,14 +413,18 @@ class TestReadOnlyEnforcement:
     async def test_batch_allows_gets_in_read_only(self):
         """GET-only batch should pass read-only check, not PermissionError."""
         mock_client = AsyncMock()
-        mock_client.execute_batch.return_value = {"resourceType": "Bundle", "type": "batch-response"}
+        mock_client.execute_batch.return_value = {
+            "resourceType": "Bundle",
+            "type": "batch-response",
+        }
 
         @asynccontextmanager
         async def fake_obo(obo=None):
             yield mock_client
 
-        with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}), patch.object(
-            srv, "_with_obo", fake_obo
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch.object(srv, "_with_obo", fake_obo),
         ):
             bundle = BundleInput(
                 type="batch",
@@ -420,14 +437,18 @@ class TestReadOnlyEnforcement:
     async def test_transaction_allows_gets_in_read_only(self):
         """GET-only transaction should also pass read-only check."""
         mock_client = AsyncMock()
-        mock_client.execute_transaction.return_value = {"resourceType": "Bundle", "type": "transaction-response"}
+        mock_client.execute_transaction.return_value = {
+            "resourceType": "Bundle",
+            "type": "transaction-response",
+        }
 
         @asynccontextmanager
         async def fake_obo(obo=None):
             yield mock_client
 
-        with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}), patch.object(
-            srv, "_with_obo", fake_obo
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch.object(srv, "_with_obo", fake_obo),
         ):
             bundle = BundleInput(
                 type="transaction",
@@ -466,19 +487,23 @@ class TestInputValidation:
     @pytest.mark.asyncio
     async def test_create_validates_resource_against_model(self):
         with pytest.raises(ValueError, match="FHIR Patient validation failed"):
-            await create_resource({
-                "resourceType": "Patient",
-                "gender": "invalid",
-            })
+            await create_resource(
+                {
+                    "resourceType": "Patient",
+                    "gender": "invalid",
+                }
+            )
 
     @pytest.mark.asyncio
     async def test_update_validates_resource_against_model(self):
         with pytest.raises(ValueError, match="FHIR Patient validation failed"):
-            await update_resource({
-                "resourceType": "Patient",
-                "id": "123",
-                "gender": "invalid",
-            })
+            await update_resource(
+                {
+                    "resourceType": "Patient",
+                    "id": "123",
+                    "gender": "invalid",
+                }
+            )
 
 
 class TestCrudToolsWithMockedClient:
@@ -500,7 +525,9 @@ class TestCrudToolsWithMockedClient:
     @pytest.mark.asyncio
     async def test_read_resource(self, mock_client):
         mock_client.read_resource.return_value = {
-            "resourceType": "Patient", "id": "123", "name": [{"family": "Smith"}]
+            "resourceType": "Patient",
+            "id": "123",
+            "name": [{"family": "Smith"}],
         }
         result = await read_resource("Patient", "123")
         mock_client.read_resource.assert_awaited_once_with("Patient", "123")
@@ -509,9 +536,7 @@ class TestCrudToolsWithMockedClient:
 
     @pytest.mark.asyncio
     async def test_search_one_found(self, mock_client):
-        mock_client.search_one.return_value = {
-            "resourceType": "Patient", "id": "456"
-        }
+        mock_client.search_one.return_value = {"resourceType": "Patient", "id": "456"}
         result = await search_one("Patient", {"family": "Smith"})
         assert result["id"] == "456"
         assert result["_response_type"] == "Patient"
@@ -525,7 +550,10 @@ class TestCrudToolsWithMockedClient:
     @pytest.mark.asyncio
     async def test_search_resources_empty_hint(self, mock_client):
         mock_client.search_with_options.return_value = {
-            "resourceType": "Bundle", "type": "searchset", "total": 0, "entry": []
+            "resourceType": "Bundle",
+            "type": "searchset",
+            "total": 0,
+            "entry": [],
         }
         result = await search_resources("Patient", {"family": "Nobody"})
         assert "_hint" in result
@@ -534,8 +562,10 @@ class TestCrudToolsWithMockedClient:
     @pytest.mark.asyncio
     async def test_search_resources_with_results(self, mock_client):
         mock_client.search_with_options.return_value = {
-            "resourceType": "Bundle", "type": "searchset", "total": 1,
-            "entry": [{"resource": {"resourceType": "Patient", "id": "1"}}]
+            "resourceType": "Bundle",
+            "type": "searchset",
+            "total": 1,
+            "entry": [{"resource": {"resourceType": "Patient", "id": "1"}}],
         }
         result = await search_resources("Patient")
         assert "_hint" not in result
@@ -544,7 +574,8 @@ class TestCrudToolsWithMockedClient:
     @pytest.mark.asyncio
     async def test_create_resource(self, mock_client):
         mock_client.create_resource.return_value = {
-            "resourceType": "Patient", "id": "new-id"
+            "resourceType": "Patient",
+            "id": "new-id",
         }
         result = await create_resource({"resourceType": "Patient"})
         assert result["id"] == "new-id"
@@ -552,7 +583,8 @@ class TestCrudToolsWithMockedClient:
     @pytest.mark.asyncio
     async def test_create_resource_if_none_exist(self, mock_client):
         mock_client.create_resource_if_none_exist.return_value = {
-            "resourceType": "Patient", "id": "existing-or-new-id"
+            "resourceType": "Patient",
+            "id": "existing-or-new-id",
         }
         result = await create_resource_if_none_exist(
             {"resourceType": "Patient"},
@@ -567,26 +599,26 @@ class TestCrudToolsWithMockedClient:
     @pytest.mark.asyncio
     async def test_update_resource_with_version_diff(self, mock_client):
         mock_client.update_resource.return_value = {
-            "resourceType": "Patient", "id": "123",
-            "meta": {"versionId": "2"}
+            "resourceType": "Patient",
+            "id": "123",
+            "meta": {"versionId": "2"},
         }
-        result = await update_resource({
-            "resourceType": "Patient", "id": "123",
-            "meta": {"versionId": "1"}
-        })
+        result = await update_resource(
+            {"resourceType": "Patient", "id": "123", "meta": {"versionId": "1"}}
+        )
         assert result["_update_info"]["previous_version"] == "1"
         assert result["_update_info"]["new_version"] == "2"
 
     @pytest.mark.asyncio
     async def test_update_resource_no_version_change(self, mock_client):
         mock_client.update_resource.return_value = {
-            "resourceType": "Patient", "id": "123",
-            "meta": {"versionId": "1"}
+            "resourceType": "Patient",
+            "id": "123",
+            "meta": {"versionId": "1"},
         }
-        result = await update_resource({
-            "resourceType": "Patient", "id": "123",
-            "meta": {"versionId": "1"}
-        })
+        result = await update_resource(
+            {"resourceType": "Patient", "id": "123", "meta": {"versionId": "1"}}
+        )
         assert "_update_info" not in result
 
     @pytest.mark.asyncio
@@ -600,7 +632,9 @@ class TestCrudToolsWithMockedClient:
     @pytest.mark.asyncio
     async def test_patch_resource(self, mock_client):
         mock_client.patch_resource.return_value = {
-            "resourceType": "Patient", "id": "123", "active": False
+            "resourceType": "Patient",
+            "id": "123",
+            "active": False,
         }
         ops = [PatchOp(op="replace", path="/active", value=False)]
         result = await patch_resource("Patient", "123", ops)

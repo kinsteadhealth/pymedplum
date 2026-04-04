@@ -46,6 +46,7 @@ except ImportError as exc:
 
         def tool(self, *_args: Any, **_kwargs: Any):
             """Return a no-op decorator when MCP extras are unavailable."""
+
             def decorator(func):
                 return func
 
@@ -53,6 +54,7 @@ except ImportError as exc:
 
         def resource(self, *_args: Any, **_kwargs: Any):
             """Return a no-op decorator when MCP extras are unavailable."""
+
             def decorator(func):
                 return func
 
