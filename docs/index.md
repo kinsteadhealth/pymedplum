@@ -8,6 +8,7 @@ This library allows you to:
 - Search for FHIR resources using powerful query parameters.
 - Execute GraphQL queries for complex data retrieval.
 - Work with fully-typed Pydantic models for all FHIR resources, providing excellent editor support and data validation.
+- Run an optional MCP server for agent-based workflows.
 
 ---
 
@@ -15,6 +16,7 @@ This library allows you to:
 
 - [Installation](installation.md)
 - [Quickstart](quickstart.md)
+- [MCP Server](mcp.md)
 
 ## Core concepts
 
@@ -24,6 +26,7 @@ This library allows you to:
 ## Advanced
 
 - [Advanced Usage (overview)](advanced_usage.md)
+- [MCP Server](mcp.md)
 
 ## Reference
 

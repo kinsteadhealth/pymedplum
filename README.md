@@ -17,8 +17,26 @@ If you like the official Medplum TypeScript SDK experience, this aims to feel fa
 - **GraphQL**: GraphQL query execution
 - **On-behalf-of (OBO)**: Act as a `ProjectMembership` (sync + async context managers)
 - **Bot management**: CRUD + deploy + execute Medplum Bots
+- **MCP server**: Optional Model Context Protocol server for agent workflows
 
 ## Installation
+
+```bash
+pip install pymedplum
+```
+
+With MCP support:
+
+```bash
+pip install "pymedplum[mcp]"
+```
+
+With `uv`:
+
+```bash
+uv add pymedplum
+uv add "pymedplum[mcp]"
+```
 
 ### From AWS CodeArtifact (Internal)
 
@@ -79,6 +97,32 @@ patients = client.search_resources("Patient", {"family": "Doe"})
 patient["active"] = True
 updated = client.update_resource(patient)
 ```
+
+## MCP Server
+
+Run the MCP server with:
+
+```bash
+uvx --from "pymedplum[mcp]" pymedplum-mcp
+```
+
+Required environment variables:
+
+```bash
+export MEDPLUM_CLIENT_ID="your-client-id"
+export MEDPLUM_CLIENT_SECRET="your-client-secret"
+```
+
+Optional environment variables:
+
+```bash
+export MEDPLUM_BASE_URL="https://api.medplum.com/"
+export MEDPLUM_FHIR_URL_PATH="fhir/R4/"
+export MEDPLUM_ON_BEHALF_OF="ProjectMembership/00000000-0000-0000-0000-000000000000"
+export MEDPLUM_READ_ONLY="true"
+```
+
+For Claude Code, Codex, and `mcp.json` setup examples, see [docs/mcp.md](docs/mcp.md).
 
 ## Showcase: common workflows
 
