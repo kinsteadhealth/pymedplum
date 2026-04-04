@@ -34,7 +34,7 @@ from pymedplum.types import (  # noqa: TC001 — runtime use by FastMCP schema g
 _MCP_IMPORT_ERROR: ImportError | None = None
 
 try:
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 except ImportError as exc:
     _MCP_IMPORT_ERROR = exc
 
@@ -111,7 +111,7 @@ def _collect_refs(obj: Any, refs: set[str]) -> None:
             _collect_refs(v, refs)
 
 
-def _get_fhir_model(resource_type: str) -> type | None:
+def _get_fhir_model(resource_type: str) -> type[BaseModel] | None:
     """Look up a Pydantic FHIR model class by name from the registry.
 
     Returns None if the type is not found (rather than raising),
