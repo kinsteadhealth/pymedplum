@@ -395,10 +395,12 @@ async def _with_obo(on_behalf_of: str | None = None):
     on_behalf_of context (overriding the default). Otherwise yields the
     base client (which may have its own default from MEDPLUM_ON_BEHALF_OF).
     """
+    # Validate before hitting _get_client so bad input fails fast
+    # (even without server credentials configured).
+    if on_behalf_of is not None:
+        ref = _validate_on_behalf_of(on_behalf_of)
     client = await _get_client()
     if on_behalf_of is not None:
-        # Explicit (even empty) — validate so misconfiguration fails loudly.
-        ref = _validate_on_behalf_of(on_behalf_of)
         async with client.on_behalf_of(ref) as obo_client:
             yield obo_client
     else:
