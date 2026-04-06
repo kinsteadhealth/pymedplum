@@ -22,7 +22,7 @@ from collections import Counter
 from contextlib import asynccontextmanager
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from pymedplum import AsyncMedplumClient
 from pymedplum.fhir import REGISTRY as FHIR_REGISTRY
@@ -70,7 +70,14 @@ except ImportError as exc:
 
 
 class PatchOp(BaseModel):
-    """A single JSON Patch operation (RFC 6902)."""
+    """A single JSON Patch operation (RFC 6902).
+
+    Note: `value` is serialized with `exclude_unset=True` so an explicit
+    `value=None` is preserved (valid JSON Patch) and distinguished from
+    "value omitted".
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     op: Literal["add", "remove", "replace", "copy", "move", "test"] = Field(
         description='The operation type: "add", "remove", "replace", "copy", "move", or "test"'
@@ -78,10 +85,34 @@ class PatchOp(BaseModel):
     path: str = Field(
         description='JSON pointer to the target field, e.g. "/active" or "/name/0/family"'
     )
-    value: Any | None = Field(
+    value: Any = Field(
         default=None,
-        description="The value to apply (required for add, replace, test)",
+        description=(
+            "The value to apply (required for add, replace, test). "
+            "May be explicitly null."
+        ),
     )
+    from_: str | None = Field(
+        default=None,
+        alias="from",
+        description=(
+            'JSON pointer to the source location (required for "copy" and "move"). '
+            'Serialized as "from" per RFC 6902.'
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _check_op_requirements(self) -> PatchOp:
+        if self.op in ("copy", "move") and not self.from_:
+            msg = f"JSON Patch '{self.op}' operation requires a 'from' field."
+            raise ValueError(msg)
+        if (
+            self.op in ("add", "replace", "test")
+            and "value" not in self.model_fields_set
+        ):
+            msg = f"JSON Patch '{self.op}' operation requires a 'value' field."
+            raise ValueError(msg)
+        return self
 
 
 class BundleInput(BaseModel):
@@ -111,18 +142,27 @@ def _collect_refs(obj: Any, refs: set[str]) -> None:
             _collect_refs(v, refs)
 
 
+_MODEL_CACHE: dict[str, type[BaseModel] | None] = {}
+
+
 def _get_fhir_model(resource_type: str) -> type[BaseModel] | None:
     """Look up a Pydantic FHIR model class by name from the registry.
 
     Returns None if the type is not found (rather than raising),
     so callers can decide whether to hard-fail or fall through.
+    Results are cached to avoid repeated imports/attribute lookups.
     """
+    if resource_type in _MODEL_CACHE:
+        return _MODEL_CACHE[resource_type]
     if resource_type not in FHIR_REGISTRY:
+        _MODEL_CACHE[resource_type] = None
         return None
     # Triggers lazy loading of the model
     from pymedplum import fhir
 
-    return getattr(fhir, resource_type, None)
+    model = getattr(fhir, resource_type, None)
+    _MODEL_CACHE[resource_type] = model
+    return model
 
 
 def _annotate_response(result: dict[str, Any]) -> dict[str, Any]:
@@ -249,14 +289,50 @@ mcp = FastMCP(
     "Medplum FHIR Server",
     lifespan=_lifespan,
     instructions=(
-        "MCP server for interacting with a Medplum FHIR server. "
-        "Provides tools for CRUD operations on any FHIR resource type, "
-        "advanced search with FHIR search parameters, terminology operations "
-        "(ValueSet, CodeSystem, ConceptMap), and generic FHIR operation execution. "
-        "All tools accept standard FHIR resource types like Patient, Observation, "
-        "Condition, MedicationRequest, etc. "
-        "Prefer read and search tools first. Use create, update, patch, and "
-        "delete only when explicitly requested by the user."
+        "MCP server for a Medplum FHIR server. "
+        #
+        # Discovery workflow
+        "Workflow: use get_resource_schema to learn a resource type's fields "
+        "(also useful for nested types like Reference, CodeableConcept, "
+        "Identifier, HumanName). Use get_resource_capabilities to discover "
+        "likely supported search parameters — note that the CapabilityStatement "
+        "describes what the server advertises, but actual support may vary; "
+        "if a search fails, inspect the error and adjust. "
+        #
+        # Searching
+        "For searching: prefer targeted queries over broad retrieval. "
+        "search_one only when uniqueness is guaranteed by a stable identifier "
+        "— do not assume uniqueness from names or demographics alone. "
+        "search_resources for paginated results. "
+        "search_all_resources only when the result set is known to be small "
+        "or tightly constrained — clinical data types like Observation, "
+        "AuditEvent, and Encounter grow very large. "
+        "Prefer normal FHIR search/read over execute_graphql unless GraphQL "
+        "is clearly better for shaping a multi-hop read. "
+        #
+        # Identity safety
+        "For Patient, Practitioner, RelatedPerson, and Organization, prefer "
+        "identifier-based lookup over name-based matching. "
+        #
+        # Writes
+        "Read before write: before patch_resource, update_resource, or "
+        "delete_resource, read the resource first unless the exact resource "
+        "ID and intended change are already unambiguous. "
+        "For writes: prefer create_resource_if_none_exist (with stable "
+        "business identifiers in if_none_exist) over create_resource to "
+        "avoid duplicates. Use patch_resource for partial field changes, "
+        "update_resource only when replacing the full resource. "
+        #
+        # Terminology
+        "Terminology tools (validate_code, expand_valueset, lookup_concept, "
+        "translate_concept) wrap standard FHIR terminology operations. "
+        "execute_operation is the escape hatch for any FHIR $operation not "
+        "covered by a dedicated tool. "
+        #
+        # Safety
+        "Inspect first, modify only when asked. Use write tools only when "
+        "explicitly requested by the user. Bot execution and deployment are "
+        "high-impact operations — only run them when the user explicitly asks."
     ),
 )
 
@@ -320,7 +396,8 @@ async def _with_obo(on_behalf_of: str | None = None):
     base client (which may have its own default from MEDPLUM_ON_BEHALF_OF).
     """
     client = await _get_client()
-    if on_behalf_of:
+    if on_behalf_of is not None:
+        # Explicit (even empty) — validate so misconfiguration fails loudly.
         ref = _validate_on_behalf_of(on_behalf_of)
         async with client.on_behalf_of(ref) as obo_client:
             yield obo_client
@@ -338,19 +415,20 @@ async def get_resource_schema(
     resource_type: str,
     include_nested: bool = False,
 ) -> dict[str, Any]:
-    """Get the Pydantic JSON schema for a FHIR resource or data type.
+    """Get the JSON schema for a FHIR resource or data type — field names,
+    types, enums, descriptions, and constraints.
 
-    Returns the full field definitions with descriptions, types, enums,
-    and constraints for any FHIR R4 resource type or data type (including
-    Medplum-specific types like Bot, Project, ProjectMembership).
+    Use this before create_resource or update_resource to understand what
+    fields a resource type expects. Works for FHIR R4 resource types (e.g.,
+    Patient, Observation), data types (e.g., HumanName, CodeableConcept),
+    and Medplum-specific types (e.g., Bot, ProjectMembership).
 
-    Use this before creating or updating resources to understand
-    exactly what fields are available and their expected formats.
+    For search parameters (what to pass to search_resources), use
+    get_resource_capabilities instead.
 
-    By default, nested type definitions ($defs) are stripped to keep the
-    response compact. The schema will still show $ref pointers indicating
-    which child types are used — call this tool again with those type
-    names to see their schemas.
+    By default, nested type definitions ($defs) are stripped for
+    compactness. The schema still shows $ref pointers — call this tool
+    again with those type names to drill into child types.
 
     Args:
         resource_type: FHIR type name, e.g., "Patient", "Observation",
@@ -439,18 +517,28 @@ async def search_resources(
     total: TotalMode | None = None,
     on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
-    """Search for FHIR resources with standard FHIR search parameters.
+    """Search for FHIR resources. Returns one page of results in a Bundle.
 
-    Use get_resource_capabilities first to discover valid search parameters
-    for a resource type if you're unsure what parameters are available.
+    If you don't know valid search parameters for a resource type, call
+    get_resource_capabilities(resource_type) first.
+
+    Use search_one instead when you expect exactly one result.
+    Use search_all_resources when you need every match across all pages
+    (warning: can return very large result sets).
 
     Args:
         resource_type: FHIR resource type to search (e.g., "Patient",
             "Observation", "Condition")
-        params: FHIR search parameters as key-value pairs.
-            Examples: {"family": "Smith"}, {"patient": "Patient/123", "code": "29463-7"},
-            {"status": "active", "date": "ge2024-01-01"}
-        count: Maximum number of results to return per page (default: server default)
+        params: FHIR search parameters as key-value pairs. Values are
+            strings. Use FHIR prefixes for comparisons (e.g., "ge", "le").
+            Use modifiers in the key (e.g., "family:exact").
+            List values become repeated params (OR semantics).
+            E.g. {"family": "Smith"},
+            {"patient": "Patient/123", "code": "29463-7"},
+            {"status": "active", "date": "ge2024-01-01"},
+            {"status": ["active", "completed"]} for OR search,
+            {"family:exact": "Smith"} for modifier
+        count: Maximum results per page (default: server default, usually 20)
         offset: Starting offset for pagination (0-based)
         sort: Sort order, e.g., "-date" (descending) or "name" (ascending).
             Use comma-separated for multiple: "-date,status"
@@ -500,13 +588,22 @@ async def search_one(
 ) -> dict[str, Any] | None:
     """Search for a single FHIR resource, returning it directly (not in a Bundle).
 
-    Convenience tool for when you expect exactly one result. Returns the
-    resource directly instead of wrapping it in a Bundle, or null if not found.
+    Uses _count=1 internally and returns the first match, or null if none
+    found. If multiple resources could match, only the first is returned
+    with no warning — use search_resources if you need to verify uniqueness.
+
+    Only use this when the query is expected to be unique by a stable
+    identifier or other strong uniqueness constraint. Do not assume
+    uniqueness from names or demographics alone — in healthcare, near-
+    matches are common and grabbing the first result silently can be
+    dangerous.
 
     Args:
         resource_type: FHIR resource type to search (e.g., "Patient")
         params: FHIR search parameters as key-value pairs.
-            Examples: {"identifier": "12345"}, {"family": "Smith", "given": "Alice"}
+            Examples: {"identifier": "http://example.org|12345"},
+            {"family": "Smith", "given": "Alice"} (use with caution —
+            may match multiple)
         on_behalf_of: Optional ProjectMembership ID to execute as
 
     Returns:
@@ -530,7 +627,26 @@ async def search_all_resources(
     params: dict[str, Any] | None = None,
     on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
-    """Search across all pages and return a flattened Bundle of resources."""
+    """Search across ALL pages and return every match in a single Bundle.
+
+    Automatically follows pagination links until exhausted. Avoid unless
+    the result set is known to be small or tightly constrained. Clinical
+    data types like Observation, AuditEvent, Communication, Encounter,
+    DiagnosticReport, and Provenance grow very large — an unconstrained
+    search can return thousands of resources and blow through context.
+
+    Prefer search_resources with count/offset for paginated browsing.
+
+    Args:
+        resource_type: FHIR resource type to search
+        params: FHIR search parameters as key-value pairs. Should be
+            tightly constrained (e.g., scoped to a single patient +
+            date range + category)
+        on_behalf_of: Optional ProjectMembership ID to execute as
+
+    Returns:
+        Bundle with all matching resources flattened into entries
+    """
     async with _with_obo(on_behalf_of) as client:
         resources = [
             resource
@@ -567,7 +683,11 @@ async def create_resource(
 ) -> dict[str, Any]:
     """Create a new FHIR resource on the Medplum server.
 
-    The resource must include a "resourceType" field.
+    If the resource should be unique (e.g., by identifier), prefer
+    create_resource_if_none_exist to avoid duplicates.
+
+    Use get_resource_schema(resource_type) to see valid fields before
+    constructing the resource.
 
     Args:
         resource: Complete FHIR resource as a JSON object. Must include
@@ -603,9 +723,27 @@ async def create_resource_if_none_exist(
 ) -> dict[str, Any]:
     """Create a FHIR resource only if no matching resource already exists.
 
-    This uses FHIR conditional create via the If-None-Exist header. It is
-    safer for agents than a search-then-create sequence because the server
-    performs the existence check atomically.
+    Uses FHIR conditional create (If-None-Exist header). The server checks
+    atomically — safer than a search-then-create sequence. If a match is
+    found, returns the existing resource without creating a duplicate.
+
+    Prefer this over create_resource when the resource should be unique
+    (e.g., a Patient with a specific identifier).
+
+    Args:
+        resource: FHIR resource dict with "resourceType". Same format as
+            create_resource.
+        if_none_exist: Search query string (same syntax as search params,
+            without a leading "?"). The server searches for existing matches
+            using this query before creating. Use stable business identifiers
+            whenever possible — loose demographic matching (name, DOB) can
+            match too broadly or too narrowly.
+            Good: "identifier=http://example.org|12345"
+            Risky: "name=Smith&birthdate=2000-01-01"
+        on_behalf_of: Optional ProjectMembership ID to execute as
+
+    Returns:
+        The created or existing resource
     """
     _check_write_allowed()
     if "resourceType" not in resource:
@@ -629,11 +767,13 @@ async def update_resource(
     resource: dict[str, Any],
     on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
-    """Update (replace) an existing FHIR resource on the Medplum server.
+    """Replace an existing FHIR resource on the Medplum server (HTTP PUT).
 
-    The resource must include both "resourceType" and "id" fields.
-    This performs a full replacement (HTTP PUT), not a partial update.
-    Use patch_resource for partial updates.
+    This is a full replacement — omitted fields may be cleared. Do not
+    construct the resource from memory. Always read the current resource
+    first with read_resource, modify the needed fields, then pass the
+    complete object here. For changing specific fields without sending
+    the full resource, use patch_resource instead.
 
     Args:
         resource: Complete FHIR resource with "resourceType" and "id".
@@ -681,9 +821,18 @@ async def patch_resource(
 ) -> dict[str, Any]:
     """Apply JSON Patch operations to a FHIR resource on the Medplum server.
 
-    This performs a partial update using JSON Patch (RFC 6902).
-    Useful when you only need to change specific fields without
-    sending the entire resource.
+    Partial update using JSON Patch (RFC 6902). Preferred over
+    update_resource when you only need to change specific fields.
+
+    For complex nested arrays (name, telecom, identifier, address),
+    read the resource first to determine correct array indices — blindly
+    patching by index can target the wrong element.
+
+    JSON Pointer examples:
+        "/active" — root boolean field
+        "/name/0/family" — first name entry, family field
+        "/telecom/1/value" — second telecom entry, value
+        "/identifier/-" — append to identifier array
 
     Args:
         resource_type: FHIR resource type (e.g., "Patient")
@@ -699,7 +848,7 @@ async def patch_resource(
         msg = "At least one patch operation is required."
         raise ValueError(msg)
 
-    raw_ops = [op.model_dump(exclude_none=True) for op in operations]
+    raw_ops = [op.model_dump(exclude_unset=True, by_alias=True) for op in operations]
     async with _with_obo(on_behalf_of) as client:
         result = await client.patch_resource(resource_type, resource_id, raw_ops)
     return _annotate_response(result)
@@ -750,23 +899,36 @@ async def delete_resource(
 async def get_resource_capabilities(
     resource_type: str | None = None,
 ) -> dict[str, Any]:
-    """Get the FHIR server's CapabilityStatement or details for a resource type.
+    """Discover likely supported search parameters and operations for a resource type.
 
-    Use this to discover what search parameters, operations, and interactions
-    are available for a given resource type. Call without arguments to get
-    the full server CapabilityStatement.
+    Almost always pass resource_type — the full CapabilityStatement is very
+    large and rarely useful. The filtered response shows searchParam names,
+    supported interactions, and available operations for that type.
+
+    Note: the CapabilityStatement describes what the server advertises, but
+    actual support for modifiers, chained search, composite params, and
+    custom operations may vary. If a search using an advertised param fails,
+    inspect the error and adjust.
+
+    Use this before search_resources if you're unsure what search parameters
+    exist. For field definitions (what to pass to create/update), use
+    get_resource_schema instead.
 
     Args:
-        resource_type: Optional FHIR resource type to filter capabilities for.
-            If provided, returns only the capabilities for that resource type.
-            If omitted, returns the full CapabilityStatement.
+        resource_type: FHIR resource type to get capabilities for (e.g.,
+            "Patient", "Observation"). Strongly recommended. If omitted,
+            returns the full CapabilityStatement (very large).
 
     Returns:
-        CapabilityStatement or filtered resource capabilities
+        Resource capability details (searchParam, interaction, operation),
+        or full CapabilityStatement if resource_type is omitted
     """
+    # Intentionally uses the raw client: /metadata is unauthenticated server
+    # metadata and has no meaningful on_behalf_of semantics.
     client = await _get_client()
     fhir_url_path = os.getenv("MEDPLUM_FHIR_URL_PATH", "fhir/R4/")
-    result = await client.get(f"{fhir_url_path}metadata")
+    normalized_path = f"{fhir_url_path.strip('/')}/" if fhir_url_path.strip("/") else ""
+    result = await client.get(f"{normalized_path}metadata")
 
     if resource_type and isinstance(result, dict):
         rest_blocks = result.get("rest", [])
@@ -800,8 +962,10 @@ async def get_patient_everything(
     resources: Conditions, Observations, MedicationRequests, Encounters,
     AllergyIntolerances, Procedures, and more.
 
-    This is the most common way to get a complete clinical picture
-    for a single patient.
+    Useful for exploring a patient's chart or building a clinical summary.
+    Can be expensive and return a large result set for patients with long
+    histories. For targeted retrieval (e.g., recent labs, active
+    medications), prefer search_resources scoped to the patient instead.
 
     Args:
         patient_id: The Patient resource ID
@@ -839,6 +1003,7 @@ async def validate_code(
     valueset_url: str | None = None,
     valueset_id: str | None = None,
     display: str | None = None,
+    on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
     """Check if a code belongs to a ValueSet.
 
@@ -853,19 +1018,20 @@ async def validate_code(
         valueset_url: Canonical URL of the ValueSet to check against
         valueset_id: ID of a specific ValueSet resource (alternative to URL)
         display: Optional display text to validate alongside the code
+        on_behalf_of: Optional ProjectMembership ID to execute as
 
     Returns:
         Parameters resource indicating if the code is valid, with
         result (boolean) and optional display text
     """
-    client = await _get_client()
-    return await client.validate_valueset_code(
-        valueset_url=valueset_url,
-        valueset_id=valueset_id,
-        code=code,
-        system=system,
-        display=display,
-    )
+    async with _with_obo(on_behalf_of) as client:
+        return await client.validate_valueset_code(
+            valueset_url=valueset_url,
+            valueset_id=valueset_id,
+            code=code,
+            system=system,
+            display=display,
+        )
 
 
 @mcp.tool(
@@ -880,16 +1046,38 @@ async def validate_codesystem_code(
     codesystem_id: str | None = None,
     coding: dict[str, Any] | None = None,
     version: str | None = None,
+    on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
-    """Check if a code exists in a CodeSystem."""
-    client = await _get_client()
-    return await client.validate_codesystem_code(
-        codesystem_url=codesystem_url,
-        codesystem_id=codesystem_id,
-        code=code,
-        coding=coding,
-        version=version,
-    )
+    """Check if a code exists in a CodeSystem (not a ValueSet).
+
+    Unlike validate_code which checks ValueSet membership, this checks
+    whether a code is defined in a CodeSystem itself.
+
+    Provide either (code + codesystem_url) or (coding) to identify
+    what to validate.
+
+    Args:
+        code: The code to validate (e.g., "12345")
+        codesystem_url: CodeSystem canonical URL (e.g., "http://loinc.org")
+        codesystem_id: ID of a specific CodeSystem resource (alternative
+            to codesystem_url)
+        coding: A FHIR Coding object as a dict, e.g.,
+            {"system": "http://loinc.org", "code": "12345"}. Alternative
+            to passing code + codesystem_url separately.
+        version: Specific CodeSystem version to validate against
+        on_behalf_of: Optional ProjectMembership ID to execute as
+
+    Returns:
+        Parameters resource with result (boolean) and display
+    """
+    async with _with_obo(on_behalf_of) as client:
+        return await client.validate_codesystem_code(
+            codesystem_url=codesystem_url,
+            codesystem_id=codesystem_id,
+            code=code,
+            coding=coding,
+            version=version,
+        )
 
 
 @mcp.tool(
@@ -905,6 +1093,7 @@ async def expand_valueset(
     count: int | None = None,
     offset: int | None = None,
     active_only: bool | None = None,
+    on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
     """Expand a ValueSet to list all its codes.
 
@@ -921,19 +1110,20 @@ async def expand_valueset(
         count: Maximum number of concepts to return
         offset: Starting offset for pagination
         active_only: If true, only include active codes
+        on_behalf_of: Optional ProjectMembership ID to execute as
 
     Returns:
         ValueSet resource with expansion containing matching codes
     """
-    client = await _get_client()
-    return await client.expand_valueset(
-        valueset_url=valueset_url,
-        valueset_id=valueset_id,
-        filter=filter,
-        count=count,
-        offset=offset,
-        active_only=active_only,
-    )
+    async with _with_obo(on_behalf_of) as client:
+        return await client.expand_valueset(
+            valueset_url=valueset_url,
+            valueset_id=valueset_id,
+            filter=filter,
+            count=count,
+            offset=offset,
+            active_only=active_only,
+        )
 
 
 @mcp.tool(
@@ -948,6 +1138,7 @@ async def lookup_concept(
     codesystem_id: str | None = None,
     display_language: str | None = None,
     property: list[str] | None = None,
+    on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
     """Look up details about a code in a CodeSystem.
 
@@ -962,18 +1153,19 @@ async def lookup_concept(
         codesystem_id: ID of a specific CodeSystem resource
         display_language: Preferred language for display text (e.g., "en")
         property: List of properties to include in the response
+        on_behalf_of: Optional ProjectMembership ID to execute as
 
     Returns:
         Parameters resource with code details (display, definition, properties)
     """
-    client = await _get_client()
-    return await client.lookup_concept(
-        code=code,
-        system=system,
-        codesystem_id=codesystem_id,
-        display_language=display_language,
-        property=property,
-    )
+    async with _with_obo(on_behalf_of) as client:
+        return await client.lookup_concept(
+            code=code,
+            system=system,
+            codesystem_id=codesystem_id,
+            display_language=display_language,
+            property=property,
+        )
 
 
 @mcp.tool(
@@ -989,6 +1181,7 @@ async def translate_concept(
     conceptmap_url: str | None = None,
     conceptmap_id: str | None = None,
     reverse: bool | None = None,
+    on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
     """Translate a code from one code system to another.
 
@@ -1003,24 +1196,27 @@ async def translate_concept(
         conceptmap_url: Canonical URL of a specific ConceptMap to use
         conceptmap_id: ID of a specific ConceptMap resource
         reverse: If true, reverse the mapping direction
+        on_behalf_of: Optional ProjectMembership ID to execute as
 
     Returns:
         Parameters resource with translation matches
     """
-    client = await _get_client()
-    return await client.translate_concept(
-        code=code,
-        system=system,
-        target_system=target_system,
-        conceptmap_url=conceptmap_url,
-        conceptmap_id=conceptmap_id,
-        reverse=reverse,
-    )
+    async with _with_obo(on_behalf_of) as client:
+        return await client.translate_concept(
+            code=code,
+            system=system,
+            target_system=target_system,
+            conceptmap_url=conceptmap_url,
+            conceptmap_id=conceptmap_id,
+            reverse=reverse,
+        )
 
 
 @mcp.tool(
     annotations={
         "title": "Execute FHIR Operation",
+        "readOnlyHint": False,
+        "destructiveHint": True,
     }
 )
 async def execute_operation(
@@ -1031,25 +1227,34 @@ async def execute_operation(
     method: Literal["GET", "POST"] = "POST",
     on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
-    """Execute a FHIR operation (standard or custom) on the Medplum server.
+    """Execute a FHIR $operation not covered by a dedicated tool.
 
-    Supports type-level operations (e.g., Patient/$match) and
-    instance-level operations (e.g., Patient/123/$everything).
+    Escape hatch for any standard or custom FHIR operation. Prefer the
+    dedicated tools when they exist:
+    - Patient $everything → get_patient_everything
+    - ValueSet $validate-code → validate_code
+    - CodeSystem $validate-code → validate_codesystem_code
+    - CodeSystem $lookup → lookup_concept
+    - ValueSet $expand → expand_valueset
+    - ConceptMap $translate → translate_concept
 
-    In read-only mode, only known read-only operations are allowed
-    (e.g., $everything, $validate-code, $lookup, $expand, $translate).
+    Supports type-level (e.g., Patient/$match) and instance-level
+    (e.g., Patient/123/$everything) operations.
 
-    Common operations:
-    - Patient/$everything: Get all data for a patient
-    - ValueSet/$validate-code: Validate a code (prefer validate_code tool)
-    - CodeSystem/$lookup: Look up a code (prefer lookup_concept tool)
+    In read-only mode, only known read-only operations are allowed.
 
     Args:
         resource_type: FHIR resource type (e.g., "Patient")
         operation: Operation name without $ prefix (e.g., "everything", "match")
         resource_id: Resource ID for instance-level operations
-        params: Parameters to pass to the operation
-        method: HTTP method
+        params: Key-value dict. For POST, automatically wrapped into a FHIR
+            Parameters resource (works for simple scalar params like
+            {"weight": 70, "unit": "kg"}). For operations needing nested
+            Parameters, resources, or repeated parts, pass the full FHIR
+            Parameters structure directly. For GET, converted to query
+            parameters
+        method: HTTP method — use GET for simple lookups, POST (default)
+            for complex params
         on_behalf_of: Optional ProjectMembership ID to execute as
 
     Returns:
@@ -1090,10 +1295,10 @@ async def execute_graphql(
 ) -> dict[str, Any]:
     """Execute a FHIR GraphQL query against the Medplum server.
 
-    Medplum's GraphQL endpoint is read-only (queries only, no mutations).
-    GraphQL provides a flexible way to query FHIR data, especially
-    when you need to traverse resource references or fetch specific
-    fields across multiple resource types in a single request.
+    Prefer normal FHIR search/read unless GraphQL is clearly better —
+    e.g., traversing resource references or fetching specific fields
+    across multiple resource types in a single request. Medplum's
+    GraphQL endpoint is read-only (queries only, no mutations).
 
     Args:
         query: GraphQL query string. Example:
@@ -1104,6 +1309,12 @@ async def execute_graphql(
     Returns:
         GraphQL response
     """
+    if _is_read_only() and re.search(r"\bmutation\b", query, re.IGNORECASE):
+        msg = (
+            "GraphQL mutations are blocked in read-only mode (MEDPLUM_READ_ONLY=true)."
+        )
+        raise PermissionError(msg)
+
     async with _with_obo(on_behalf_of) as client:
         result = await client.execute_graphql(query, variables)
     return _annotate_response(result)
@@ -1119,13 +1330,16 @@ async def export_ccda(
     patient_id: str,
     on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
-    """Export a patient's history as a C-CDA XML document."""
+    """Export a patient's clinical history as a C-CDA (Consolidated CDA) XML document.
+
+    C-CDA is a standard clinical document format used for health information
+    exchange. Returns the raw XML string in a wrapper dict.
+    """
     async with _with_obo(on_behalf_of) as client:
         ccda_xml = await client.export_ccda(patient_id)
     return {
-        "resourceType": "Binary",
-        "contentType": "application/xml",
         "format": "ccda",
+        "contentType": "application/xml",
         "patientId": patient_id,
         "data": ccda_xml,
     }
@@ -1144,7 +1358,16 @@ async def execute_bot(
     content_type: str = "application/json",
     on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
-    """Execute a Medplum Bot with the provided input data."""
+    """Execute a deployed Medplum Bot, passing input_data as its trigger payload.
+
+    HIGH-IMPACT: Bots are arbitrary server-side code that can read, write,
+    and delete FHIR resources, send communications, and trigger other
+    workflows. Only execute a bot when the user explicitly asks, and only
+    when you know what the bot does.
+
+    The bot must already be deployed via save_and_deploy_bot. The bot's
+    code receives input_data and can read/write FHIR resources on the server.
+    """
     _check_write_allowed()
     async with _with_obo(on_behalf_of) as client:
         result = await client.execute_bot(bot_id, input_data, content_type=content_type)
@@ -1166,15 +1389,33 @@ async def create_bot(
     additional_fields: dict[str, Any] | None = None,
     on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
-    """Create a Medplum Bot resource with agent-friendly defaults."""
+    """Create a Medplum Bot (server-side JavaScript/TypeScript function).
+
+    Bots are Medplum-specific resources that execute code on the server.
+    You must set runtime_version for the bot to be executable:
+    - "awslambda": runs on AWS Lambda (most common, required for production)
+    - "vmcontext": runs in a VM sandbox (useful for development/testing)
+
+    After creating a bot, use save_and_deploy_bot to upload and deploy code.
+    """
     _check_write_allowed()
+    extras = dict(additional_fields or {})
+    # Prevent silent overrides of explicit arguments via additional_fields.
+    reserved = {"name", "description", "source_code", "runtime_version"}
+    collisions = reserved & extras.keys()
+    if collisions:
+        msg = (
+            f"additional_fields cannot override explicit arguments: "
+            f"{sorted(collisions)}. Pass these via their named parameters."
+        )
+        raise ValueError(msg)
     async with _with_obo(on_behalf_of) as client:
         result = await client.create_bot(
             name=name,
             description=description,
             source_code=source_code,
             runtime_version=runtime_version,
-            **(additional_fields or {}),
+            **extras,
         )
     return _annotate_response(result)
 
@@ -1193,7 +1434,18 @@ async def save_and_deploy_bot(
     filename: str = "index.js",
     on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
-    """Save bot source code and deploy compiled code in one step."""
+    """Save bot source code and deploy compiled code in one step.
+
+    HIGH-IMPACT: Deployment replaces the live bot code immediately. Only
+    deploy when the user explicitly asks to create or update bot code.
+
+    Both `source_code` and `compiled_code` must be provided by the caller.
+    This tool does not compile source — the caller (e.g. a build step in the
+    host environment) is expected to run the TypeScript/JavaScript compiler
+    and pass the resulting JS as `compiled_code`. The `source_code` is
+    stored on the Bot for reference; `compiled_code` is what actually runs
+    in the Medplum bot runtime.
+    """
     _check_write_allowed()
     async with _with_obo(on_behalf_of) as client:
         bot, deploy_result = await client.save_and_deploy_bot(
@@ -1225,6 +1477,16 @@ async def execute_batch(
     while others succeed). A transaction bundle is atomic (all succeed
     or all fail).
 
+    Entry structure example::
+
+        {"type": "transaction", "entry": [
+            {"request": {"method": "POST", "url": "Patient"},
+             "resource": {"resourceType": "Patient", "name": [...]}},
+            {"request": {"method": "GET", "url": "Patient/123"}},
+            {"request": {"method": "PUT", "url": "Patient/456"},
+             "resource": {"resourceType": "Patient", "id": "456", ...}}
+        ]}
+
     In read-only mode, bundles containing only GET requests are allowed
     (including transactions). Bundles with any write methods (POST, PUT,
     PATCH, DELETE) are blocked.
@@ -1254,6 +1516,71 @@ async def execute_batch(
     return _annotate_response(result)
 
 
+@mcp.tool(
+    annotations={
+        "title": "Raw Medplum HTTP Request",
+        "readOnlyHint": False,
+        "destructiveHint": True,
+    }
+)
+async def raw_request(
+    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"],
+    path: str,
+    body: dict[str, Any] | list[Any] | None = None,
+    query_params: list[list[str]] | None = None,
+    on_behalf_of: str | None = None,
+) -> dict[str, Any]:
+    """Send an authenticated HTTP request to any Medplum endpoint.
+
+    Low-level escape hatch when no dedicated tool covers the endpoint.
+    Prefer the dedicated tools (read_resource, search_resources,
+    create_resource, execute_operation, etc.) for standard FHIR
+    operations — they provide validation, response annotation, and
+    better error messages.
+
+    Use this for non-FHIR Medplum endpoints (admin, project management,
+    bulk data, $reindex), FHIR interactions not covered by dedicated
+    tools (_history, conditional update with custom headers), or
+    endpoints discovered from Medplum documentation.
+
+    The path is appended to the server's base URL. Do not include the
+    base URL itself.
+
+    Args:
+        method: HTTP method
+        path: Endpoint path relative to the base URL. Do not include
+            a leading slash — the base URL already ends with one.
+            FHIR examples: "fhir/R4/Patient/123/_history",
+            "fhir/R4/Patient?_summary=count"
+            Non-FHIR examples: "admin/projects/123",
+            "auth/me", "fhir/R4/$reindex"
+        body: Optional JSON request body (for POST, PUT, PATCH)
+        query_params: Optional query parameters as a list of [key, value]
+            pairs. A list of pairs (not a dict) because FHIR and Medplum
+            endpoints often need repeated keys, e.g.,
+            [["_include", "Observation:subject"],
+            ["_include", "Observation:performer"],
+            ["status", "active"]]
+        on_behalf_of: Optional ProjectMembership ID to execute as
+
+    Returns:
+        The parsed JSON response from the server
+    """
+    if method in ("POST", "PUT", "PATCH", "DELETE"):
+        _check_write_allowed()
+
+    async with _with_obo(on_behalf_of) as client:
+        url = f"{client.base_url}{path}"
+        kwargs: dict[str, Any] = {}
+        if body is not None:
+            kwargs["json"] = body
+        if query_params:
+            kwargs["params"] = [(k, v) for k, v in query_params]
+        result = await client._request(method, url, **kwargs)
+
+    return result or {}
+
+
 @mcp.resource("medplum://server-info")
 async def server_info() -> dict[str, Any]:
     """Server connection info and configuration."""
@@ -1273,6 +1600,78 @@ async def server_info() -> dict[str, Any]:
     )
 
     return info
+
+
+@mcp.resource("medplum://tool-guide")
+async def tool_guide() -> str:
+    """Quick reference for choosing the right tool."""
+    return (
+        "DISCOVER:\n"
+        "  Field definitions     → get_resource_schema\n"
+        "  Search parameters     → get_resource_capabilities\n"
+        "\n"
+        "READ:\n"
+        "  Known ID              → read_resource\n"
+        "  Find by identifier    → search_one (only if unique)\n"
+        "  Find multiple         → search_resources (paginated)\n"
+        "  Get everything        → search_all_resources (small sets only)\n"
+        "  Patient full record   → get_patient_everything\n"
+        "  GraphQL multi-hop     → execute_graphql\n"
+        "\n"
+        "WRITE (only when user asks):\n"
+        "  Create (idempotent)   → create_resource_if_none_exist (preferred)\n"
+        "  Create (simple)       → create_resource\n"
+        "  Change some fields    → patch_resource (read first)\n"
+        "  Replace entire        → update_resource (read first)\n"
+        "  Remove                → delete_resource (read first)\n"
+        "  Batch/transaction     → execute_batch\n"
+        "\n"
+        "TERMINOLOGY:\n"
+        "  Check ValueSet membership  → validate_code\n"
+        "  Check CodeSystem existence → validate_codesystem_code\n"
+        "  List codes in ValueSet     → expand_valueset\n"
+        "  Code meaning/display       → lookup_concept\n"
+        "  Map between systems        → translate_concept\n"
+        "\n"
+        "ESCAPE HATCHES:\n"
+        "  Any FHIR $operation   → execute_operation\n"
+        "  Any Medplum endpoint  → raw_request (last resort)\n"
+        "\n"
+        "BOTS (high-impact, explicit user request only):\n"
+        "  Create bot            → create_bot\n"
+        "  Deploy code           → save_and_deploy_bot\n"
+        "  Run bot               → execute_bot\n"
+    )
+
+
+@mcp.resource("medplum://common-errors")
+async def common_errors() -> dict[str, str]:
+    """Common FHIR/Medplum error codes and what to do about them."""
+    return {
+        "400 Bad Request": (
+            "Validation failed. Check field names and types with "
+            "get_resource_schema. Check search params with "
+            "get_resource_capabilities."
+        ),
+        "401 Unauthorized": (
+            "Authentication failed. Check MEDPLUM_CLIENT_ID and MEDPLUM_CLIENT_SECRET."
+        ),
+        "403 Forbidden": (
+            "Access denied. Check on_behalf_of ProjectMembership permissions."
+        ),
+        "404 Not Found": (
+            "Resource doesn't exist, was deleted, or you lack access. "
+            "Try search_resources instead of read_resource."
+        ),
+        "409 Conflict": (
+            "Version mismatch — resource was modified since you read it. "
+            "Read the resource again and retry."
+        ),
+        "410 Gone": "Resource was soft-deleted on Medplum.",
+        "429 Too Many Requests": (
+            "Rate limited. The client retries automatically with backoff."
+        ),
+    }
 
 
 def main() -> None:

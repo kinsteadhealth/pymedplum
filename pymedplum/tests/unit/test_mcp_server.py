@@ -11,7 +11,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-import pymedplum.mcp.server as srv
 from pymedplum.mcp.server import (
     BundleInput,
     PatchOp,
@@ -31,6 +30,7 @@ from pymedplum.mcp.server import (
     export_ccda,
     get_resource_schema,
     patch_resource,
+    raw_request,
     read_resource,
     save_and_deploy_bot,
     search_all_resources,
@@ -220,13 +220,48 @@ class TestPatchOpModel:
 
     def test_missing_path_rejected(self):
         with pytest.raises(Exception):
-            PatchOp(op="add")
+            PatchOp(op="add", value=1)
 
-    def test_dump_excludes_none(self):
+    def test_dump_excludes_unset(self):
         op = PatchOp(op="remove", path="/foo")
-        dumped = op.model_dump(exclude_none=True)
+        dumped = op.model_dump(exclude_unset=True, by_alias=True)
         assert "value" not in dumped
+        assert "from" not in dumped
         assert dumped == {"op": "remove", "path": "/foo"}
+
+    def test_explicit_null_value_preserved(self):
+        # RFC 6902 allows value: null as a legitimate JSON Patch value.
+        op = PatchOp(op="replace", path="/active", value=None)
+        dumped = op.model_dump(exclude_unset=True, by_alias=True)
+        assert "value" in dumped
+        assert dumped["value"] is None
+
+    def test_add_requires_value(self):
+        with pytest.raises(Exception):
+            PatchOp(op="add", path="/foo")
+
+    def test_replace_requires_value(self):
+        with pytest.raises(Exception):
+            PatchOp(op="replace", path="/foo")
+
+    def test_test_requires_value(self):
+        with pytest.raises(Exception):
+            PatchOp(op="test", path="/foo")
+
+    def test_copy_requires_from(self):
+        with pytest.raises(Exception):
+            PatchOp(op="copy", path="/to")
+
+    def test_move_requires_from(self):
+        with pytest.raises(Exception):
+            PatchOp(op="move", path="/to")
+
+    def test_copy_with_from_serializes_as_from(self):
+        op = PatchOp.model_validate({"op": "copy", "path": "/to", "from": "/src"})
+        assert op.from_ == "/src"
+        dumped = op.model_dump(exclude_unset=True, by_alias=True)
+        assert dumped["from"] == "/src"
+        assert "from_" not in dumped
 
 
 class TestBundleInputModel:
@@ -392,7 +427,7 @@ class TestReadOnlyEnforcement:
 
         with (
             patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
-            patch.object(srv, "_with_obo", fake_obo),
+            patch("pymedplum.mcp.server._with_obo", fake_obo),
         ):
             result = await execute_operation(
                 "Patient", "everything", resource_id="123", method="GET"
@@ -424,7 +459,7 @@ class TestReadOnlyEnforcement:
 
         with (
             patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
-            patch.object(srv, "_with_obo", fake_obo),
+            patch("pymedplum.mcp.server._with_obo", fake_obo),
         ):
             bundle = BundleInput(
                 type="batch",
@@ -448,7 +483,7 @@ class TestReadOnlyEnforcement:
 
         with (
             patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
-            patch.object(srv, "_with_obo", fake_obo),
+            patch("pymedplum.mcp.server._with_obo", fake_obo),
         ):
             bundle = BundleInput(
                 type="transaction",
@@ -519,7 +554,7 @@ class TestCrudToolsWithMockedClient:
         async def fake_obo(obo=None):
             yield mock_client
 
-        with patch.object(srv, "_with_obo", fake_obo):
+        with patch("pymedplum.mcp.server._with_obo", fake_obo):
             yield
 
     @pytest.mark.asyncio
@@ -738,7 +773,12 @@ class TestDirectClientTools:
             "resourceType": "Parameters",
             "parameter": [{"name": "result", "valueBoolean": True}],
         }
-        with patch.object(srv, "_get_client", AsyncMock(return_value=mock_client)):
+
+        @asynccontextmanager
+        async def fake_obo(obo=None):
+            yield mock_client
+
+        with patch("pymedplum.mcp.server._with_obo", fake_obo):
             result = await validate_codesystem_code(
                 code="12345",
                 codesystem_url="http://loinc.org",
@@ -761,10 +801,230 @@ class TestDirectClientTools:
             yield mock_client
 
         mock_client.export_ccda.return_value = "<ClinicalDocument />"
-        with patch.object(srv, "_with_obo", fake_obo):
+        with patch("pymedplum.mcp.server._with_obo", fake_obo):
             result = await export_ccda("patient-123")
 
         mock_client.export_ccda.assert_awaited_once_with("patient-123")
         assert result["contentType"] == "application/xml"
         assert result["patientId"] == "patient-123"
         assert result["data"] == "<ClinicalDocument />"
+
+
+class TestWithOboEmptyString:
+    @pytest.mark.asyncio
+    async def test_empty_string_on_behalf_of_rejected(self):
+        """Explicit empty string must fail loudly, not silently fall through."""
+        with pytest.raises(ValueError, match="cannot be empty"):
+            await read_resource("Patient", "123", on_behalf_of="")
+
+    @pytest.mark.asyncio
+    async def test_whitespace_only_on_behalf_of_rejected(self):
+        with pytest.raises(ValueError, match="cannot be empty"):
+            await read_resource("Patient", "123", on_behalf_of="   ")
+
+
+class TestGraphQLReadOnly:
+    @pytest.mark.asyncio
+    async def test_mutation_blocked_in_read_only(self):
+        from pymedplum.mcp.server import execute_graphql
+
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            pytest.raises(PermissionError, match="mutations are blocked"),
+        ):
+            await execute_graphql("mutation { PatientCreate(resource: {}) { id } }")
+
+    @pytest.mark.asyncio
+    async def test_mutation_case_insensitive(self):
+        from pymedplum.mcp.server import execute_graphql
+
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            pytest.raises(PermissionError, match="mutations are blocked"),
+        ):
+            await execute_graphql("MUTATION { Foo }")
+
+    @pytest.mark.asyncio
+    async def test_mutation_substring_ignored(self):
+        """'mutationRate' in a field name is not a mutation keyword."""
+        from pymedplum.mcp.server import execute_graphql
+
+        mock_client = AsyncMock()
+        mock_client.execute_graphql.return_value = {"data": {}}
+
+        @asynccontextmanager
+        async def fake_obo(obo=None):
+            yield mock_client
+
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch("pymedplum.mcp.server._with_obo", fake_obo),
+        ):
+            # No standalone 'mutation' keyword — should pass.
+            result = await execute_graphql("{ Patient { mutationRate } }")
+            assert "data" in result
+
+    @pytest.mark.asyncio
+    async def test_query_allowed_in_read_only(self):
+        from pymedplum.mcp.server import execute_graphql
+
+        mock_client = AsyncMock()
+        mock_client.execute_graphql.return_value = {"data": {}}
+
+        @asynccontextmanager
+        async def fake_obo(obo=None):
+            yield mock_client
+
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch("pymedplum.mcp.server._with_obo", fake_obo),
+        ):
+            result = await execute_graphql('{ Patient(id: "1") { id } }')
+            assert "data" in result
+
+
+class TestCreateBotCollisions:
+    @pytest.mark.asyncio
+    async def test_additional_fields_cannot_override_name(self):
+        with pytest.raises(ValueError, match="additional_fields cannot override"):
+            await create_bot("Test", additional_fields={"name": "Other"})
+
+    @pytest.mark.asyncio
+    async def test_additional_fields_allows_non_reserved(self):
+        mock_client = AsyncMock()
+        mock_client.create_bot.return_value = {
+            "resourceType": "Bot",
+            "id": "bot-1",
+        }
+
+        @asynccontextmanager
+        async def fake_obo(obo=None):
+            yield mock_client
+
+        with patch("pymedplum.mcp.server._with_obo", fake_obo):
+            await create_bot(
+                "Test Bot",
+                additional_fields={"category": [{"text": "foo"}]},
+            )
+        mock_client.create_bot.assert_awaited_once()
+        kwargs = mock_client.create_bot.await_args.kwargs
+        assert kwargs["name"] == "Test Bot"
+        assert kwargs["category"] == [{"text": "foo"}]
+
+
+class TestGetCapabilitiesPathNormalization:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "env_path,expected",
+        [
+            ("fhir/R4/", "fhir/R4/metadata"),
+            ("fhir/R4", "fhir/R4/metadata"),
+            ("/fhir/R4/", "fhir/R4/metadata"),
+            ("/fhir/R4", "fhir/R4/metadata"),
+        ],
+    )
+    async def test_path_normalized(self, env_path, expected):
+        from pymedplum.mcp.server import get_resource_capabilities
+
+        mock_client = AsyncMock()
+        mock_client.get.return_value = {"resourceType": "CapabilityStatement"}
+
+        with (
+            patch.dict(os.environ, {"MEDPLUM_FHIR_URL_PATH": env_path}),
+            patch(
+                "pymedplum.mcp.server._get_client",
+                AsyncMock(return_value=mock_client),
+            ),
+        ):
+            await get_resource_capabilities()
+        mock_client.get.assert_awaited_once_with(expected)
+
+
+class TestRawRequest:
+    @pytest.mark.asyncio
+    async def test_get_request(self):
+        mock_client = AsyncMock()
+        mock_client.base_url = "https://api.medplum.com/"
+        mock_client._request.return_value = {"resourceType": "Patient", "id": "1"}
+
+        @asynccontextmanager
+        async def fake_obo(obo=None):
+            yield mock_client
+
+        with patch("pymedplum.mcp.server._with_obo", fake_obo):
+            result = await raw_request("GET", "fhir/R4/Patient/1")
+
+        mock_client._request.assert_awaited_once_with(
+            "GET", "https://api.medplum.com/fhir/R4/Patient/1"
+        )
+        assert result["id"] == "1"
+
+    @pytest.mark.asyncio
+    async def test_post_with_body_and_params(self):
+        mock_client = AsyncMock()
+        mock_client.base_url = "https://api.medplum.com/"
+        mock_client._request.return_value = {"ok": True}
+
+        @asynccontextmanager
+        async def fake_obo(obo=None):
+            yield mock_client
+
+        with patch("pymedplum.mcp.server._with_obo", fake_obo):
+            result = await raw_request(
+                "POST",
+                "admin/projects/123/invite",
+                body={"email": "a@b.com"},
+                query_params=[["notify", "true"]],
+            )
+
+        call_args = mock_client._request.await_args
+        assert call_args[0] == (
+            "POST",
+            "https://api.medplum.com/admin/projects/123/invite",
+        )
+        assert call_args[1]["json"] == {"email": "a@b.com"}
+        assert call_args[1]["params"] == [("notify", "true")]
+        assert result["ok"] is True
+
+    @pytest.mark.asyncio
+    async def test_write_blocked_in_read_only(self):
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            pytest.raises(PermissionError, match="read-only mode"),
+        ):
+            await raw_request(
+                "POST", "fhir/R4/Patient", body={"resourceType": "Patient"}
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_allowed_in_read_only(self):
+        mock_client = AsyncMock()
+        mock_client.base_url = "https://api.medplum.com/"
+        mock_client._request.return_value = {"data": "ok"}
+
+        @asynccontextmanager
+        async def fake_obo(obo=None):
+            yield mock_client
+
+        with (
+            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch("pymedplum.mcp.server._with_obo", fake_obo),
+        ):
+            result = await raw_request("GET", "auth/me")
+
+        assert result["data"] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_none_response_returns_empty_dict(self):
+        mock_client = AsyncMock()
+        mock_client.base_url = "https://api.medplum.com/"
+        mock_client._request.return_value = None
+
+        @asynccontextmanager
+        async def fake_obo(obo=None):
+            yield mock_client
+
+        with patch("pymedplum.mcp.server._with_obo", fake_obo):
+            result = await raw_request("GET", "fhir/R4/Patient/nonexistent")
+
+        assert result == {}
