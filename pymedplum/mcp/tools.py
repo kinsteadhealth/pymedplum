@@ -1185,11 +1185,23 @@ async def execute_batch(
 ) -> dict[str, Any]:
     """Execute a FHIR batch or transaction bundle on the Medplum server.
 
-    A batch bundle processes each entry independently (some may fail
-    while others succeed). A transaction bundle is atomic (all succeed
-    or all fail).
+    This server stores protected health information (PHI). Bundles can
+    create, update, and delete multiple patient records in a single
+    call. Construct with care.
 
-    Entry structure example::
+    REQUIRED PREREQUISITE: call get_resource_schema(resource_type) for
+    every resource type included in the bundle entries. Medplum diverges
+    from FHIR R4 — your training data is not reliable for field names
+    or types. For entries that write resources, the same schema and
+    validation rules apply as create_resource and update_resource.
+
+    Batch vs transaction:
+    - "batch": each entry processed independently (some may fail while
+      others succeed)
+    - "transaction": atomic (all succeed or all fail, with rollback)
+
+    Entry structure — each entry needs a "request" with "method" and
+    "url", plus a "resource" for writes::
 
         {"type": "transaction", "entry": [
             {"request": {"method": "POST", "url": "Patient"},
@@ -1199,8 +1211,13 @@ async def execute_batch(
              "resource": {"resourceType": "Patient", "id": "456", ...}}
         ]}
 
-    Use relative request URLs inside entry.request.url (e.g., "Patient"
-    or "Patient/123"), not full absolute server URLs.
+    Common mistakes:
+    - request.url MUST be relative (e.g., "Patient", "Patient/123"),
+      NOT full absolute server URLs
+    - PUT entries MUST include "id" in the resource body
+    - POST entries MUST NOT include "id" (server assigns it)
+    - Resources inside entries follow the same schema rules as
+      create_resource / update_resource — do not guess field shapes
 
     In read-only mode, bundles containing only GET requests are allowed
     (including transactions). Bundles with any write methods (POST, PUT,
@@ -1211,7 +1228,8 @@ async def execute_batch(
         on_behalf_of: Optional ProjectMembership UUID to execute as
 
     Returns:
-        Response Bundle with results for each entry
+        Response Bundle with one entry per input, each containing a
+        response with status code and (for reads/creates) the resource
     """
     write_methods = {"POST", "PUT", "PATCH", "DELETE"}
     has_writes = any(
