@@ -1063,7 +1063,7 @@ class AsyncMedplumClient(BaseClient):
             account_refs = [account_refs]
 
         # Build FHIR Parameters resource
-        parameter = [
+        parameter: list[dict[str, Any]] = [
             {
                 "name": "accounts",
                 "valueReference": {"reference": ref},
