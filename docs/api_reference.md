@@ -29,13 +29,14 @@ print(f"Authenticated with token: {token[:20]}...")
 
 ### Resource Operations
 
-#### `create_resource(resource, headers=None, *, as_fhir=None) -> dict | Model`
+#### `create_resource(resource, headers=None, *, accounts=None, as_fhir=None) -> dict | Model`
 
 Create a new FHIR resource.
 
 **Parameters**:
 - `resource` (dict | Pydantic model): The resource to create
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request
+- `accounts` (str | list[str], optional): Account references to set on `meta.accounts` at creation time for multi-tenant compartment assignment
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 
 **Returns**: dict or Pydantic model instance - The created resource with server-assigned ID
@@ -44,24 +45,28 @@ Create a new FHIR resource.
 ```python
 from pymedplum.fhir import Patient
 
-# Using Pydantic model - returns dict
-patient = Patient(name=[{"family": "Smith", "given": ["John"]}])
-created = client.create_resource(patient)
-print(f"Created patient with ID: {created['id']}")
-
-# Using dictionary
+# Basic creation
 patient_dict = {"resourceType": "Patient", "active": True}
 created = client.create_resource(patient_dict)
+
+# With account assignment (multi-tenant)
+created = client.create_resource(
+    patient_dict,
+    accounts="Organization/org-456",
+)
+
+# Multiple accounts
+created = client.create_resource(
+    patient_dict,
+    accounts=["Organization/org-456", "Organization/org-789"],
+)
 
 # With type-safe response
 created_patient = client.create_resource(patient_dict, as_fhir=Patient)
 print(created_patient.name[0].family)  # Full IDE autocomplete!
-
-# With custom headers
-created = client.create_resource(patient, headers={"X-Custom-Header": "value"})
 ```
 
-#### `create_resource_if_none_exist(resource, if_none_exist, headers=None, *, as_fhir=None) -> dict | Model`
+#### `create_resource_if_none_exist(resource, if_none_exist, headers=None, *, accounts=None, as_fhir=None) -> dict | Model`
 
 Conditionally create a FHIR resource only if no matching resource exists (If-None-Exist).
 
@@ -71,6 +76,7 @@ This method uses FHIR's conditional create mechanism via the `If-None-Exist` hea
 - `resource` (dict | Pydantic model): The resource to create
 - `if_none_exist` (str): FHIR search query string (e.g., "identifier=MRN|12345"). Accepts plain query strings or strings with a leading `?` (which is automatically stripped). Full URLs are also accepted and the query portion is extracted.
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request
+- `accounts` (str | list[str], optional): Account references to set on `meta.accounts` at creation time
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 
 **Returns**: dict or Pydantic model instance - The created or existing resource
@@ -138,14 +144,14 @@ patient = client.read_resource("Patient", "123", as_fhir=Patient)
 print(patient.name[0].family)  # Type-safe access
 ```
 
-#### `update_resource(resource, headers=None, *, as_fhir=None) -> dict | Model`
+#### `update_resource(resource, headers=None, *, accounts=None, as_fhir=None) -> dict | Model`
 
 Update an existing FHIR resource (requires id).
 
 **Parameters**:
 - `resource` (dict | Pydantic model): Resource with id field
-
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request (e.g., `If-Match` for optimistic locking)
+- `accounts` (str | list[str], optional): Account references to set on `meta.accounts`
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 
 **Returns**: dict or Pydantic model instance - The updated resource
