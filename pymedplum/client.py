@@ -1046,7 +1046,7 @@ class MedplumClient(BaseClient):
         *,
         propagate: bool = False,
         prefer_async: bool = False,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Assign a resource to accounts via the $set-accounts operation.
 
         Medplum uses meta.accounts for compartment-based multi-tenant
@@ -1065,11 +1065,13 @@ class MedplumClient(BaseClient):
                 resources (Appointments, Observations, etc.)
             prefer_async: If True, send Prefer: respond-async header.
                 Recommended for large compartments to avoid timeouts.
-                Server returns 202 with Content-Location for polling.
+                Returns None when the server accepts asynchronously
+                (HTTP 202). Use get_async_job_status() to poll.
 
         Returns:
             FHIR Parameters with resourcesUpdated count, or the resource
-            itself (response format depends on Medplum server version).
+            itself. Returns None when prefer_async=True and the server
+            accepts the job asynchronously (HTTP 202).
 
         Examples:
             # Assign patient to an organization's account
@@ -1083,12 +1085,13 @@ class MedplumClient(BaseClient):
             )
 
             # Async for large compartments
-            client.set_accounts(
+            result = client.set_accounts(
                 "Patient/123",
                 "Organization/org-a",
                 propagate=True,
                 prefer_async=True,
             )
+            # result may be None if server accepted async (202)
         """
         if "/" not in resource_ref:
             raise ValueError(f"Invalid resource reference: {resource_ref}")

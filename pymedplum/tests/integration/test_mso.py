@@ -3,8 +3,6 @@
 Validates organization-based access control in a multi-tenant scenario.
 """
 
-import contextlib
-import os
 import secrets
 
 import pytest
@@ -28,13 +26,13 @@ def _bundle_ids(bundle: dict) -> set[str]:
 
 
 @pytest.fixture
-def async_client():
+def async_client(medplum_credentials):
     """Factory for authenticated async clients."""
 
     async def _create(**kwargs):
         client = AsyncMedplumClient(
-            client_id=os.getenv("MEDPLUM_CLIENT_ID"),
-            client_secret=os.getenv("MEDPLUM_CLIENT_SECRET"),
+            client_id=medplum_credentials["client_id"],
+            client_secret=medplum_credentials["client_secret"],
             **kwargs,
         )
         await client.authenticate()
@@ -53,6 +51,10 @@ def mso_setup(
     create_test_membership,
 ):
     """Set up MSO environment with 2 orgs, 3 practitioners, and test patients"""
+    project_id = medplum_client.project_id
+    if not project_id:
+        pytest.skip("MEDPLUM_PROJECT_ID must be set for MSO tests")
+
     cleanup = []
 
     try:
@@ -72,27 +74,22 @@ def mso_setup(
         }
         cleanup.extend([("AccessPolicy", p["id"]) for p in policies.values()])
 
-        project_id = medplum_client.project_id
-
         memberships = {}
         practitioners = {}
-        if project_id:
-            members = [
-                ("admin", "Admin", "Test", policies["admin"]),
-                ("doctor_a", "Doctor", "A", policies["doctor_a"]),
-                ("doctor_b", "Doctor", "B", policies["doctor_b"]),
-            ]
-            for key, first, last, policy in members:
-                m = create_test_membership(
-                    project_id, first, last, policy["id"], test_id
-                )
-                if m:
-                    memberships[key] = m
-                    practitioners[key] = {
-                        "id": _extract_practitioner_id(m),
-                        "resourceType": "Practitioner",
-                    }
-                    cleanup.append(("ProjectMembership", m["id"]))
+        members = [
+            ("admin", "Admin", "Test", policies["admin"]),
+            ("doctor_a", "Doctor", "A", policies["doctor_a"]),
+            ("doctor_b", "Doctor", "B", policies["doctor_b"]),
+        ]
+        for key, first, last, policy in members:
+            m = create_test_membership(project_id, first, last, policy["id"], test_id)
+            if m:
+                memberships[key] = m
+                practitioners[key] = {
+                    "id": _extract_practitioner_id(m),
+                    "resourceType": "Practitioner",
+                }
+                cleanup.append(("ProjectMembership", m["id"]))
 
         patients = {
             "a1": create_test_patient("Alice", "OrgA-Patient1", org_a["id"], test_id),
@@ -416,15 +413,29 @@ async def test_async_on_behalf_of_nested_contexts(async_client, mso_setup):
         assert patient3["id"] == patient_id
 
 
-def test_cross_org_access_denied(create_scoped_client, mso_setup):
-    """Doctor A should not be able to read Org B's patients."""
+def test_cross_org_scoped_request(create_scoped_client, mso_setup):
+    """Verify OBO header is sent when Doctor A reads cross-org.
+
+    Note: The mso_setup fixture uses an open AccessPolicy (no compartment
+    restriction), so cross-org reads are allowed. True access denial is
+    tested in test_mso_compartment_isolation which uses a compartment-based
+    policy with %organization.
+    """
     doctor_a_id = mso_setup["memberships"]["doctor_a"]["id"]
     patient_b1_id = mso_setup["patients"]["b1"]["id"]
 
+    obo_sent = False
+
+    def track_obo(method, url, headers, kwargs):
+        nonlocal obo_sent
+        if "X-Medplum-On-Behalf-Of" in headers:
+            obo_sent = True
+
     doctor_a_client = create_scoped_client(doctor_a_id)
+    doctor_a_client.before_request = track_obo
     try:
-        with contextlib.suppress(Exception):
-            doctor_a_client.read_resource("Patient", patient_b1_id)
+        doctor_a_client.read_resource("Patient", patient_b1_id)
+        assert obo_sent, "OBO header should be sent for scoped requests"
     finally:
         doctor_a_client.close()
 
