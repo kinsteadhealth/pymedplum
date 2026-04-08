@@ -485,6 +485,50 @@ with client.on_behalf_of("ProjectMembership/123") as obo_client:
     patient = obo_client.read_resource("Patient", "456")
 ```
 
+### Multi-Tenant Accounts
+
+#### `set_accounts(resource_ref, account_refs, *, propagate=False, prefer_async=False) -> dict`
+
+Assign a resource to one or more accounts using Medplum's `$set-accounts` operation. Account assignments (stored in `meta.accounts`) drive compartment-based access control in multi-tenant MSO setups.
+
+**Parameters**:
+- `resource_ref` (str): Reference like `"Patient/123"`
+- `account_refs` (str | list[str]): Account references to assign (typically Organizations or Practitioners)
+- `propagate` (bool): If True, cascade assignments to all resources in the target's FHIR compartment (Observations, Encounters, etc.)
+- `prefer_async` (bool): If True, send `Prefer: respond-async` header for large compartments
+
+**Returns**: dict - FHIR Parameters with `resourcesUpdated` count, or the resource itself
+
+**Example**:
+```python
+# Assign patient to an organization
+client.set_accounts("Patient/123", "Organization/org-456")
+
+# Multiple accounts with propagation to related resources
+client.set_accounts(
+    "Patient/123",
+    ["Organization/org-456", "Practitioner/prac-789"],
+    propagate=True,
+)
+```
+
+#### `get_resource_accounts(resource) -> list[str]`
+
+Return list of account reference strings from a resource's `meta.accounts`.
+
+#### `resource_has_account(resource, account_ref) -> bool`
+
+Check if a resource is assigned to a given account.
+
+**Example**:
+```python
+from pymedplum import get_resource_accounts, resource_has_account
+
+patient = client.read_resource("Patient", "123")
+resource_has_account(patient, "Organization/org-456")  # True/False
+get_resource_accounts(patient)  # ["Organization/org-456", ...]
+```
+
 ### Terminology Operations
 
 PyMedplum provides methods for FHIR terminology operations including ValueSet expansion, CodeSystem lookup, and ConceptMap translation.

@@ -186,7 +186,7 @@ def to_portable(
     """Convert Medplum-specific FHIR to portable FHIR.
 
     Removes vendor-specific meta fields and converts Medplum's
-    multi-organization accounts to standard FHIR extensions.
+    compartment assignments (meta.accounts) to standard FHIR extensions.
 
     Args:
         resource: FHIR resource with Medplum-specific fields
@@ -244,6 +244,65 @@ def to_portable(
         meta.pop(field, None)
 
     return result
+
+
+def get_resource_accounts(resource: dict[str, Any]) -> list[str]:
+    """Return the account references assigned to a resource.
+
+    Reads from Medplum's meta.accounts field, which stores account
+    assignments used for compartment-based multi-tenant access control.
+
+    Args:
+        resource: FHIR resource dict
+
+    Returns:
+        List of reference strings (e.g., ["Organization/abc", "Practitioner/xyz"])
+
+    Example:
+        >>> resource = {
+        ...     "resourceType": "Patient",
+        ...     "meta": {
+        ...         "accounts": [
+        ...             {"reference": "Organization/org-1"},
+        ...             {"reference": "Organization/org-2"},
+        ...         ]
+        ...     }
+        ... }
+        >>> get_resource_accounts(resource)
+        ['Organization/org-1', 'Organization/org-2']
+    """
+    if hasattr(resource, "model_dump"):
+        resource = resource.model_dump()
+
+    return [
+        acc["reference"]
+        for acc in resource.get("meta", {}).get("accounts", [])
+        if isinstance(acc, dict) and "reference" in acc
+    ]
+
+
+def resource_has_account(resource: dict[str, Any], account_ref: str) -> bool:
+    """Check if a resource is assigned to a given account.
+
+    Checks Medplum's meta.accounts field for the given reference.
+
+    Args:
+        resource: FHIR resource dict
+        account_ref: Account reference to check (e.g., "Organization/abc")
+
+    Returns:
+        True if the resource is assigned to the given account
+
+    Example:
+        >>> resource = {
+        ...     "meta": {"accounts": [{"reference": "Organization/org-1"}]}
+        ... }
+        >>> resource_has_account(resource, "Organization/org-1")
+        True
+        >>> resource_has_account(resource, "Organization/org-2")
+        False
+    """
+    return account_ref in get_resource_accounts(resource)
 
 
 def decode_jwt_exp(token: str) -> datetime | None:

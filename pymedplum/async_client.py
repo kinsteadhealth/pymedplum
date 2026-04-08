@@ -1008,6 +1008,87 @@ class AsyncMedplumClient(BaseClient):
 
         return await self._request("POST", self.fhir_base_url, json=data)
 
+    async def set_accounts(
+        self,
+        resource_ref: str,
+        account_refs: str | list[str],
+        *,
+        propagate: bool = False,
+        prefer_async: bool = False,
+    ) -> dict[str, Any]:
+        """Assign a resource to accounts via the $set-accounts operation.
+
+        Medplum uses meta.accounts for compartment-based multi-tenant
+        access control. This operation assigns one or more account
+        references (typically Organizations or Practitioners) to a
+        resource. When propagate is True, the assignments cascade to
+        all resources in the target's FHIR compartment (e.g., a
+        Patient's Observations, Encounters, etc.).
+
+        Args:
+            resource_ref: Reference like "Patient/123"
+            account_refs: Account references to assign — single string
+                or list (e.g., "Organization/abc" or
+                ["Organization/abc", "Practitioner/xyz"])
+            propagate: If True, cascade account assignments to related
+                resources (Appointments, Observations, etc.)
+            prefer_async: If True, send Prefer: respond-async header.
+                Recommended for large compartments to avoid timeouts.
+                Server returns 202 with Content-Location for polling.
+
+        Returns:
+            FHIR Parameters with resourcesUpdated count, or the resource
+            itself (response format depends on Medplum server version).
+
+        Examples:
+            # Assign patient to an organization's account
+            await client.set_accounts("Patient/123", "Organization/org-a")
+
+            # Multiple accounts with propagation
+            await client.set_accounts(
+                "Patient/123",
+                ["Organization/org-a", "Practitioner/prac-1"],
+                propagate=True,
+            )
+        """
+        if "/" not in resource_ref:
+            raise ValueError(f"Invalid resource reference: {resource_ref}")
+
+        resource_type, resource_id = resource_ref.split("/", 1)
+
+        # Normalize to list
+        if isinstance(account_refs, str):
+            account_refs = [account_refs]
+
+        # Build FHIR Parameters resource
+        parameter = [
+            {
+                "name": "accounts",
+                "valueReference": {"reference": ref},
+            }
+            for ref in account_refs
+        ]
+
+        if propagate:
+            parameter.append({"name": "propagate", "valueBoolean": True})
+
+        params = {
+            "resourceType": "Parameters",
+            "parameter": parameter,
+        }
+
+        headers = None
+        if prefer_async:
+            headers = {"Prefer": "respond-async"}
+
+        return await self.execute_operation(
+            resource_type,
+            "set-accounts",
+            resource_id=resource_id,
+            params=params,
+            headers=headers,
+        )
+
     async def get(self, path: str, **kwargs) -> dict[str, Any]:
         """GET from any Medplum endpoint (not just FHIR).
 

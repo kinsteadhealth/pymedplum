@@ -250,13 +250,14 @@ class BaseClient:
         org_mode: OrgMode | None = None,
         org_ref: str | None = None,
     ) -> dict[str, Any]:
-        """Inject org tag into resource based on org_mode setting.
+        """Inject organization account tag into resource for multi-tenant isolation.
 
         Idempotent - won't duplicate existing tags.
 
         Args:
             resource: FHIR resource dict
-            org_mode: Override client's org_mode
+            org_mode: Override client's org_mode ("accounts" writes to
+                meta.accounts, "extension" writes to meta.extension)
             org_ref: Override client's org_ref
 
         Returns:

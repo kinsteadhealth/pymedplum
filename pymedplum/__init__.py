@@ -22,7 +22,9 @@ from .helpers import (
     extract_identifier,
     get_code_display,
     get_patient_display_name,
+    get_resource_accounts,
     parse_reference,
+    resource_has_account,
     to_fhir_json,
     to_portable,
 )
@@ -52,7 +54,9 @@ __all__ = [
     "extract_identifier",
     "get_code_display",
     "get_patient_display_name",
+    "get_resource_accounts",
     "parse_reference",
+    "resource_has_account",
     "to_fhir_json",
     "to_portable",
 ]

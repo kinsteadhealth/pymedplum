@@ -1039,44 +1039,93 @@ class MedplumClient(BaseClient):
 
         return self._request("POST", self.fhir_base_url, json=data)
 
-    def set_accounts(self, resource_ref: str, org_ref: str) -> dict[str, Any]:
-        """Explicitly set accounts using $set-accounts operation.
-        Preferred over auto-injection for AccessPolicy compatibility.
+    def set_accounts(
+        self,
+        resource_ref: str,
+        account_refs: str | list[str],
+        *,
+        propagate: bool = False,
+        prefer_async: bool = False,
+    ) -> dict[str, Any]:
+        """Assign a resource to accounts via the $set-accounts operation.
+
+        Medplum uses meta.accounts for compartment-based multi-tenant
+        access control. This operation assigns one or more account
+        references (typically Organizations or Practitioners) to a
+        resource. When propagate is True, the assignments cascade to
+        all resources in the target's FHIR compartment (e.g., a
+        Patient's Observations, Encounters, etc.).
 
         Args:
             resource_ref: Reference like "Patient/123"
-            org_ref: Organization reference like "Organization/ORG_A"
+            account_refs: Account references to assign — single string
+                or list (e.g., "Organization/abc" or
+                ["Organization/abc", "Practitioner/xyz"])
+            propagate: If True, cascade account assignments to related
+                resources (Appointments, Observations, etc.)
+            prefer_async: If True, send Prefer: respond-async header.
+                Recommended for large compartments to avoid timeouts.
+                Server returns 202 with Content-Location for polling.
 
         Returns:
-            FHIR Parameters or Patient resource with operation results
-            (response type depends on Medplum server version).
+            FHIR Parameters with resourcesUpdated count, or the resource
+            itself (response format depends on Medplum server version).
 
-        Example:
-            result = client.set_accounts("Patient/123", "Organization/org-456")
-            # Example response (Parameters variant):
-            # {"resourceType": "Parameters", "parameter": [{"name": "resourcesUpdated", "valueInteger": 1}]}
+        Examples:
+            # Assign patient to an organization's account
+            client.set_accounts("Patient/123", "Organization/org-a")
+
+            # Multiple accounts with propagation
+            client.set_accounts(
+                "Patient/123",
+                ["Organization/org-a", "Practitioner/prac-1"],
+                propagate=True,
+            )
+
+            # Async for large compartments
+            client.set_accounts(
+                "Patient/123",
+                "Organization/org-a",
+                propagate=True,
+                prefer_async=True,
+            )
         """
         if "/" not in resource_ref:
             raise ValueError(f"Invalid resource reference: {resource_ref}")
 
         resource_type, resource_id = resource_ref.split("/", 1)
 
-        # Build the FHIR Parameters resource as per Medplum documentation
+        # Normalize to list
+        if isinstance(account_refs, str):
+            account_refs = [account_refs]
+
+        # Build FHIR Parameters resource
+        parameter = [
+            {
+                "name": "accounts",
+                "valueReference": {"reference": ref},
+            }
+            for ref in account_refs
+        ]
+
+        if propagate:
+            parameter.append({"name": "propagate", "valueBoolean": True})
+
         params = {
             "resourceType": "Parameters",
-            "parameter": [
-                {
-                    "name": "accounts",
-                    "valueReference": {"reference": org_ref},
-                }
-            ],
+            "parameter": parameter,
         }
+
+        headers = None
+        if prefer_async:
+            headers = {"Prefer": "respond-async"}
 
         return self.execute_operation(
             resource_type,
             "set-accounts",
             resource_id=resource_id,
             params=params,
+            headers=headers,
         )
 
     def get(self, path: str, **kwargs) -> dict[str, Any]:

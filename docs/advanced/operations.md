@@ -62,16 +62,51 @@ result = client.execute_operation(
 )
 ```
 
-## Medplum account compartments (`$set-accounts`)
+## Multi-tenant accounts (`$set-accounts`)
 
-`set_accounts` uses Medplum’s `$set-accounts` operation to manage `meta.accounts`.
+In multi-tenant MSO (Management Services Organization) setups, Medplum uses `meta.accounts` to assign resources to accounts — typically Organizations — which drive compartment-based access control via AccessPolicies.
+
+`set_accounts` wraps Medplum’s `$set-accounts` operation:
 
 ```python
-result = client.set_accounts(
-    resource_ref="Patient/patient-123",
-    org_ref="Organization/org-456",
+# Assign a patient to an organization
+client.set_accounts("Patient/patient-123", "Organization/org-456")
+
+# Assign to multiple accounts (e.g., an org and a specific practitioner)
+client.set_accounts(
+    "Patient/patient-123",
+    ["Organization/org-456", "Practitioner/prac-789"],
 )
-print(f"Resources updated: {result['parameter'][0]['valueInteger']}")
+
+# Propagate account assignments to all related resources
+# in the patient’s FHIR compartment (Observations, Encounters, etc.)
+client.set_accounts(
+    "Patient/patient-123",
+    "Organization/org-456",
+    propagate=True,
+)
+
+# For patients with large compartments, use prefer_async to avoid timeouts
+client.set_accounts(
+    "Patient/patient-123",
+    "Organization/org-456",
+    propagate=True,
+    prefer_async=True,
+)
+```
+
+Helpers for inspecting account assignments:
+
+```python
+from pymedplum import get_resource_accounts, resource_has_account
+
+patient = client.read_resource("Patient", "patient-123")
+
+# Check if a resource is assigned to a specific account
+resource_has_account(patient, "Organization/org-456")  # True/False
+
+# List all account references on a resource
+get_resource_accounts(patient)  # ["Organization/org-456", ...]
 ```
 
 ## C-CDA export
