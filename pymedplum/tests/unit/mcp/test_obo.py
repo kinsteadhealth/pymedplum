@@ -1,0 +1,90 @@
+"""Tests for on-behalf-of edge cases and get_resource_capabilities path handling."""
+
+import os
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
+from pymedplum.mcp.server import (
+    get_resource_capabilities,
+    read_resource,
+)
+
+
+class TestWithOboEmptyString:
+    @pytest.mark.asyncio
+    async def test_empty_string_rejected(self):
+        with pytest.raises(ValueError, match="cannot be empty"):
+            await read_resource("Patient", "123", on_behalf_of="")
+
+    @pytest.mark.asyncio
+    async def test_whitespace_only_rejected(self):
+        with pytest.raises(ValueError, match="cannot be empty"):
+            await read_resource("Patient", "123", on_behalf_of="   ")
+
+
+class TestGetCapabilitiesPathNormalization:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "env_path,expected",
+        [
+            ("fhir/R4/", "fhir/R4/metadata"),
+            ("fhir/R4", "fhir/R4/metadata"),
+            ("/fhir/R4/", "fhir/R4/metadata"),
+            ("/fhir/R4", "fhir/R4/metadata"),
+        ],
+    )
+    async def test_path_normalized(self, env_path, expected):
+        mock_client = AsyncMock()
+        mock_client.get.return_value = {"resourceType": "CapabilityStatement"}
+        with (
+            patch.dict(os.environ, {"MEDPLUM_FHIR_URL_PATH": env_path}),
+            patch(
+                "pymedplum.mcp.tools._get_client",
+                AsyncMock(return_value=mock_client),
+            ),
+        ):
+            await get_resource_capabilities()
+        mock_client.get.assert_awaited_once_with(expected)
+
+    @pytest.mark.asyncio
+    async def test_filters_by_resource_type(self):
+        mock_client = AsyncMock()
+        mock_client.get.return_value = {
+            "resourceType": "CapabilityStatement",
+            "rest": [
+                {
+                    "mode": "server",
+                    "resource": [
+                        {
+                            "type": "Patient",
+                            "searchParam": [{"name": "family"}],
+                        },
+                        {"type": "Observation"},
+                    ],
+                }
+            ],
+        }
+        with patch(
+            "pymedplum.mcp.tools._get_client",
+            AsyncMock(return_value=mock_client),
+        ):
+            result = await get_resource_capabilities("Patient")
+        assert result["type"] == "Patient"
+        assert result["searchParam"][0]["name"] == "family"
+
+    @pytest.mark.asyncio
+    async def test_unknown_resource_type_raises(self):
+        mock_client = AsyncMock()
+        mock_client.get.return_value = {
+            "resourceType": "CapabilityStatement",
+            "rest": [{"mode": "server", "resource": [{"type": "Patient"}]}],
+        }
+        with (
+            patch(
+                "pymedplum.mcp.tools._get_client",
+                AsyncMock(return_value=mock_client),
+            ),
+            pytest.raises(ValueError, match="not found in CapabilityStatement"),
+        ):
+            await get_resource_capabilities("NonExistentType")

@@ -28,13 +28,11 @@ export MEDPLUM_READ_ONLY="true"
 
 ### Claude Code CLI
 
-Add the server with `claude mcp add`:
-
 ```bash
-claude mcp add --transport stdio \
-  --env MEDPLUM_CLIENT_ID=your-client-id \
-  --env MEDPLUM_CLIENT_SECRET=your-client-secret \
-  --env MEDPLUM_BASE_URL=https://api.medplum.com/ \
+claude mcp add \
+  -e MEDPLUM_CLIENT_ID=your-client-id \
+  -e MEDPLUM_CLIENT_SECRET=your-client-secret \
+  -e MEDPLUM_BASE_URL=https://api.medplum.com/ \
   pymedplum -- \
   uvx --from "pymedplum[mcp]" pymedplum-mcp
 ```
@@ -59,14 +57,12 @@ For shared project config, use `.mcp.json`:
 
 ### Codex CLI
 
-Add the server with `codex mcp add`:
-
 ```bash
 codex mcp add \
   pymedplum \
-  --env MEDPLUM_CLIENT_ID=your-client-id \
-  --env MEDPLUM_CLIENT_SECRET=your-client-secret \
-  --env MEDPLUM_BASE_URL=https://api.medplum.com/ \
+  -e MEDPLUM_CLIENT_ID=your-client-id \
+  -e MEDPLUM_CLIENT_SECRET=your-client-secret \
+  -e MEDPLUM_BASE_URL=https://api.medplum.com/ \
   -- \
   uvx --from "pymedplum[mcp]" pymedplum-mcp
 ```
@@ -111,23 +107,26 @@ environment variables instead of checking credentials into the repo.
 
 ## What The Server Exposes
 
-The MCP keeps a relatively compact tool surface:
+The MCP provides a compact tool surface:
 
-- Generic FHIR CRUD and search
-- Resource schema and server capability discovery
-- Generic FHIR operation execution
-- GraphQL queries
-- Terminology helpers
-- Agent-oriented helpers such as conditional create, full-result search,
-  CodeSystem validation, C-CDA export, and Medplum bot workflows
+- **Discovery**: resource schema lookup, server capability discovery
+- **FHIR CRUD**: read, search (paginated, single, all-pages), create
+  (with conditional create), update, patch (JSON Patch), delete
+- **Patient**: `$everything` operation for full clinical picture
+- **Terminology**: ValueSet validation/expansion, CodeSystem validation/lookup,
+  ConceptMap translation
+- **Operations**: generic FHIR `$operation` execution, GraphQL queries,
+  batch/transaction bundles
+- **Bots**: create, deploy, and execute Medplum bots
+- **Escape hatch**: `raw_request` for any authenticated Medplum endpoint
+  not covered by a dedicated tool
 
-Use the higher-level tools first when they exist:
+The server also exposes three MCP resources:
 
-- `create_resource_if_none_exist`
-- `search_all_resources`
-- `create_bot`
-- `execute_bot`
-- `save_and_deploy_bot`
+- `medplum://server-info` — connection info and read-only status
+- `medplum://tool-guide` — quick-reference for which tool to use when
+- `medplum://common-errors` — HTTP error codes and recovery steps
 
-Use `execute_operation` as the escape hatch for uncommon FHIR or
-Medplum-specific operations.
+Use `execute_operation` for FHIR `$operations` not covered by a dedicated
+tool, and `raw_request` as the last resort for arbitrary Medplum endpoints
+(admin APIs, `$reindex`, `_history`, etc.).
