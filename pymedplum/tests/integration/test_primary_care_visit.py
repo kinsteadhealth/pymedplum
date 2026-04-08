@@ -154,11 +154,9 @@ def elderly_diabetic_patient(medplum_client, primary_care_clinic, visit_test_id)
         ],
     )
 
-    # Tag to clinic using org_mode
     return medplum_client.create_resource(
         to_fhir_json(patient),
-        org_mode="accounts",
-        org_ref=f"Organization/{primary_care_clinic['id']}",
+        accounts=f"Organization/{primary_care_clinic['id']}",
     )
 
 

@@ -20,7 +20,7 @@ from .bundle import FHIRBundle
 from .exceptions import MedplumError
 from .fhir.base import MedplumFHIRBase
 from .helpers import decode_jwt_exp, to_fhir_json
-from .types import OrgMode, PatchOperation, QueryTypes, SummaryMode, TotalMode
+from .types import PatchOperation, QueryTypes, SummaryMode, TotalMode
 
 ResourceT = TypeVar("ResourceT", bound=MedplumFHIRBase)
 
@@ -157,10 +157,9 @@ class MedplumClient(BaseClient):
     def create_resource(
         self,
         resource: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT],
     ) -> ResourceT:
         pass
@@ -169,10 +168,9 @@ class MedplumClient(BaseClient):
     def create_resource(
         self,
         resource: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: None = None,
     ) -> dict[str, Any]:
         pass
@@ -180,19 +178,18 @@ class MedplumClient(BaseClient):
     def create_resource(
         self,
         resource: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT] | None = None,
     ) -> ResourceT | dict[str, Any]:
         """Create a FHIR resource.
 
         Args:
             resource: FHIR resource dict or Pydantic model
-            org_mode: Override client org_mode for this request
-            org_ref: Override client org_ref for this request
             headers: Optional HTTP headers to include in the request
+            accounts: Account references to set on meta.accounts at
+                creation time (e.g., "Organization/abc" or a list)
             as_fhir: Optional FHIR resource class for typed response
 
         Returns:
@@ -215,7 +212,8 @@ class MedplumClient(BaseClient):
         """
         data = to_fhir_json(resource)
 
-        data = self._inject_org_tag(data, org_mode=org_mode, org_ref=org_ref)
+        if accounts:
+            data = self._apply_accounts(data, accounts)
 
         resource_type = data.get("resourceType")
         if not resource_type:
@@ -235,10 +233,9 @@ class MedplumClient(BaseClient):
         self,
         resource: dict[str, Any] | Any,
         if_none_exist: str,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT],
     ) -> ResourceT:
         pass
@@ -248,10 +245,9 @@ class MedplumClient(BaseClient):
         self,
         resource: dict[str, Any] | Any,
         if_none_exist: str,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: None = None,
     ) -> dict[str, Any]:
         pass
@@ -260,10 +256,9 @@ class MedplumClient(BaseClient):
         self,
         resource: dict[str, Any] | Any,
         if_none_exist: str,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT] | None = None,
     ) -> ResourceT | dict[str, Any]:
         """Conditionally create a resource only if no matching resource exists.
@@ -276,9 +271,9 @@ class MedplumClient(BaseClient):
             resource: FHIR resource dict or Pydantic model to create
             if_none_exist: Search query string for matching existing resources
                 (e.g., "identifier=http://example.org|12345")
-            org_mode: Override client org_mode for this request
-            org_ref: Override client org_ref for this request
             headers: Optional HTTP headers to include in the request
+            accounts: Account references to set on meta.accounts at
+                creation time (e.g., "Organization/abc" or a list)
             as_fhir: Optional FHIR resource class for typed response
 
         Returns:
@@ -308,7 +303,8 @@ class MedplumClient(BaseClient):
         """
         data = to_fhir_json(resource)
 
-        data = self._inject_org_tag(data, org_mode=org_mode, org_ref=org_ref)
+        if accounts:
+            data = self._apply_accounts(data, accounts)
 
         resource_type = data.get("resourceType")
         if not resource_type:
@@ -462,10 +458,9 @@ class MedplumClient(BaseClient):
     def update_resource(
         self,
         resource: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT],
     ) -> ResourceT:
         pass
@@ -474,10 +469,9 @@ class MedplumClient(BaseClient):
     def update_resource(
         self,
         resource: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: None = None,
     ) -> dict[str, Any]:
         pass
@@ -485,19 +479,18 @@ class MedplumClient(BaseClient):
     def update_resource(
         self,
         resource: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT] | None = None,
     ) -> dict[str, Any] | ResourceT:
         """Update a FHIR resource (requires id).
 
         Args:
             resource: FHIR resource dict or Pydantic model
-            org_mode: Override client org_mode for this request
-            org_ref: Override client org_ref for this request
             headers: Optional HTTP headers (e.g., If-Match for optimistic locking)
+            accounts: Account references to set on meta.accounts
+                (e.g., "Organization/abc" or a list)
             as_fhir: Optional Pydantic model class to parse response into
 
         Returns:
@@ -523,7 +516,8 @@ class MedplumClient(BaseClient):
         """
         data = to_fhir_json(resource)
 
-        data = self._inject_org_tag(data, org_mode=org_mode, org_ref=org_ref)
+        if accounts:
+            data = self._apply_accounts(data, accounts)
 
         resource_type = data.get("resourceType")
         resource_id = data.get("id")
@@ -1023,19 +1017,22 @@ class MedplumClient(BaseClient):
     def execute_batch(
         self,
         bundle: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
+        *,
+        accounts: str | list[str] | None = None,
     ) -> dict[str, Any]:
         """Execute a FHIR batch/transaction bundle.
 
         Args:
             bundle: FHIR Bundle resource
-            org_mode: Override client org_mode for all bundle entries
-            org_ref: Override client org_ref for all bundle entries
+            accounts: Account references to set on each bundle entry's
+                meta.accounts (e.g., "Organization/abc" or a list)
         """
         data = to_fhir_json(bundle)
 
-        data = self._inject_org_tag(data, org_mode=org_mode, org_ref=org_ref)
+        if accounts:
+            for entry in data.get("entry", []):
+                if "resource" in entry and isinstance(entry["resource"], dict):
+                    self._apply_accounts(entry["resource"], accounts)
 
         return self._request("POST", self.fhir_base_url, json=data)
 

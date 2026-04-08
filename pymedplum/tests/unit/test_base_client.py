@@ -6,7 +6,6 @@ Tests common methods used by both sync and async clients.
 import pytest
 
 from pymedplum._base import BaseClient
-from pymedplum.types import DEFAULT_ORG_EXTENSION_URL
 
 
 def test_base_client_initialization():
@@ -16,8 +15,6 @@ def test_base_client_initialization():
         client_id="test-client",
         client_secret="test-secret",
         project_id="test-project",
-        org_mode="accounts",
-        org_ref="Organization/test",
         default_on_behalf_of="membership-123",
     )
 
@@ -26,8 +23,6 @@ def test_base_client_initialization():
     assert client.client_id == "test-client"
     assert client.client_secret == "test-secret"
     assert client.project_id == "test-project"
-    assert client.org_mode == "accounts"
-    assert client.org_ref == "Organization/test"
     # default_on_behalf_of is stored as-is, not normalized
     assert client.default_on_behalf_of == "membership-123"
     assert len(client._obo_stack) == 0
@@ -215,95 +210,6 @@ def test_obo_current_with_values():
 
     client._obo_stack.append("ProjectMembership/second")
     assert client._obo_current() == "ProjectMembership/second"
-
-
-def test_inject_org_tag_accounts_mode():
-    """Test org tag injection in accounts mode."""
-    client = BaseClient(org_mode="accounts", org_ref="Organization/ORG_A")
-
-    resource = {"resourceType": "Patient", "name": [{"family": "Test"}]}
-
-    result = client._inject_org_tag(resource)
-
-    assert "meta" in result
-    assert "accounts" in result["meta"]
-    assert {"reference": "Organization/ORG_A"} in result["meta"]["accounts"]
-
-
-def test_inject_org_tag_extension_mode():
-    """Test org tag injection in extension mode."""
-    client = BaseClient(org_mode="extension", org_ref="Organization/ORG_B")
-
-    resource = {"resourceType": "Patient"}
-
-    result = client._inject_org_tag(resource)
-
-    assert "meta" in result
-    assert "extension" in result["meta"]
-
-    ext = result["meta"]["extension"][0]
-    assert ext["url"] == DEFAULT_ORG_EXTENSION_URL
-    assert ext["valueReference"]["reference"] == "Organization/ORG_B"
-
-
-def test_inject_org_tag_custom_extension_url():
-    """Test org tag injection with custom extension URL."""
-    custom_url = "https://custom.org/org-tag"
-    client = BaseClient(
-        org_mode="extension", org_ref="Organization/ORG_C", org_extension_url=custom_url
-    )
-
-    resource = {"resourceType": "Patient"}
-
-    result = client._inject_org_tag(resource)
-
-    ext = result["meta"]["extension"][0]
-    assert ext["url"] == custom_url
-
-
-def test_inject_org_tag_idempotent():
-    """Test org tag injection is idempotent (doesn't duplicate)."""
-    client = BaseClient(org_mode="accounts", org_ref="Organization/ORG_A")
-
-    resource = {"resourceType": "Patient"}
-
-    # Inject twice
-    result1 = client._inject_org_tag(resource)
-    result2 = client._inject_org_tag(result1)
-
-    # Should only have one account entry
-    assert len(result2["meta"]["accounts"]) == 1
-
-
-def test_inject_org_tag_bundle_recursive():
-    """Test org tag injection handles Bundle entries recursively."""
-    client = BaseClient(org_mode="accounts", org_ref="Organization/ORG_A")
-
-    bundle = {
-        "resourceType": "Bundle",
-        "entry": [
-            {"resource": {"resourceType": "Patient", "id": "1"}},
-            {"resource": {"resourceType": "Patient", "id": "2"}},
-        ],
-    }
-
-    result = client._inject_org_tag(bundle)
-
-    # Each entry should be tagged
-    for entry in result["entry"]:
-        assert "meta" in entry["resource"]
-        assert "accounts" in entry["resource"]["meta"]
-
-
-def test_inject_org_tag_no_mode():
-    """Test org tag injection does nothing without org_mode."""
-    client = BaseClient()
-
-    resource = {"resourceType": "Patient"}
-    result = client._inject_org_tag(resource)
-
-    # Should be unchanged
-    assert "meta" not in result
 
 
 def test_build_query_params_from_dict():

@@ -265,8 +265,7 @@ def test_on_behalf_of_create_resource(medplum_client, create_scoped_client, mso_
                 "name": [{"given": ["TestCreate"], "family": f"OBO-{test_id}"}],
                 "gender": "female",
             },
-            org_mode="accounts",
-            org_ref=org_a_ref,
+            accounts=org_a_ref,
         )
 
         assert new_patient["id"]
@@ -278,17 +277,17 @@ def test_on_behalf_of_create_resource(medplum_client, create_scoped_client, mso_
         scoped_client.close()
 
 
-def test_org_tag_idempotent(medplum_client, mso_setup):
-    patient = mso_setup["patients"]["a1"]
+def test_set_accounts_idempotent(medplum_client, mso_setup):
+    patient_id = mso_setup["patients"]["a1"]["id"]
     org_ref = f"Organization/{mso_setup['orgs']['a']['id']}"
 
+    patient = medplum_client.read_resource("Patient", patient_id)
     initial_count = len(patient["meta"]["accounts"])
 
     for _ in range(3):
-        patient = medplum_client.update_resource(
-            patient, org_mode="accounts", org_ref=org_ref
-        )
+        medplum_client.set_accounts(f"Patient/{patient_id}", org_ref)
 
+    patient = medplum_client.read_resource("Patient", patient_id)
     assert len(patient["meta"]["accounts"]) == initial_count
     org_count = sum(
         1 for acc in patient["meta"]["accounts"] if acc.get("reference") == org_ref
@@ -382,8 +381,7 @@ async def test_async_on_behalf_of_create_resource(
                     ],
                     "gender": "female",
                 },
-                org_mode="accounts",
-                org_ref=org_a_ref,
+                accounts=org_a_ref,
             )
 
         assert new_patient["id"]

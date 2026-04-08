@@ -187,10 +187,9 @@ def create_test_patient(medplum_client):
             name=[HumanName(given=[given_name], family=f"{family_suffix}-{test_id}")],
             gender="female" if given_name == "Alice" else "male",
         )
-        # Convert to dict for API
         patient_data = patient.model_dump(by_alias=True, exclude_none=True)
         return medplum_client.create_resource(
-            patient_data, org_mode="accounts", org_ref=f"Organization/{org_id}"
+            patient_data, accounts=f"Organization/{org_id}"
         )
 
     return _create

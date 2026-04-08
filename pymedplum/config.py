@@ -6,7 +6,7 @@ encapsulating all initialization options in a type-safe dataclass.
 
 from dataclasses import dataclass
 
-from .types import DEFAULT_ORG_EXTENSION_URL, BeforeRequestCallback, OrgMode
+from .types import BeforeRequestCallback
 
 
 @dataclass
@@ -24,9 +24,6 @@ class MedplumClientConfig:
         access_token: Pre-existing access token (optional)
         fhir_url_path: FHIR API path relative to base_url (default: fhir/R4/)
         project_id: Medplum project ID (optional)
-        org_mode: Multi-organization mode ("accounts" or "extension")
-        org_ref: Organization reference for multi-org mode
-        org_extension_url: Custom extension URL for org mode
         before_request: Callback executed before each HTTP request
         default_on_behalf_of: Default ProjectMembership for on-behalf-of operations
 
@@ -35,8 +32,6 @@ class MedplumClientConfig:
         ...     base_url="https://api.medplum.com/",
         ...     client_id="my-client-id",
         ...     client_secret="my-secret",
-        ...     org_mode="accounts",
-        ...     org_ref="Organization/123"
         ... )
         >>> client = MedplumClient(config=config)
     """
@@ -47,27 +42,13 @@ class MedplumClientConfig:
     access_token: str | None = None
     fhir_url_path: str = "fhir/R4/"
     project_id: str | None = None
-    org_mode: OrgMode | None = None
-    org_ref: str | None = None
-    org_extension_url: str = DEFAULT_ORG_EXTENSION_URL
     before_request: BeforeRequestCallback | None = None
     default_on_behalf_of: str | None = None
 
     def __post_init__(self):
         """Validate configuration after initialization."""
-        # Ensure base_url ends with /
         if not self.base_url.endswith("/"):
             self.base_url = self.base_url + "/"
-
-        # Validate org_mode if set
-        if self.org_mode and self.org_mode not in ("accounts", "extension"):
-            raise ValueError(
-                f"Invalid org_mode: {self.org_mode}. Must be 'accounts' or 'extension'"
-            )
-
-        # Validate org configuration
-        if self.org_mode and not self.org_ref:
-            raise ValueError("org_ref is required when org_mode is set")
 
     def to_dict(self) -> dict:
         """Convert config to dictionary for client initialization.
@@ -82,9 +63,6 @@ class MedplumClientConfig:
             "access_token": self.access_token,
             "fhir_url_path": self.fhir_url_path,
             "project_id": self.project_id,
-            "org_mode": self.org_mode,
-            "org_ref": self.org_ref,
-            "org_extension_url": self.org_extension_url,
             "before_request": self.before_request,
             "default_on_behalf_of": self.default_on_behalf_of,
         }

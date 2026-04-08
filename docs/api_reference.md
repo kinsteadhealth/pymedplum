@@ -29,14 +29,12 @@ print(f"Authenticated with token: {token[:20]}...")
 
 ### Resource Operations
 
-#### `create_resource(resource, org_mode=None, org_ref=None, headers=None, *, as_fhir=None) -> dict | Model`
+#### `create_resource(resource, headers=None, *, as_fhir=None) -> dict | Model`
 
 Create a new FHIR resource.
 
 **Parameters**:
 - `resource` (dict | Pydantic model): The resource to create
-- `org_mode` (OrgMode, optional): Override client org_mode for this request
-- `org_ref` (str, optional): Override client org_ref for this request
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 
@@ -63,7 +61,7 @@ print(created_patient.name[0].family)  # Full IDE autocomplete!
 created = client.create_resource(patient, headers={"X-Custom-Header": "value"})
 ```
 
-#### `create_resource_if_none_exist(resource, if_none_exist, org_mode=None, org_ref=None, headers=None, *, as_fhir=None) -> dict | Model`
+#### `create_resource_if_none_exist(resource, if_none_exist, headers=None, *, as_fhir=None) -> dict | Model`
 
 Conditionally create a FHIR resource only if no matching resource exists (If-None-Exist).
 
@@ -72,8 +70,6 @@ This method uses FHIR's conditional create mechanism via the `If-None-Exist` hea
 **Parameters**:
 - `resource` (dict | Pydantic model): The resource to create
 - `if_none_exist` (str): FHIR search query string (e.g., "identifier=MRN|12345"). Accepts plain query strings or strings with a leading `?` (which is automatically stripped). Full URLs are also accepted and the query portion is extracted.
-- `org_mode` (OrgMode, optional): Override client org_mode for this request
-- `org_ref` (str, optional): Override client org_ref for this request
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 
@@ -142,14 +138,13 @@ patient = client.read_resource("Patient", "123", as_fhir=Patient)
 print(patient.name[0].family)  # Type-safe access
 ```
 
-#### `update_resource(resource, org_mode=None, org_ref=None, headers=None, *, as_fhir=None) -> dict | Model`
+#### `update_resource(resource, headers=None, *, as_fhir=None) -> dict | Model`
 
 Update an existing FHIR resource (requires id).
 
 **Parameters**:
 - `resource` (dict | Pydantic model): Resource with id field
-- `org_mode` (OrgMode, optional): Override client org_mode
-- `org_ref` (str, optional): Override client org_ref
+
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request (e.g., `If-Match` for optimistic locking)
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 
