@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from pymedplum.mcp.server import (
-    BundleInput,
+from pymedplum.mcp.server import BundleInput
+from pymedplum.mcp.tools import (
     execute_batch,
     execute_bot,
     execute_graphql,
@@ -152,7 +152,6 @@ class TestGetPatientEverything:
         assert result["_resource_summary"]["Patient"] == 1
 
 
-
 class TestTerminologyTools:
     @pytest.mark.asyncio
     async def test_validate_code(self):
@@ -231,14 +230,14 @@ class TestBotTools:
 
     @pytest.mark.asyncio
     async def test_create_bot_collision(self):
-        from pymedplum.mcp.server import create_bot
+        from pymedplum.mcp.tools import create_bot
 
         with pytest.raises(ValueError, match="additional_fields cannot override"):
             await create_bot("Test", additional_fields={"name": "Other"})
 
     @pytest.mark.asyncio
     async def test_create_bot_allows_extras(self):
-        from pymedplum.mcp.server import create_bot
+        from pymedplum.mcp.tools import create_bot
 
         mock = AsyncMock()
         mock.create_bot.return_value = {"resourceType": "Bot", "id": "b1"}
@@ -250,7 +249,7 @@ class TestBotTools:
 
     @pytest.mark.asyncio
     async def test_save_and_deploy_bot(self):
-        from pymedplum.mcp.server import save_and_deploy_bot
+        from pymedplum.mcp.tools import save_and_deploy_bot
 
         mock = AsyncMock()
         mock.save_and_deploy_bot.return_value = (

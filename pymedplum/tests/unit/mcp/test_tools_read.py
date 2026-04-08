@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from pymedplum.mcp.server import (
+from pymedplum.mcp.tools import (
     get_resource_schema,
     read_resource,
     search_all_resources,

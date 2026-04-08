@@ -312,9 +312,7 @@ async def search_all_resources(
     resources: list[dict[str, Any]] = []
     truncated = False
     async with _with_obo(on_behalf_of) as client:
-        async for resource in client.search_resource_pages(
-            resource_type, params
-        ):
+        async for resource in client.search_resource_pages(resource_type, params):
             resources.append(resource)
             if len(resources) >= max_resources:
                 truncated = True
@@ -1049,7 +1047,6 @@ async def execute_graphql(
     return _annotate_response(result)
 
 
-
 @mcp.tool(
     annotations={
         "title": "Execute Medplum Bot",
@@ -1111,7 +1108,15 @@ async def create_bot(
     _check_write_allowed()
     extras = dict(additional_fields or {})
     # Prevent silent overrides of explicit arguments via additional_fields.
-    reserved = {"name", "description", "source_code", "runtime_version"}
+    reserved = {
+        "name",
+        "description",
+        "source_code",
+        "runtime_version",
+        # SDK key names (create_bot maps these from the params above)
+        "code",
+        "runtimeVersion",
+    }
     collisions = reserved & extras.keys()
     if collisions:
         msg = (
@@ -1262,7 +1267,7 @@ async def raw_request(
     body: dict[str, Any] | list[Any] | None = None,
     query_params: list[list[str]] | None = None,
     on_behalf_of: str | None = None,
-) -> dict[str, Any]:
+) -> Any:
     """Send an authenticated HTTP request to any Medplum endpoint.
 
     DANGEROUS: This tool bypasses all schema validation, response

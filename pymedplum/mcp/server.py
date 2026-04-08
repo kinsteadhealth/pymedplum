@@ -421,8 +421,8 @@ async def _with_obo(on_behalf_of: str | None = None):
 # Register tools and resources (import triggers @mcp.tool/@mcp.resource)
 # ---------------------------------------------------------------------------
 
-from pymedplum.mcp.resources import *  # noqa: E402, F403
-from pymedplum.mcp.tools import *  # noqa: E402, F403
+import pymedplum.mcp.resources  # noqa: E402
+import pymedplum.mcp.tools  # noqa: E402, F401
 
 # ---------------------------------------------------------------------------
 # Entry point

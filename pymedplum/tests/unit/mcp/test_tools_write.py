@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from pymedplum.mcp.server import (
-    PatchOp,
+from pymedplum.mcp.server import PatchOp
+from pymedplum.mcp.tools import (
     create_resource,
     create_resource_if_none_exist,
     delete_resource,

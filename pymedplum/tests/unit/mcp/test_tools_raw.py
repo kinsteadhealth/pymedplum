@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from pymedplum.mcp.server import raw_request
+from pymedplum.mcp.tools import raw_request
 from pymedplum.tests.unit.mcp.conftest import make_fake_obo
 
 
