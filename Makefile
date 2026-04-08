@@ -32,34 +32,34 @@ help:
 
 # Installation targets
 install:
-	pip install -e .
+	uv sync
 
 install-dev:
-	pip install -e ".[dev]"
+	uv sync --all-extras
 
 install-pre-commit: install-dev
-	pre-commit install
+	uv run pre-commit install
 	@echo "Pre-commit hooks installed successfully!"
 
 # Testing targets
 test:
-	python -m pytest
+	uv run pytest
 
 test-unit:
-	python -m pytest pymedplum/tests/unit/
+	uv run pytest pymedplum/tests/unit/
 
 test-integration:
-	python -m pytest pymedplum/tests/integration/
+	uv run pytest pymedplum/tests/integration/
 
 # Code quality targets
 lint:
-	python -m ruff check --fix .
+	uv run ruff check --fix .
 
 format:
-	python -m ruff format .
+	uv run ruff format .
 
 type-check:
-	python -m mypy pymedplum/
+	uv run mypy pymedplum/
 
 check: lint format type-check
 	@echo "All code quality checks passed!"
@@ -80,10 +80,10 @@ clean:
 	find . -type f -name 'coverage.xml' -delete
 
 build: clean
-	python -m build
+	uv build
 
 publish: build
-	python -m twine upload dist/*
+	uv publish
 
 # Code generation targets
 generate:

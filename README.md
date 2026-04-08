@@ -17,37 +17,25 @@ If you like the official Medplum TypeScript SDK experience, this aims to feel fa
 - **GraphQL**: GraphQL query execution
 - **On-behalf-of (OBO)**: Act as a `ProjectMembership` (sync + async context managers)
 - **Bot management**: CRUD + deploy + execute Medplum Bots
+- **MCP server**: Model Context Protocol server with runtime schema discovery, client-side FHIR validation, and healthcare-aware guardrails for AI agent workflows
 
 ## Installation
 
-### From AWS CodeArtifact (Internal)
-
-For Kinstead Health team members:
-
 ```bash
-# Configure AWS credentials
-aws configure
-
-# Login to CodeArtifact
-aws codeartifact login --tool pip --domain pymedplum --repository pymedplum --region us-east-1
-
-# Install the package
 pip install pymedplum
 ```
 
-#### In GitHub Actions
+With MCP support:
 
-```yaml
-- name: Configure AWS credentials
-  uses: aws-actions/configure-aws-credentials@v4
-  with:
-    role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
-    aws-region: us-east-1
+```bash
+pip install "pymedplum[mcp]"
+```
 
-- name: Install from CodeArtifact
-  run: |
-    aws codeartifact login --tool pip --domain pymedplum --repository pymedplum --region us-east-1
-    pip install pymedplum
+With `uv`:
+
+```bash
+uv add pymedplum
+uv add "pymedplum[mcp]"
 ```
 
 ## Quick Start
@@ -79,6 +67,36 @@ patients = client.search_resources("Patient", {"family": "Doe"})
 patient["active"] = True
 updated = client.update_resource(patient)
 ```
+
+## MCP Server
+
+PyMedplum includes an optional [Model Context Protocol](https://modelcontextprotocol.io/) server that lets AI agents (Claude, GPT, etc.) interact with a Medplum FHIR server through structured tools.
+
+What makes it useful: the MCP leverages pymedplum's Pydantic FHIR models to provide **runtime schema discovery** and **client-side validation**. An LLM can call `get_resource_schema("Patient")` and get back the actual JSON schema the validation layer enforces — not documentation that might be stale, but the live schema from the typed models. When it constructs a resource incorrectly, `_validate_resource` catches it *before* the request hits the server and returns a detailed error pointing at the exact field, with a hint to check the schema. This feedback loop is possible because Pydantic models exist at runtime — TypeScript interfaces can't do this since they're erased after compilation.
+
+The server also includes healthcare-specific behavioral guardrails: warnings against name-based patient matching, read-before-write enforcement, broad query protection, and identity safety rules.
+
+```bash
+uvx --from "pymedplum[mcp]" pymedplum-mcp
+```
+
+Required environment variables:
+
+```bash
+export MEDPLUM_CLIENT_ID="your-client-id"
+export MEDPLUM_CLIENT_SECRET="your-client-secret"
+```
+
+Optional environment variables:
+
+```bash
+export MEDPLUM_BASE_URL="https://api.medplum.com/"
+export MEDPLUM_FHIR_URL_PATH="fhir/R4/"
+export MEDPLUM_ON_BEHALF_OF="ProjectMembership/00000000-0000-0000-0000-000000000000"
+export MEDPLUM_READ_ONLY="true"
+```
+
+For Claude Code, Codex, and `mcp.json` setup examples, see [docs/mcp.md](docs/mcp.md).
 
 ## Showcase: common workflows
 

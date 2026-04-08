@@ -22,6 +22,7 @@ nav:
   - Getting Started:
       - Installation: installation.md
       - Quickstart: quickstart.md
+      - MCP Server: mcp.md
   - Core Concepts:
       - FHIR Models: fhir_models.md
       - Client Design: client_design.md

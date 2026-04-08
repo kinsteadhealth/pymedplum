@@ -10,6 +10,29 @@ pip install pymedplum
 
 This will install the core package and its dependencies, including `pydantic` and `httpx`.
 
+## Install with MCP support
+
+If you want to use the optional MCP server, the recommended launch pattern is:
+
+```bash
+uvx --from "pymedplum[mcp]" pymedplum-mcp
+```
+
+If you specifically want it installed into your environment, install the `mcp`
+extra:
+
+```bash
+pip install "pymedplum[mcp]"
+```
+
+With `uv`:
+
+```bash
+uv add "pymedplum[mcp]"
+```
+
+For MCP clients, prefer the direct `uvx` command over a separate install step.
+
 ## For Developers
 
 If you are contributing to `pymedplum`, you will need to install the package in editable mode along with development dependencies.
