@@ -258,11 +258,19 @@ class BaseClient:
 
         meta = resource.setdefault("meta", {})
         existing = meta.setdefault("accounts", [])
+        existing_refs = {
+            acc.get("reference") for acc in existing if isinstance(acc, dict)
+        }
 
         for ref in accounts:
-            entry = {"reference": ref}
-            if entry not in existing:
-                existing.append(entry)
+            if not ref or "/" not in ref:
+                raise ValueError(
+                    f"Invalid account reference: {ref!r}. "
+                    "Expected format like 'Organization/abc'."
+                )
+            if ref not in existing_refs:
+                existing.append({"reference": ref})
+                existing_refs.add(ref)
 
         return resource
 

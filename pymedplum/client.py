@@ -212,7 +212,7 @@ class MedplumClient(BaseClient):
         """
         data = to_fhir_json(resource)
 
-        if accounts:
+        if accounts is not None:
             data = self._apply_accounts(data, accounts)
 
         resource_type = data.get("resourceType")
@@ -303,7 +303,7 @@ class MedplumClient(BaseClient):
         """
         data = to_fhir_json(resource)
 
-        if accounts:
+        if accounts is not None:
             data = self._apply_accounts(data, accounts)
 
         resource_type = data.get("resourceType")
@@ -516,7 +516,7 @@ class MedplumClient(BaseClient):
         """
         data = to_fhir_json(resource)
 
-        if accounts:
+        if accounts is not None:
             data = self._apply_accounts(data, accounts)
 
         resource_type = data.get("resourceType")
@@ -1029,10 +1029,12 @@ class MedplumClient(BaseClient):
         """
         data = to_fhir_json(bundle)
 
-        if accounts:
+        if accounts is not None:
             for entry in data.get("entry", []):
                 if "resource" in entry and isinstance(entry["resource"], dict):
-                    self._apply_accounts(entry["resource"], accounts)
+                    entry["resource"] = self._apply_accounts(
+                        entry["resource"], accounts
+                    )
 
         return self._request("POST", self.fhir_base_url, json=data)
 
@@ -1062,13 +1064,13 @@ class MedplumClient(BaseClient):
                 resources (Appointments, Observations, etc.)
             prefer_async: If True, send Prefer: respond-async header.
                 Recommended for large compartments to avoid timeouts.
-                Returns None when the server accepts asynchronously
-                (HTTP 202). Use get_async_job_status() to poll.
+                The server may return HTTP 202 with an async job
+                response. Use get_async_job_status() to poll.
 
         Returns:
-            FHIR Parameters with resourcesUpdated count, or the resource
-            itself. Returns None when prefer_async=True and the server
-            accepts the job asynchronously (HTTP 202).
+            FHIR Parameters with resourcesUpdated count, or the
+            resource itself. May return None if the server responds
+            with an empty body (e.g., 202 with no content).
 
         Examples:
             # Assign patient to an organization's account
