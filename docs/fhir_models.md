@@ -169,34 +169,18 @@ When you run the generator, it creates a sophisticated, multi-file architecture 
     -   A marker file that signals to type checkers that `pymedplum` is a PEP 561-compliant typed package.
 
 ### Regenerating Models
-If the upstream Medplum FHIR definitions change, you can regenerate all Pydantic models using the following process:
 
-#### Step 1: Run the Code Generator
-The TypeScript-based generator parses the source definitions and writes all the Python files described above.
-
-1.  **Navigate to the scripts directory:**
-    ```bash
-    cd scripts
-    ```
-2.  **Install Node.js dependencies:**
-    ```bash
-    npm install
-    ```
-3.  **Run the generator:**
-    ```bash
-    npm run generate
-    ```
-
-#### Step 2: Lint and Format (Recommended)
-The generator does its best to produce clean code, but it's always good practice to run the project's formatters to ensure consistency. From the project root directory:
+If the upstream Medplum FHIR definitions change, regenerate all Pydantic models with a single command from the project root:
 
 ```bash
-make format
-```
-or
-```bash
-ruff format pymedplum/
-ruff check pymedplum/ --fix
+make generate              # Update to latest @medplum/fhirtypes and regenerate
+make generate-no-update    # Regenerate without updating the npm dependency
 ```
 
-After these steps, the models will be fully up-to-date with proper formatting and typing.
+This runs the full pipeline: npm update, TypeScript codegen, ruff formatting, and a validation smoke test. It also automatically removes stale `.py` files if an upstream type was deleted.
+
+**Requirements:** `node`, `npm`, `python3`, and `uvx` must be on your PATH. The script checks for all of these at startup.
+
+The generated `__init__.py` records which `@medplum/fhirtypes` version produced it, so you can always tell what's deployed.
+
+For more details on the generator architecture, see [scripts/README.md](../scripts/README.md).

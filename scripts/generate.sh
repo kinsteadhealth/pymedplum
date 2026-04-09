@@ -27,7 +27,7 @@ echo "========================================"
 
 # ── Pre-flight checks ──────────────────────────────────────────────────
 
-for cmd in node npm; do
+for cmd in node npm python3 uvx; do
     if ! command -v "$cmd" &>/dev/null; then
         echo "ERROR: $cmd is not installed or not on PATH" >&2
         exit 1
@@ -72,7 +72,7 @@ fi
 
 echo ""
 echo "[2/4] Installing npm dependencies..."
-npm ci 2>/dev/null || npm install
+npm ci || npm install
 
 # ── Step 3: Run generator ─────────────────────────────────────────────
 

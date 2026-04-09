@@ -17,14 +17,25 @@ make generate-no-update    # Regenerate without updating npm
 ## Requirements
 
 - **Node.js** / **npm** - for TypeScript generation
-- **uv** - for running ruff formatter (auto-downloads ruff on first run)
+- **python3** - for validation smoke test
+- **uvx** - for running ruff formatter (auto-downloads ruff on first run)
+
+The script checks for all of these at startup and exits with a clear error if any are missing.
 
 ## What It Does
 
-1. **Updates `@medplum/fhirtypes`** - fetches latest version from npm
-2. **Clean installs dependencies** - removes node_modules to avoid corruption
-3. **Runs TypeScript generator** - parses `.d.ts` files → generates Pydantic models
+1. **Updates `@medplum/fhirtypes`** - fetches latest version from npm (skip with `--no-update`)
+2. **Installs dependencies** - uses `npm ci` for reproducible installs (falls back to `npm install` if no lockfile)
+3. **Runs TypeScript generator** - parses `.d.ts` files, generates Pydantic models, removes stale files
 4. **Formats with ruff** - applies formatting and lint fixes
+5. **Validates output** - smoke test imports key types and instantiates a Patient
+
+## Safety Features
+
+- **Stale file cleanup**: If an upstream type is removed, the corresponding `.py` file is automatically deleted. Cleanup is skipped if any files errored during generation to prevent accidental data loss.
+- **Version stamp**: The generated `__init__.py` records which `@medplum/fhirtypes` version produced it.
+- **Validation**: A Python smoke test runs after generation to catch import errors early.
+- **Pre-flight checks**: The script validates that all required tools are on PATH before starting.
 
 ## Output
 
@@ -55,10 +66,10 @@ pymedplum/fhir/*.py
 
 | File | Purpose |
 |------|---------|
-| `src/index.ts` | Main orchestrator |
+| `src/index.ts` | Main orchestrator, stale file cleanup, version detection |
 | `src/parser.ts` | TypeScript AST parser, type mapping |
 | `src/writer.ts` | Pydantic code generator |
-| `generate.sh` | End-to-end build script |
+| `generate.sh` | End-to-end build script with validation |
 
 ## Manual Generation
 
