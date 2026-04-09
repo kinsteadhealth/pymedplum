@@ -65,3 +65,8 @@ class DomainConfiguration(MedplumFHIRBase):
         alias="identityProvider",
         description="Optional external Identity Provider (IdP) for the domain name.",
     )
+    allowed_post_login_redirect_urls: list[str] | None = Field(
+        default=None,
+        alias="allowedPostLoginRedirectUrls",
+        description="List of allowed post-login redirect URLs for this domain configuration.",
+    )

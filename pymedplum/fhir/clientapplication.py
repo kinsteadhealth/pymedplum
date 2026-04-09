@@ -88,7 +88,6 @@ class ClientApplication(MedplumFHIRBase):
         alias="jwksUri",
         description="Optional JWKS URI for public key verification of JWTs issued by the authorization server (client_secret_jwt).",
     )
-    redirect_uri: str | None = Field(default=None, alias="redirectUri")
     redirect_uris: list[str] | None = Field(
         default=None,
         alias="redirectUris",
@@ -98,6 +97,13 @@ class ClientApplication(MedplumFHIRBase):
         default=None,
         alias="launchUri",
         description="Optional launch URI for SMART EHR launch sequence.",
+    )
+    launch_identifier_systems: list[ClientApplicationLaunchIdentifierSystems] | None = (
+        Field(
+            default=None,
+            alias="launchIdentifierSystems",
+            description="Optional array of identifier systems to use in SMART launch context. When specified, the resource's identifier with the matching system will be included in the SmartAppLaunch resource's reference and returned to the SMART app in the token response.",
+        )
     )
     pkce_optional: bool | None = Field(
         default=None,
@@ -128,6 +134,29 @@ class ClientApplication(MedplumFHIRBase):
         default=None,
         alias="defaultScope",
         description="Optional default OAuth scope for the client application. This scope is used when the client application does not specify a scope in the authorization request.",
+    )
+    certificate_trust_store: str | None = Field(
+        default=None,
+        alias="certificateTrustStore",
+        description="Optional PEM-formatted certificates that are allowed to authenticate to this service via mutual TLS. Supports both Certificate Authorities (CAs) and self-signed certificates. Multiple certificates can be included.",
+    )
+    redirect_uri: str | None = Field(default=None, alias="redirectUri")
+
+
+class ClientApplicationLaunchIdentifierSystems(MedplumFHIRBase):
+    """Optional array of identifier systems to use in SMART launch context.
+    When specified, the resource's identifier with the matching system will
+    be included in the SmartAppLaunch resource's reference and returned to
+    the SMART app in the token response.
+    """
+
+    resource_type: Literal["ClientApplicationLaunchIdentifierSystems"] = Field(
+        default="ClientApplicationLaunchIdentifierSystems", alias="resourceType"
+    )
+
+    system: str = Field(
+        default=...,
+        description="The identifier system URI to use for the specified resource type.",
     )
 
 

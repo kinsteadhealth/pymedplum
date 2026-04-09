@@ -508,11 +508,13 @@ export function generatePydanticClass(parsed: ParsedInterface): string {
  */
 export function generateInitFile(
   resourceNames: string[],
-  classesToFiles: Map<string, string>
+  classesToFiles: Map<string, string>,
+  fhirTypesVersion: string = "unknown",
 ): string {
   const lines: string[] = [
     "# Generated FHIR module",
     "# Do not edit manually",
+    `# Source: @medplum/fhirtypes ${fhirTypesVersion}`,
     '"""FHIR Resource models with lazy loading support.',
     '',
     'This module provides ~300 FHIR resource type definitions. To avoid massive',

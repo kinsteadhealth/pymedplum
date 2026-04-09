@@ -121,7 +121,11 @@ from .claimresponse import (
     ClaimResponseProcessNote,
     ClaimResponseTotal,
 )
-from .clientapplication import ClientApplication, ClientApplicationSignInForm
+from .clientapplication import (
+    ClientApplication,
+    ClientApplicationLaunchIdentifierSystems,
+    ClientApplicationSignInForm,
+)
 from .clinicalimpression import (
     ClinicalImpression,
     ClinicalImpressionFinding,
@@ -561,6 +565,9 @@ from .operationdefinition import (
 from .operationoutcome import OperationOutcome, OperationOutcomeIssue
 from .organization import Organization, OrganizationContact
 from .organizationaffiliation import OrganizationAffiliation
+from .package import Package
+from .packageinstallation import PackageInstallation
+from .packagerelease import PackageRelease
 from .parameterdefinition import ParameterDefinition
 from .parameters import Parameters, ParametersParameter
 from .patient import Patient, PatientCommunication, PatientContact, PatientLink
@@ -947,6 +954,7 @@ __all__ = [
     "ClaimResponseTotal",
     "ClaimSupportingInfo",
     "ClientApplication",
+    "ClientApplicationLaunchIdentifierSystems",
     "ClientApplicationSignInForm",
     "ClinicalImpression",
     "ClinicalImpressionFinding",
@@ -1318,6 +1326,9 @@ __all__ = [
     "Organization",
     "OrganizationAffiliation",
     "OrganizationContact",
+    "Package",
+    "PackageInstallation",
+    "PackageRelease",
     "ParameterDefinition",
     "Parameters",
     "ParametersParameter",

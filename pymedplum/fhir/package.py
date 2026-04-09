@@ -11,18 +11,21 @@ from pydantic import Field
 from pymedplum.fhir.base import MedplumFHIRBase
 
 if TYPE_CHECKING:
+    from pymedplum.fhir.codeableconcept import CodeableConcept
     from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.identifier import Identifier
     from pymedplum.fhir.meta import Meta
     from pymedplum.fhir.narrative import Narrative
     from pymedplum.fhir.reference import Reference
 
 
-class SmartAppLaunch(MedplumFHIRBase):
-    """This resource contains context details for a SMART App Launch."""
+class Package(MedplumFHIRBase):
+    """Definition of a marketplace package, which represents a set of automated
+    actions that can be taken by a system, such as a subscription or a
+    workflow.
+    """
 
-    resource_type: Literal["SmartAppLaunch"] = Field(
-        default="SmartAppLaunch", alias="resourceType"
-    )
+    resource_type: Literal["Package"] = Field(default="Package", alias="resourceType")
 
     id: str | None = Field(
         default=None,
@@ -57,16 +60,22 @@ class SmartAppLaunch(MedplumFHIRBase):
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the resource and that modifies the understanding of the element that contains it and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer is allowed to define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
-    patient: Reference | None = Field(
-        default=None,
-        description="Optional patient indicating that the app was launched in the patient context.",
+    identifier: list[Identifier] | None = Field(
+        default=None, description="An identifier for this package."
     )
-    encounter: Reference | None = Field(
-        default=None,
-        description="Optional encounter indicating that the app was launched in the encounter context.",
+    status: Literal["pending", "active", "end-of-life"] = Field(
+        default=..., description="The status of the package."
     )
-    fhir_context: list[Reference] | None = Field(
+    name: str = Field(default=..., description="A name associated with the Package.")
+    description: str | None = Field(
         default=None,
-        alias="fhirContext",
-        description="Optional FHIR context indicating the resources that were included when the app was launched.",
+        description="A summary, characterization or explanation of the Package.",
+    )
+    category: list[CodeableConcept] | None = Field(
+        default=None,
+        description="A code that classifies the service for searching, sorting and display purposes (e.g. &quot;Surgical Procedure&quot;).",
+    )
+    author: Reference = Field(
+        default=...,
+        description="Reference to the resource that represents the author of the package.",
     )
