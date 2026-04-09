@@ -303,7 +303,7 @@ class BaseClient:
         if job.startswith(("http://", "https://")):
             return job
 
-        return f"{self.base_url}fhir/R4/job/{job}/status"
+        return f"{self.fhir_base_url}job/{job}/status"
 
     def _build_query_params(self, query: Any) -> list[tuple]:
         """Build query parameters from various input formats.
