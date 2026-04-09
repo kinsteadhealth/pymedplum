@@ -86,13 +86,17 @@ client.set_accounts(
     propagate=True,
 )
 
-# For patients with large compartments, use prefer_async to avoid timeouts
-client.set_accounts(
+# For large compartments, use prefer_async to avoid timeouts
+# (only takes effect when propagate is also True)
+result = client.set_accounts(
     "Patient/patient-123",
     "Organization/org-456",
     propagate=True,
     prefer_async=True,
 )
+# Server returns OperationOutcome with async job URL
+job_url = result["issue"][0]["diagnostics"]
+status = client.get(job_url)
 ```
 
 Helpers for inspecting account assignments:

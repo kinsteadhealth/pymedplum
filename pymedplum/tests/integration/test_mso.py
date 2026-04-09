@@ -11,10 +11,7 @@ from pymedplum import (
     AsyncMedplumClient,
     get_resource_accounts,
     resource_has_account,
-    to_fhir_json,
-    to_portable,
 )
-from pymedplum.fhir import Patient
 
 
 def _extract_practitioner_id(membership: dict) -> str:
@@ -324,30 +321,6 @@ def test_set_accounts_operation(medplum_client, mso_setup):
         medplum_client.delete_resource("Patient", patient["id"])
 
 
-def test_fhir_resources_roundtrip(medplum_client, mso_setup):
-    patient_dict = medplum_client.read_resource(
-        "Patient", mso_setup["patients"]["a1"]["id"]
-    )
-
-    portable_patient = to_portable(patient_dict)
-    patient_model = Patient(**portable_patient)
-
-    assert patient_model.id == mso_setup["patients"]["a1"]["id"]
-    assert patient_model.resource_type == "Patient"
-    assert patient_model.name[0].given[0] == "Alice"
-    assert patient_model.gender == "female"
-
-    org_ext_url = "https://example.org/fhir/StructureDefinition/orgLink"
-    org_extensions = [
-        ext for ext in patient_model.meta.extension or [] if ext.url == org_ext_url
-    ]
-    assert len(org_extensions) > 0
-
-    patient_json = to_fhir_json(patient_model)
-    assert patient_json["id"] == patient_dict["id"]
-    assert patient_json["resourceType"] == patient_dict["resourceType"]
-
-
 @pytest.mark.asyncio
 async def test_async_on_behalf_of_context(async_client, mso_setup):
     membership_id = mso_setup["memberships"]["doctor_a"]["id"]
@@ -409,33 +382,6 @@ async def test_async_on_behalf_of_nested_contexts(async_client, mso_setup):
 
         patient3 = await client.read_resource("Patient", patient_id)
         assert patient3["id"] == patient_id
-
-
-def test_cross_org_scoped_request(create_scoped_client, mso_setup):
-    """Verify OBO header is sent when Doctor A reads cross-org.
-
-    Note: The mso_setup fixture uses an open AccessPolicy (no compartment
-    restriction), so cross-org reads are allowed. True access denial is
-    tested in test_mso_compartment_isolation which uses a compartment-based
-    policy with %organization.
-    """
-    doctor_a_id = mso_setup["memberships"]["doctor_a"]["id"]
-    patient_b1_id = mso_setup["patients"]["b1"]["id"]
-
-    obo_sent = False
-
-    def track_obo(method, url, headers, kwargs):
-        nonlocal obo_sent
-        if "X-Medplum-On-Behalf-Of" in headers:
-            obo_sent = True
-
-    doctor_a_client = create_scoped_client(doctor_a_id)
-    doctor_a_client.before_request = track_obo
-    try:
-        doctor_a_client.read_resource("Patient", patient_b1_id)
-        assert obo_sent, "OBO header should be sent for scoped requests"
-    finally:
-        doctor_a_client.close()
 
 
 def test_multi_org_access_allowed(create_scoped_client, mso_setup):

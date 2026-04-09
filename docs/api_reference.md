@@ -496,9 +496,9 @@ Assign a resource to one or more accounts using Medplum's `$set-accounts` operat
 - `resource_ref` (str): Reference like `"Patient/123"`
 - `account_refs` (str | list[str]): Account references to assign (typically Organizations or Practitioners)
 - `propagate` (bool): If True, cascade assignments to all resources in the target's FHIR compartment (Observations, Encounters, etc.)
-- `prefer_async` (bool): If True, send `Prefer: respond-async` header for large compartments
+- `prefer_async` (bool): If True, send `Prefer: respond-async` header. Only takes effect when `propagate` is also True. Server returns an OperationOutcome with the async job URL in `issue[0].diagnostics`.
 
-**Returns**: dict - FHIR Parameters with `resourcesUpdated` count, or the resource itself
+**Returns**: Synchronous: FHIR Parameters with `resourcesUpdated` count. Async (202): OperationOutcome with job URL in `issue[0].diagnostics`.
 
 **Example**:
 ```python

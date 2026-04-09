@@ -2,6 +2,7 @@
 
 import pytest
 
+from pymedplum import MedplumClient
 from pymedplum._base import BaseClient
 from pymedplum.helpers import get_resource_accounts, resource_has_account
 
@@ -114,3 +115,9 @@ def test_resource_has_account_false():
 
 def test_resource_has_account_no_meta():
     assert not resource_has_account({"resourceType": "Patient"}, "Org/1")
+
+
+def test_set_accounts_prefer_async_without_propagate_raises():
+    client = MedplumClient()
+    with pytest.raises(ValueError, match="prefer_async only takes effect"):
+        client.set_accounts("Patient/123", "Organization/org-1", prefer_async=True)

@@ -26,7 +26,6 @@ from .helpers import (
     parse_reference,
     resource_has_account,
     to_fhir_json,
-    to_portable,
 )
 from .types import PatchOperation, SummaryMode, TotalMode
 
@@ -57,5 +56,4 @@ __all__ = [
     "parse_reference",
     "resource_has_account",
     "to_fhir_json",
-    "to_portable",
 ]

@@ -5,7 +5,6 @@ reduce boilerplate in application code.
 """
 
 import base64
-import copy
 import json
 from datetime import datetime, timezone
 from typing import Any
@@ -177,73 +176,6 @@ def to_fhir_json(resource: dict[str | Any, Any]) -> dict[str, Any]:
     if hasattr(resource, "model_dump"):
         return resource.model_dump(by_alias=True, exclude_none=True)
     return resource
-
-
-def to_portable(
-    resource: dict[str, Any],
-    org_ext_url: str = "https://example.org/fhir/StructureDefinition/orgLink",
-) -> dict[str, Any]:
-    """Convert Medplum-specific FHIR to portable FHIR.
-
-    Removes vendor-specific meta fields and converts Medplum's
-    compartment assignments (meta.accounts) to standard FHIR extensions.
-
-    Args:
-        resource: FHIR resource with Medplum-specific fields
-        org_ext_url: Extension URL for organization links
-
-    Returns:
-        Portable FHIR resource (deep copy, original unchanged)
-
-    Example:
-        >>> resource = {
-        ...     "resourceType": "Patient",
-        ...     "meta": {
-        ...         "accounts": [{"reference": "Organization/org1"}],
-        ...         "author": {"reference": "ClientApplication/app1"}
-        ...     }
-        ... }
-        >>> portable = to_portable(resource)
-        >>> "accounts" in portable["meta"]
-        False
-        >>> "author" in portable["meta"]
-        False
-    """
-    # Deep copy to avoid mutating original
-    result = copy.deepcopy(resource)
-
-    # Handle Bundle entries recursively
-    if result.get("resourceType") == "Bundle" and result.get("entry"):
-        for entry in result["entry"]:
-            if "resource" in entry:
-                entry["resource"] = to_portable(entry["resource"], org_ext_url)
-
-    # Process meta field
-    meta = result.get("meta")
-    if not meta:
-        return result
-
-    # Convert accounts to extensions
-    accounts = meta.pop("accounts", None)
-    if accounts:
-        extensions = meta.get("extension", [])
-        for account in accounts:
-            if "reference" in account:
-                extensions.append(
-                    {
-                        "url": org_ext_url,
-                        "valueReference": {"reference": account["reference"]},
-                    }
-                )
-        if extensions:
-            meta["extension"] = extensions
-
-    # Remove vendor-specific fields
-    vendor_fields = ["author", "project", "account", "compartment", "onBehalfOf"]
-    for field in vendor_fields:
-        meta.pop(field, None)
-
-    return result
 
 
 def get_resource_accounts(resource: dict[str, Any]) -> list[str]:

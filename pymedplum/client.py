@@ -1045,7 +1045,7 @@ class MedplumClient(BaseClient):
         *,
         propagate: bool = False,
         prefer_async: bool = False,
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, Any]:
         """Assign a resource to accounts via the $set-accounts operation.
 
         Medplum uses meta.accounts for compartment-based multi-tenant
@@ -1063,14 +1063,14 @@ class MedplumClient(BaseClient):
             propagate: If True, cascade account assignments to related
                 resources (Appointments, Observations, etc.)
             prefer_async: If True, send Prefer: respond-async header.
-                Recommended for large compartments to avoid timeouts.
-                The server may return HTTP 202 with an async job
-                response. Use get_async_job_status() to poll.
+                Only takes effect when propagate is also True.
+                Server returns an OperationOutcome with the async job
+                URL in issue[0].diagnostics. Poll with client.get().
 
         Returns:
-            FHIR Parameters with resourcesUpdated count, or the
-            resource itself. May return None if the server responds
-            with an empty body (e.g., 202 with no content).
+            Synchronous: FHIR Parameters with resourcesUpdated count.
+            Async (202): OperationOutcome with job URL in
+            issue[0].diagnostics.
 
         Examples:
             # Assign patient to an organization's account
@@ -1090,18 +1090,21 @@ class MedplumClient(BaseClient):
                 propagate=True,
                 prefer_async=True,
             )
-            # result may be None if server accepted async (202)
+            # Poll the async job
+            job_url = result["issue"][0]["diagnostics"]
+            status = client.get(job_url)
         """
         if "/" not in resource_ref:
             raise ValueError(f"Invalid resource reference: {resource_ref}")
 
+        if prefer_async and not propagate:
+            raise ValueError("prefer_async only takes effect with propagate=True")
+
         resource_type, resource_id = resource_ref.split("/", 1)
 
-        # Normalize to list
         if isinstance(account_refs, str):
             account_refs = [account_refs]
 
-        # Build FHIR Parameters resource
         parameter: list[dict[str, Any]] = [
             {
                 "name": "accounts",
