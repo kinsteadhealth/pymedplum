@@ -22,6 +22,7 @@ from .helpers import decode_jwt_exp
 if TYPE_CHECKING:
     from .async_client import AsyncMedplumClient
     from .client import MedplumClient
+    from .fhir.operationoutcome import OperationOutcome
     from .types import BeforeRequestCallback
 
 
@@ -273,6 +274,36 @@ class BaseClient:
                 existing_refs.add(ref)
 
         return resource
+
+    def _resolve_async_job_url(
+        self, job: str | dict[str, Any] | OperationOutcome
+    ) -> str:
+        """Resolve an async job input to a polling URL.
+
+        Args:
+            job: Job ID, full URL, OperationOutcome dict, or
+                OperationOutcome Pydantic model
+
+        Returns:
+            Full URL for polling the job status
+        """
+        if hasattr(job, "model_dump"):
+            job = job.model_dump(by_alias=True, exclude_none=True)
+
+        if isinstance(job, dict):
+            issues = job.get("issue", [])
+            if issues and isinstance(issues[0], dict):
+                url = issues[0].get("diagnostics")
+                if url:
+                    return url
+            raise ValueError(
+                "Expected OperationOutcome with job URL in issue[0].diagnostics"
+            )
+
+        if job.startswith(("http://", "https://")):
+            return job
+
+        return f"{self.base_url}fhir/R4/job/{job}/status"
 
     def _build_query_params(self, query: Any) -> list[tuple]:
         """Build query parameters from various input formats.

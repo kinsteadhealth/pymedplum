@@ -1,7 +1,7 @@
 import random
 import time
 from collections.abc import Iterator
-from typing import Any, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
 from urllib.parse import urlparse
 
 import httpx
@@ -18,6 +18,9 @@ from ._fhir_ops import (
 )
 from .bundle import FHIRBundle
 from .exceptions import MedplumError
+
+if TYPE_CHECKING:
+    from .fhir.operationoutcome import OperationOutcome
 from .fhir.base import MedplumFHIRBase
 from .helpers import decode_jwt_exp, to_fhir_json
 from .types import PatchOperation, QueryTypes, SummaryMode, TotalMode
@@ -1090,9 +1093,8 @@ class MedplumClient(BaseClient):
                 propagate=True,
                 prefer_async=True,
             )
-            # Poll the async job
-            job_url = result["issue"][0]["diagnostics"]
-            status = client.get(job_url)
+            # Wait for the async job to complete
+            job = client.wait_for_async_job(result, timeout=60)
         """
         if "/" not in resource_ref:
             raise ValueError(f"Invalid resource reference: {resource_ref}")
@@ -1646,80 +1648,77 @@ class MedplumClient(BaseClient):
 
     def get_async_job_status(
         self,
-        job_id: str,
+        job: "str | dict[str, Any] | OperationOutcome",
     ) -> dict[str, Any]:
-        """Get the status of an async job (BulkDataExport).
+        """Get the status of an async job.
 
-        Medplum uses the BulkDataExport resource to track the status of
-        long-running operations like bulk exports. This method retrieves
-        the current status of such a job.
+        Accepts a job ID, a job status URL, or an OperationOutcome
+        returned from an async operation (e.g., set_accounts with
+        prefer_async=True).
 
         Args:
-            job_id: The ID of the BulkDataExport resource
+            job: Job ID, full status URL, or OperationOutcome dict
+                with the job URL in issue[0].diagnostics
 
         Returns:
-            BulkDataExport resource with current status
+            AsyncJob resource with current status
 
         Example:
-            # Start a bulk export (returns immediately with job ID)
-            # Then poll for status
-            job = client.get_async_job_status("export-job-123")
-
-            if job.get("status") == "completed":
-                # Get output files
-                for output in job.get("output", []):
-                    print(f"File: {output['url']}")
-            elif job.get("status") == "error":
-                print(f"Export failed: {job.get('error')}")
+            result = client.set_accounts(
+                "Patient/123", "Organization/org-a",
+                propagate=True, prefer_async=True,
+            )
+            job = client.get_async_job_status(result)
         """
-        return self.read_resource("BulkDataExport", job_id)
+        url = self._resolve_async_job_url(job)
+        return self._request("GET", url)
 
     def wait_for_async_job(
         self,
-        job_id: str,
+        job: "str | dict[str, Any] | OperationOutcome",
         poll_interval: float = 1.0,
         timeout: float | None = None,
     ) -> dict[str, Any]:
-        """Wait for an async job to complete, polling at regular intervals.
+        """Wait for an async job to complete, polling at intervals.
 
-        Polls the job status until it reaches a terminal state (completed, error)
-        or until the timeout is reached.
+        Accepts the same inputs as get_async_job_status.
 
         Args:
-            job_id: The ID of the BulkDataExport resource
+            job: Job ID, full status URL, or OperationOutcome dict
             poll_interval: Seconds between status checks (default: 1.0)
-            timeout: Maximum seconds to wait (default: None = wait indefinitely)
+            timeout: Maximum seconds to wait (None = indefinite)
 
         Returns:
-            BulkDataExport resource with final status
+            AsyncJob resource with final status
 
         Raises:
             TimeoutError: If timeout is reached before job completes
 
         Example:
-            # Wait for a bulk export to complete
-            job = client.wait_for_async_job("export-job-123", timeout=300)
-
-            if job.get("status") == "completed":
-                for output in job.get("output", []):
-                    # Download output files
-                    content = client.get(output["url"].replace(client.base_url, ""))
+            result = client.set_accounts(
+                "Patient/123", "Organization/org-a",
+                propagate=True, prefer_async=True,
+            )
+            job = client.wait_for_async_job(result, timeout=60)
+            if job["status"] == "completed":
+                print(job["output"])
         """
+        url = self._resolve_async_job_url(job)
         start_time = time.time()
-        terminal_statuses = {"completed", "error", "stopped"}
+        terminal_statuses = {"completed", "error", "stopped", "cancelled"}
 
         while True:
-            job = self.get_async_job_status(job_id)
-            status = job.get("status", "")
+            status_response = self._request("GET", url)
+            status = status_response.get("status", "")
 
             if status in terminal_statuses:
-                return job
+                return status_response
 
             if timeout is not None:
                 elapsed = time.time() - start_time
                 if elapsed >= timeout:
                     raise TimeoutError(
-                        f"Async job {job_id} did not complete within {timeout} seconds"
+                        f"Async job did not complete within {timeout} seconds"
                     )
 
             time.sleep(poll_interval)

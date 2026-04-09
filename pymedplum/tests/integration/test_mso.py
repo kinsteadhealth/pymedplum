@@ -610,6 +610,72 @@ def test_set_accounts_with_propagate(medplum_client):
         medplum_client.delete_resource("Organization", org["id"])
 
 
+def test_set_accounts_prefer_async_and_wait(medplum_client):
+    """Test the full async flow: set_accounts → wait_for_async_job."""
+    org = medplum_client.create_resource(
+        {"resourceType": "Organization", "name": "AsyncFlow Org"}
+    )
+    patient = medplum_client.create_resource(
+        {
+            "resourceType": "Patient",
+            "name": [{"given": ["AsyncFlow"], "family": "Test"}],
+        }
+    )
+    org_ref = f"Organization/{org['id']}"
+
+    try:
+        result = medplum_client.set_accounts(
+            f"Patient/{patient['id']}",
+            org_ref,
+            propagate=True,
+            prefer_async=True,
+        )
+
+        assert result["resourceType"] == "OperationOutcome"
+        assert result["issue"][0]["diagnostics"]
+
+        job = medplum_client.wait_for_async_job(result, timeout=30)
+        assert job["status"] == "completed"
+
+        updated = medplum_client.read_resource("Patient", patient["id"])
+        assert resource_has_account(updated, org_ref)
+    finally:
+        medplum_client.delete_resource("Patient", patient["id"])
+        medplum_client.delete_resource("Organization", org["id"])
+
+
+def test_get_async_job_status_single_check(medplum_client):
+    """Test get_async_job_status for a single non-polling check."""
+    org = medplum_client.create_resource(
+        {"resourceType": "Organization", "name": "StatusCheck Org"}
+    )
+    patient = medplum_client.create_resource(
+        {
+            "resourceType": "Patient",
+            "name": [{"given": ["StatusCheck"], "family": "Test"}],
+        }
+    )
+
+    try:
+        result = medplum_client.set_accounts(
+            f"Patient/{patient['id']}",
+            f"Organization/{org['id']}",
+            propagate=True,
+            prefer_async=True,
+        )
+
+        job = medplum_client.get_async_job_status(result)
+        assert job["resourceType"] == "AsyncJob"
+        assert job["status"] in (
+            "accepted",
+            "active",
+            "completed",
+        )
+    finally:
+        medplum_client.delete_resource("Patient", patient["id"])
+        medplum_client.delete_resource("Organization", org["id"])
+
+
 def test_set_accounts_with_practitioner_ref(medplum_client, mso_setup):
     org_a_ref = f"Organization/{mso_setup['orgs']['a']['id']}"
     prac_ref = f"Practitioner/{mso_setup['practitioners']['doctor_a']['id']}"

@@ -530,6 +530,54 @@ resource_has_account(patient, "Organization/org-456")  # True/False
 get_resource_accounts(patient)  # ["Organization/org-456", ...]
 ```
 
+### Async Jobs
+
+#### `get_async_job_status(job) -> dict`
+
+Get the current status of an async job.
+
+**Parameters**:
+- `job` (str | dict | OperationOutcome): Job ID, full status URL, OperationOutcome dict, or OperationOutcome Pydantic model
+
+**Returns**: AsyncJob resource with current status
+
+**Example**:
+```python
+# Check once without waiting
+job = client.get_async_job_status(result)
+if job["status"] == "completed":
+    print(job["output"])
+elif job["status"] in ("accepted", "active"):
+    print("Still running")
+```
+
+#### `wait_for_async_job(job, poll_interval=1.0, timeout=None) -> dict`
+
+Poll an async job until it reaches a terminal state.
+
+**Parameters**:
+- `job` (str | dict | OperationOutcome): Same as `get_async_job_status`
+- `poll_interval` (float): Seconds between polls (default: 1.0)
+- `timeout` (float | None): Maximum seconds to wait (default: None = indefinite)
+
+**Returns**: AsyncJob resource with final status
+
+**Raises**: `TimeoutError` if timeout is reached
+
+**Example**:
+```python
+# Start an async operation
+result = client.set_accounts(
+    "Patient/123", "Organization/org-456",
+    propagate=True, prefer_async=True,
+)
+
+# Wait for completion — accepts the OperationOutcome directly
+job = client.wait_for_async_job(result, timeout=60)
+print(job["status"])  # "completed"
+print(job["output"])  # Parameters with resourcesUpdated
+```
+
 ### Terminology Operations
 
 PyMedplum provides methods for FHIR terminology operations including ValueSet expansion, CodeSystem lookup, and ConceptMap translation.

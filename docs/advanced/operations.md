@@ -94,9 +94,14 @@ result = client.set_accounts(
     propagate=True,
     prefer_async=True,
 )
-# Server returns OperationOutcome with async job URL
-job_url = result["issue"][0]["diagnostics"]
-status = client.get(job_url)
+# Server returns an OperationOutcome — wait for completion
+job = client.wait_for_async_job(result, timeout=60)
+print(job["status"])  # "completed"
+
+# Or check once without waiting
+job = client.get_async_job_status(result)
+if job["status"] == "completed":
+    print(job["output"])
 ```
 
 ### How Medplum assigns accounts

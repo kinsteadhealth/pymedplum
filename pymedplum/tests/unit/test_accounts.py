@@ -121,3 +121,57 @@ def test_set_accounts_prefer_async_without_propagate_raises():
     client = MedplumClient()
     with pytest.raises(ValueError, match="prefer_async only takes effect"):
         client.set_accounts("Patient/123", "Organization/org-1", prefer_async=True)
+
+
+def test_resolve_async_job_url_from_operation_outcome():
+    client = MedplumClient()
+    outcome = {
+        "resourceType": "OperationOutcome",
+        "issue": [
+            {
+                "severity": "information",
+                "code": "informational",
+                "diagnostics": "https://api.medplum.com/fhir/R4/job/abc-123/status",
+            }
+        ],
+    }
+    assert client._resolve_async_job_url(outcome) == (
+        "https://api.medplum.com/fhir/R4/job/abc-123/status"
+    )
+
+
+def test_resolve_async_job_url_from_full_url():
+    client = MedplumClient()
+    url = "https://api.medplum.com/fhir/R4/job/abc-123/status"
+    assert client._resolve_async_job_url(url) == url
+
+
+def test_resolve_async_job_url_from_job_id():
+    client = MedplumClient()
+    assert client._resolve_async_job_url("abc-123") == (
+        "https://api.medplum.com/fhir/R4/job/abc-123/status"
+    )
+
+
+def test_resolve_async_job_url_from_pydantic_model():
+    from pymedplum.fhir import OperationOutcome, OperationOutcomeIssue
+
+    client = MedplumClient()
+    outcome = OperationOutcome(
+        issue=[
+            OperationOutcomeIssue(
+                severity="information",
+                code="informational",
+                diagnostics="https://api.medplum.com/fhir/R4/job/abc-123/status",
+            )
+        ],
+    )
+    assert client._resolve_async_job_url(outcome) == (
+        "https://api.medplum.com/fhir/R4/job/abc-123/status"
+    )
+
+
+def test_resolve_async_job_url_invalid_dict_raises():
+    client = MedplumClient()
+    with pytest.raises(ValueError, match="Expected OperationOutcome"):
+        client._resolve_async_job_url({"resourceType": "Patient"})
