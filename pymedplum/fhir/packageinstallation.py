@@ -12,16 +12,19 @@ from pymedplum.fhir.base import MedplumFHIRBase
 
 if TYPE_CHECKING:
     from pymedplum.fhir.extension import Extension
+    from pymedplum.fhir.identifier import Identifier
     from pymedplum.fhir.meta import Meta
     from pymedplum.fhir.narrative import Narrative
     from pymedplum.fhir.reference import Reference
 
 
-class PasswordChangeRequest(MedplumFHIRBase):
-    """PasswordChangeRequest FHIR resource"""
+class PackageInstallation(MedplumFHIRBase):
+    """Definition of a marketplace package installation, which represents the
+    installation of a specific package release in a system.
+    """
 
-    resource_type: Literal["PasswordChangeRequest"] = Field(
-        default="PasswordChangeRequest", alias="resourceType"
+    resource_type: Literal["PackageInstallation"] = Field(
+        default="PackageInstallation", alias="resourceType"
     )
 
     id: str | None = Field(
@@ -57,23 +60,25 @@ class PasswordChangeRequest(MedplumFHIRBase):
         alias="modifierExtension",
         description="May be used to represent additional information that is not part of the basic definition of the resource and that modifies the understanding of the element that contains it and/or the understanding of the containing element's descendants. Usually modifier elements provide negation or qualification. To make the use of extensions safe and manageable, there is a strict set of governance applied to the definition and use of extensions. Though any implementer is allowed to define an extension, there is a set of requirements that SHALL be met as part of the definition of the extension. Applications processing a resource are required to check for modifier extensions. Modifier extensions SHALL NOT change the meaning of any elements on Resource or DomainResource (including cannot change the meaning of modifierExtension itself).",
     )
-    type: Literal["invite", "reset"] | None = Field(
-        default=None,
-        description="The type of password change request (invite or reset).",
+    identifier: list[Identifier] | None = Field(
+        default=None, description="An identifier for this package installation."
     )
-    user: Reference = Field(
-        default=..., description="The user requesting the password change."
+    package: Reference = Field(
+        default=..., description="The Package of this installation."
     )
-    secret: str = Field(
+    package_release: Reference = Field(
         default=...,
-        description="Secret string used to verify the identity of the user.",
+        alias="packageRelease",
+        description="The PackageRelease of this installation.",
     )
-    used: bool | None = Field(
-        default=None,
-        description="Whether this request has been used, and is therefore no longer valid.",
+    version: str = Field(
+        default=..., description="The version of the PackageInstallation."
     )
-    redirect_uri: str | None = Field(
-        default=None,
-        alias="redirectUri",
-        description="Redirect URI used when redirecting a client back to the client application.",
+    status: Literal["requested", "installing", "installed", "error"] = Field(
+        default=..., description="The status of the package installation."
+    )
+    installed_by: Reference = Field(
+        default=...,
+        alias="installedBy",
+        description="Reference to the resource that represents the installer of the package.",
     )

@@ -1,5 +1,6 @@
 # Generated FHIR module
 # Do not edit manually
+# Source: @medplum/fhirtypes 5.1.7
 """FHIR Resource models with lazy loading support.
 
 This module provides ~300 FHIR resource type definitions. To avoid massive
@@ -167,6 +168,7 @@ REGISTRY: dict[str, str] = {
     "ClaimResponseTotal": "pymedplum.fhir.claimresponse:ClaimResponseTotal",
     "ClaimSupportingInfo": "pymedplum.fhir.claim:ClaimSupportingInfo",
     "ClientApplication": "pymedplum.fhir.clientapplication:ClientApplication",
+    "ClientApplicationLaunchIdentifierSystems": "pymedplum.fhir.clientapplication:ClientApplicationLaunchIdentifierSystems",
     "ClientApplicationSignInForm": "pymedplum.fhir.clientapplication:ClientApplicationSignInForm",
     "ClinicalImpression": "pymedplum.fhir.clinicalimpression:ClinicalImpression",
     "ClinicalImpressionFinding": "pymedplum.fhir.clinicalimpression:ClinicalImpressionFinding",
@@ -538,6 +540,9 @@ REGISTRY: dict[str, str] = {
     "Organization": "pymedplum.fhir.organization:Organization",
     "OrganizationAffiliation": "pymedplum.fhir.organizationaffiliation:OrganizationAffiliation",
     "OrganizationContact": "pymedplum.fhir.organization:OrganizationContact",
+    "Package": "pymedplum.fhir.package:Package",
+    "PackageInstallation": "pymedplum.fhir.packageinstallation:PackageInstallation",
+    "PackageRelease": "pymedplum.fhir.packagerelease:PackageRelease",
     "ParameterDefinition": "pymedplum.fhir.parameterdefinition:ParameterDefinition",
     "Parameters": "pymedplum.fhir.parameters:Parameters",
     "ParametersParameter": "pymedplum.fhir.parameters:ParametersParameter",
@@ -1153,6 +1158,7 @@ if TYPE_CHECKING:
     )
     from pymedplum.fhir.clientapplication import (
         ClientApplication,
+        ClientApplicationLaunchIdentifierSystems,
         ClientApplicationSignInForm,
     )
     from pymedplum.fhir.clinicalimpression import (
@@ -1624,6 +1630,9 @@ if TYPE_CHECKING:
     from pymedplum.fhir.operationoutcome import OperationOutcome, OperationOutcomeIssue
     from pymedplum.fhir.organization import Organization, OrganizationContact
     from pymedplum.fhir.organizationaffiliation import OrganizationAffiliation
+    from pymedplum.fhir.package import Package
+    from pymedplum.fhir.packageinstallation import PackageInstallation
+    from pymedplum.fhir.packagerelease import PackageRelease
     from pymedplum.fhir.parameterdefinition import ParameterDefinition
     from pymedplum.fhir.parameters import Parameters, ParametersParameter
     from pymedplum.fhir.patient import (
@@ -2026,6 +2035,7 @@ if TYPE_CHECKING:
         | ClaimResponseTotal
         | ClaimSupportingInfo
         | ClientApplication
+        | ClientApplicationLaunchIdentifierSystems
         | ClientApplicationSignInForm
         | ClinicalImpression
         | ClinicalImpressionFinding
@@ -2397,6 +2407,9 @@ if TYPE_CHECKING:
         | Organization
         | OrganizationAffiliation
         | OrganizationContact
+        | Package
+        | PackageInstallation
+        | PackageRelease
         | ParameterDefinition
         | Parameters
         | ParametersParameter
@@ -2753,6 +2766,7 @@ if TYPE_CHECKING:
         "ClaimResponseTotal",
         "ClaimSupportingInfo",
         "ClientApplication",
+        "ClientApplicationLaunchIdentifierSystems",
         "ClientApplicationSignInForm",
         "ClinicalImpression",
         "ClinicalImpressionFinding",
@@ -3124,6 +3138,9 @@ if TYPE_CHECKING:
         "Organization",
         "OrganizationAffiliation",
         "OrganizationContact",
+        "Package",
+        "PackageInstallation",
+        "PackageRelease",
         "ParameterDefinition",
         "Parameters",
         "ParametersParameter",

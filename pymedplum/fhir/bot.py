@@ -106,6 +106,11 @@ class Bot(MedplumFHIRBase):
         alias="publicWebhook",
         description="Optional flag to indicate that the bot can be used as an unauthenticated public webhook. Note that this is a security risk and should only be used for public bots that do not require authentication.",
     )
+    streaming_enabled: bool | None = Field(
+        default=None,
+        alias="streamingEnabled",
+        description="Optional flag to indicate that the bot should be deployed in a streaming-enabled context, allowing it to execute with streaming responses.",
+    )
     audit_event_trigger: Literal["always", "never", "on-error", "on-output"] | None = (
         Field(
             default=None,

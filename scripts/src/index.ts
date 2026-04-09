@@ -10,6 +10,35 @@ import { parseTypeScriptFile } from "./parser";
 import { generatePydanticFile, generateInitFile, generateStubFile } from "./writer";
 
 // ============================================================================
+// Version Detection
+// ============================================================================
+
+/**
+ * Reads the installed @medplum/fhirtypes version from the resolved types directory.
+ * Accepts the typesDir returned by findMedplumTypesDir() so the version always
+ * matches the actual source used for generation.
+ */
+function getInstalledFhirTypesVersion(typesDir: string): string {
+  // Walk up from typesDir (which may be .../dist) to find package.json
+  let dir = typesDir;
+  for (let i = 0; i < 3; i++) {
+    const candidate = path.join(dir, "package.json");
+    if (fs.existsSync(candidate)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(candidate, "utf-8"));
+        if (pkg.name === "@medplum/fhirtypes") {
+          return pkg.version || "unknown";
+        }
+      } catch {
+        // continue walking up
+      }
+    }
+    dir = path.dirname(dir);
+  }
+  return "unknown";
+}
+
+// ============================================================================
 // Configuration
 // ============================================================================
 
@@ -79,17 +108,22 @@ function ensureOutputDirectory(outputDir: string): void {
 /**
  * Processes a single TypeScript definition file.
  */
+type ProcessResult =
+  | { status: "generated"; parsedFile: ReturnType<typeof parseTypeScriptFile> }
+  | { status: "skipped" }
+  | { status: "error" };
+
 function processDefinitionFile(
   tsPath: string,
   resourceName: string,
   outputDir: string,
-): { success: boolean; interfaceCount: number } {
+): ProcessResult {
   try {
     const parsedFile = parseTypeScriptFile(tsPath);
 
     if (parsedFile.interfaces.length === 0) {
       console.log(`   ⚠️  No interfaces found, skipping`);
-      return { success: false, interfaceCount: 0 };
+      return { status: "skipped" };
     }
 
     // Generate and write Pydantic code
@@ -101,10 +135,10 @@ function processDefinitionFile(
       `   ✅ Generated ${resourceName.toLowerCase()}.py (${parsedFile.interfaces.length} class${parsedFile.interfaces.length > 1 ? "es" : ""})`,
     );
 
-    return { success: true, interfaceCount: parsedFile.interfaces.length };
+    return { status: "generated", parsedFile };
   } catch (error) {
     console.error(`   ❌ Error: ${error}`);
-    return { success: false, interfaceCount: 0 };
+    return { status: "error" };
   }
 }
 
@@ -114,19 +148,20 @@ function processDefinitionFile(
 function generateModuleInit(
   resourceNames: string[],
   classesToFiles: Map<string, string>,
-  outputDir: string
+  outputDir: string,
+  fhirTypesVersion: string,
 ): void {
   console.log("\n📦 Generating module exports...");
-  
+
   // Generate __init__.py
-  const initCode = generateInitFile(resourceNames, classesToFiles);
+  const initCode = generateInitFile(resourceNames, classesToFiles, fhirTypesVersion);
   fs.writeFileSync(path.join(outputDir, "__init__.py"), initCode, "utf-8");
-  
+
   // Generate __init__.pyi stub file for IDE/type checker support
   console.log("📝 Generating type stub file (__init__.pyi)...");
   const stubCode = generateStubFile(resourceNames, classesToFiles);
   fs.writeFileSync(path.join(outputDir, "__init__.pyi"), stubCode, "utf-8");
-  
+
   // Create py.typed marker file
   console.log("🏷️  Creating py.typed marker...");
   const pyTypedPath = path.resolve(outputDir, "../py.typed");
@@ -173,6 +208,9 @@ function main(): void {
 
   ensureOutputDirectory(OUTPUT_DIR);
 
+  // Track which .py files we generate so we can remove stale ones
+  const generatedFiles = new Set<string>(["__init__.py", "__init__.pyi", "base.py", "py.typed"]);
+
   const files = getDefinitionFiles(typesDir);
   console.log(`📋 Found ${files.length} type definition files\n`);
 
@@ -195,23 +233,51 @@ function main(): void {
 
     const result = processDefinitionFile(tsPath, resourceName, OUTPUT_DIR);
 
-    if (result.success) {
-      stats.generated++;
-      // Collect all interface names from the parsed file and map to their file
-      const parsedFile = parseTypeScriptFile(tsPath);
-      const pythonFileName = resourceName.toLowerCase();
-      parsedFile.interfaces.forEach((iface) => {
-        resourceNames.push(iface.name);
-        classesToFiles.set(iface.name, pythonFileName);
-      });
-    } else if (result.interfaceCount === 0) {
-      stats.skipped++;
-    } else {
-      stats.errors++;
+    switch (result.status) {
+      case "generated": {
+        stats.generated++;
+        const pythonFileName = resourceName.toLowerCase();
+        generatedFiles.add(`${pythonFileName}.py`);
+        result.parsedFile.interfaces.forEach((iface) => {
+          resourceNames.push(iface.name);
+          classesToFiles.set(iface.name, pythonFileName);
+        });
+        break;
+      }
+      case "skipped":
+        stats.skipped++;
+        break;
+      case "error":
+        stats.errors++;
+        break;
     }
   }
 
-  generateModuleInit(resourceNames, classesToFiles, OUTPUT_DIR);
+  // Remove stale .py files that no longer correspond to upstream types.
+  // Skip cleanup if any files errored — a transient failure shouldn't
+  // cause deletion of previously valid generated files.
+  if (stats.errors > 0) {
+    console.log("\n⚠️  Skipping stale file cleanup due to generation errors");
+  } else {
+    const existingFiles = fs.readdirSync(OUTPUT_DIR).filter(
+      (f) => f.endsWith(".py") || f.endsWith(".pyi") || f === "py.typed"
+    );
+    let staleCount = 0;
+    for (const existing of existingFiles) {
+      if (!generatedFiles.has(existing)) {
+        const stalePath = path.join(OUTPUT_DIR, existing);
+        fs.unlinkSync(stalePath);
+        console.log(`   🗑️  Removed stale file: ${existing}`);
+        staleCount++;
+      }
+    }
+    if (staleCount > 0) {
+      console.log(`\n🧹 Removed ${staleCount} stale file(s)`);
+    }
+  }
+
+  const fhirTypesVersion = getInstalledFhirTypesVersion(typesDir);
+  generateModuleInit(resourceNames, classesToFiles, OUTPUT_DIR, fhirTypesVersion);
   printSummary(stats);
 
   if (stats.errors > 0) {
