@@ -18,11 +18,12 @@ from .exceptions import (
     ServerError,
 )
 from .helpers import decode_jwt_exp
-from .types import DEFAULT_ORG_EXTENSION_URL, BeforeRequestCallback, OrgMode
 
 if TYPE_CHECKING:
     from .async_client import AsyncMedplumClient
     from .client import MedplumClient
+    from .fhir.operationoutcome import OperationOutcome
+    from .types import BeforeRequestCallback
 
 
 def _raise_or_json(response: httpx.Response) -> dict[str, Any | None]:
@@ -112,9 +113,6 @@ class BaseClient:
         access_token: str | None = None,
         fhir_url_path: str = "fhir/R4/",
         project_id: str | None = None,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
-        org_extension_url: str = DEFAULT_ORG_EXTENSION_URL,
         before_request: BeforeRequestCallback | None = None,
         default_on_behalf_of: str | None = None,
     ):
@@ -124,9 +122,6 @@ class BaseClient:
         self.client_secret = client_secret
         self.access_token = access_token
         self.project_id = project_id
-        self.org_mode = org_mode
-        self.org_ref = org_ref
-        self.org_extension_url = org_extension_url
         self.before_request = before_request
         self.default_on_behalf_of = default_on_behalf_of
 
@@ -244,62 +239,71 @@ class BaseClient:
             seconds=60
         )
 
-    def _inject_org_tag(
-        self,
+    @staticmethod
+    def _apply_accounts(
         resource: dict[str, Any],
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
+        accounts: str | list[str],
     ) -> dict[str, Any]:
-        """Inject org tag into resource based on org_mode setting.
-
-        Idempotent - won't duplicate existing tags.
+        """Set meta.accounts on a resource before sending to the server.
 
         Args:
             resource: FHIR resource dict
-            org_mode: Override client's org_mode
-            org_ref: Override client's org_ref
+            accounts: Single reference or list of references to assign
+                (e.g., "Organization/abc" or ["Organization/abc"])
 
         Returns:
-            Modified resource dict
+            Modified resource dict with meta.accounts set
         """
-        effective_mode = org_mode or self.org_mode
-        effective_ref = org_ref or self.org_ref
+        if isinstance(accounts, str):
+            accounts = [accounts]
 
-        if not effective_mode or not effective_ref:
-            return resource
+        meta = resource.setdefault("meta", {})
+        existing = meta.setdefault("accounts", [])
+        existing_refs = {
+            acc.get("reference") for acc in existing if isinstance(acc, dict)
+        }
 
-        if resource.get("resourceType") == "Bundle":
-            for entry in resource.get("entry", []):
-                if "resource" in entry and isinstance(entry["resource"], dict):
-                    entry["resource"] = self._inject_org_tag(
-                        entry["resource"],
-                        org_mode=effective_mode,
-                        org_ref=effective_ref,
-                    )
-            return resource
-
-        if effective_mode == "accounts":
-            # CRITICAL FIX: Use plural 'accounts', not 'account'
-            meta = resource.setdefault("meta", {})
-            accounts = meta.setdefault("accounts", [])
-
-            org_account = {"reference": effective_ref}
-            if org_account not in accounts:
-                accounts.append(org_account)
-
-        elif effective_mode == "extension":
-            meta = resource.setdefault("meta", {})
-            extensions = meta.setdefault("extension", [])
-
-            org_ext = {
-                "url": self.org_extension_url,
-                "valueReference": {"reference": effective_ref},
-            }
-
-            if not any(ext.get("url") == org_ext["url"] for ext in extensions):
-                extensions.append(org_ext)
+        for ref in accounts:
+            if not ref or "/" not in ref:
+                raise ValueError(
+                    f"Invalid account reference: {ref!r}. "
+                    "Expected format like 'Organization/abc'."
+                )
+            if ref not in existing_refs:
+                existing.append({"reference": ref})
+                existing_refs.add(ref)
 
         return resource
+
+    def _resolve_async_job_url(
+        self, job: str | dict[str, Any] | OperationOutcome
+    ) -> str:
+        """Resolve an async job input to a polling URL.
+
+        Args:
+            job: Job ID, full URL, OperationOutcome dict, or
+                OperationOutcome Pydantic model
+
+        Returns:
+            Full URL for polling the job status
+        """
+        if hasattr(job, "model_dump"):
+            job = job.model_dump(by_alias=True, exclude_none=True)
+
+        if isinstance(job, dict):
+            issues = job.get("issue", [])
+            if issues and isinstance(issues[0], dict):
+                url = issues[0].get("diagnostics")
+                if url:
+                    return url
+            raise ValueError(
+                "Expected OperationOutcome with job URL in issue[0].diagnostics"
+            )
+
+        if job.startswith(("http://", "https://")):
+            return job
+
+        return f"{self.fhir_base_url}job/{job}/status"
 
     def _build_query_params(self, query: Any) -> list[tuple]:
         """Build query parameters from various input formats.

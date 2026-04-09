@@ -29,15 +29,14 @@ print(f"Authenticated with token: {token[:20]}...")
 
 ### Resource Operations
 
-#### `create_resource(resource, org_mode=None, org_ref=None, headers=None, *, as_fhir=None) -> dict | Model`
+#### `create_resource(resource, headers=None, *, accounts=None, as_fhir=None) -> dict | Model`
 
 Create a new FHIR resource.
 
 **Parameters**:
 - `resource` (dict | Pydantic model): The resource to create
-- `org_mode` (OrgMode, optional): Override client org_mode for this request
-- `org_ref` (str, optional): Override client org_ref for this request
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request
+- `accounts` (str | list[str], optional): Account references to set on `meta.accounts` at creation time for multi-tenant compartment assignment
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 
 **Returns**: dict or Pydantic model instance - The created resource with server-assigned ID
@@ -46,24 +45,28 @@ Create a new FHIR resource.
 ```python
 from pymedplum.fhir import Patient
 
-# Using Pydantic model - returns dict
-patient = Patient(name=[{"family": "Smith", "given": ["John"]}])
-created = client.create_resource(patient)
-print(f"Created patient with ID: {created['id']}")
-
-# Using dictionary
+# Basic creation
 patient_dict = {"resourceType": "Patient", "active": True}
 created = client.create_resource(patient_dict)
+
+# With account assignment (multi-tenant)
+created = client.create_resource(
+    patient_dict,
+    accounts="Organization/org-456",
+)
+
+# Multiple accounts
+created = client.create_resource(
+    patient_dict,
+    accounts=["Organization/org-456", "Organization/org-789"],
+)
 
 # With type-safe response
 created_patient = client.create_resource(patient_dict, as_fhir=Patient)
 print(created_patient.name[0].family)  # Full IDE autocomplete!
-
-# With custom headers
-created = client.create_resource(patient, headers={"X-Custom-Header": "value"})
 ```
 
-#### `create_resource_if_none_exist(resource, if_none_exist, org_mode=None, org_ref=None, headers=None, *, as_fhir=None) -> dict | Model`
+#### `create_resource_if_none_exist(resource, if_none_exist, headers=None, *, accounts=None, as_fhir=None) -> dict | Model`
 
 Conditionally create a FHIR resource only if no matching resource exists (If-None-Exist).
 
@@ -72,9 +75,8 @@ This method uses FHIR's conditional create mechanism via the `If-None-Exist` hea
 **Parameters**:
 - `resource` (dict | Pydantic model): The resource to create
 - `if_none_exist` (str): FHIR search query string (e.g., "identifier=MRN|12345"). Accepts plain query strings or strings with a leading `?` (which is automatically stripped). Full URLs are also accepted and the query portion is extracted.
-- `org_mode` (OrgMode, optional): Override client org_mode for this request
-- `org_ref` (str, optional): Override client org_ref for this request
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request
+- `accounts` (str | list[str], optional): Account references to set on `meta.accounts` at creation time
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 
 **Returns**: dict or Pydantic model instance - The created or existing resource
@@ -142,15 +144,14 @@ patient = client.read_resource("Patient", "123", as_fhir=Patient)
 print(patient.name[0].family)  # Type-safe access
 ```
 
-#### `update_resource(resource, org_mode=None, org_ref=None, headers=None, *, as_fhir=None) -> dict | Model`
+#### `update_resource(resource, headers=None, *, accounts=None, as_fhir=None) -> dict | Model`
 
 Update an existing FHIR resource (requires id).
 
 **Parameters**:
 - `resource` (dict | Pydantic model): Resource with id field
-- `org_mode` (OrgMode, optional): Override client org_mode
-- `org_ref` (str, optional): Override client org_ref
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request (e.g., `If-Match` for optimistic locking)
+- `accounts` (str | list[str], optional): Account references to set on `meta.accounts`
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 
 **Returns**: dict or Pydantic model instance - The updated resource
@@ -483,6 +484,98 @@ Create context manager for on-behalf-of operations.
 with client.on_behalf_of("ProjectMembership/123") as obo_client:
     # Operations here execute with the permissions of membership 123
     patient = obo_client.read_resource("Patient", "456")
+```
+
+### Multi-Tenant Accounts
+
+#### `set_accounts(resource_ref, account_refs, *, propagate=False, prefer_async=False) -> dict`
+
+Assign a resource to one or more accounts using Medplum's `$set-accounts` operation. Account assignments (stored in `meta.accounts`) drive compartment-based access control in multi-tenant MSO setups.
+
+**Parameters**:
+- `resource_ref` (str): Reference like `"Patient/123"`
+- `account_refs` (str | list[str]): Account references to assign (typically Organizations or Practitioners)
+- `propagate` (bool): If True, cascade assignments to all resources in the target's FHIR compartment (Observations, Encounters, etc.)
+- `prefer_async` (bool): If True, send `Prefer: respond-async` header. Only takes effect when `propagate` is also True. Server returns an OperationOutcome with the async job URL in `issue[0].diagnostics`.
+
+**Returns**: Synchronous: FHIR Parameters with `resourcesUpdated` count. Async (202): OperationOutcome with job URL in `issue[0].diagnostics`.
+
+**Example**:
+```python
+# Assign patient to an organization
+client.set_accounts("Patient/123", "Organization/org-456")
+
+# Multiple accounts with propagation to related resources
+client.set_accounts(
+    "Patient/123",
+    ["Organization/org-456", "Practitioner/prac-789"],
+    propagate=True,
+)
+```
+
+#### `get_resource_accounts(resource) -> list[str]`
+
+Return list of account reference strings from a resource's `meta.accounts`.
+
+#### `resource_has_account(resource, account_ref) -> bool`
+
+Check if a resource is assigned to a given account.
+
+**Example**:
+```python
+from pymedplum import get_resource_accounts, resource_has_account
+
+patient = client.read_resource("Patient", "123")
+resource_has_account(patient, "Organization/org-456")  # True/False
+get_resource_accounts(patient)  # ["Organization/org-456", ...]
+```
+
+### Async Jobs
+
+#### `get_async_job_status(job) -> dict`
+
+Get the current status of an async job.
+
+**Parameters**:
+- `job` (str | dict | OperationOutcome): Job ID, full status URL, OperationOutcome dict, or OperationOutcome Pydantic model
+
+**Returns**: AsyncJob resource with current status
+
+**Example**:
+```python
+# Check once without waiting
+job = client.get_async_job_status(result)
+if job["status"] == "completed":
+    print(job["output"])
+elif job["status"] in ("accepted", "active"):
+    print("Still running")
+```
+
+#### `wait_for_async_job(job, poll_interval=1.0, timeout=None) -> dict`
+
+Poll an async job until it reaches a terminal state.
+
+**Parameters**:
+- `job` (str | dict | OperationOutcome): Same as `get_async_job_status`
+- `poll_interval` (float): Seconds between polls (default: 1.0)
+- `timeout` (float | None): Maximum seconds to wait (default: None = indefinite)
+
+**Returns**: AsyncJob resource with final status
+
+**Raises**: `TimeoutError` if timeout is reached
+
+**Example**:
+```python
+# Start an async operation
+result = client.set_accounts(
+    "Patient/123", "Organization/org-456",
+    propagate=True, prefer_async=True,
+)
+
+# Wait for completion — accepts the OperationOutcome directly
+job = client.wait_for_async_job(result, timeout=60)
+print(job["status"])  # "completed"
+print(job["output"])  # Parameters with resourcesUpdated
 ```
 
 ### Terminology Operations

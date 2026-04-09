@@ -62,16 +62,100 @@ result = client.execute_operation(
 )
 ```
 
-## Medplum account compartments (`$set-accounts`)
+## Multi-tenant accounts (`$set-accounts`)
 
-`set_accounts` uses Medplum’s `$set-accounts` operation to manage `meta.accounts`.
+In multi-tenant MSO (Management Services Organization) setups, Medplum uses `meta.accounts` to assign resources to accounts — typically Organizations — which drive compartment-based access control via AccessPolicies.
+
+`set_accounts` wraps Medplum’s `$set-accounts` operation:
 
 ```python
-result = client.set_accounts(
-    resource_ref="Patient/patient-123",
-    org_ref="Organization/org-456",
+# Assign a patient to an organization
+client.set_accounts("Patient/patient-123", "Organization/org-456")
+
+# Assign to multiple accounts (e.g., an org and a specific practitioner)
+client.set_accounts(
+    "Patient/patient-123",
+    ["Organization/org-456", "Practitioner/prac-789"],
 )
-print(f"Resources updated: {result['parameter'][0]['valueInteger']}")
+
+# Propagate account assignments to all related resources
+# in the patient’s FHIR compartment (Observations, Encounters, etc.)
+client.set_accounts(
+    "Patient/patient-123",
+    "Organization/org-456",
+    propagate=True,
+)
+
+# For large compartments, use prefer_async to avoid timeouts
+# (only takes effect when propagate is also True)
+result = client.set_accounts(
+    "Patient/patient-123",
+    "Organization/org-456",
+    propagate=True,
+    prefer_async=True,
+)
+# Server returns an OperationOutcome — wait for completion
+job = client.wait_for_async_job(result, timeout=60)
+print(job["status"])  # "completed"
+
+# Or check once without waiting
+job = client.get_async_job_status(result)
+if job["status"] == "completed":
+    print(job["output"])
+```
+
+### How Medplum assigns accounts
+
+Most of the time, you don't need to set accounts yourself. Medplum
+handles it:
+
+- **Creating a Patient via OBO**: The server assigns accounts from the
+  user's AccessPolicy `compartment` field automatically.
+- **Creating resources linked to a Patient** (Encounter, Observation,
+  etc.): The server copies the Patient's `meta.accounts` onto the new
+  resource. If the Patient is in multiple orgs, the new resource
+  inherits all of them.
+- **Updating a resource**: Accounts are preserved for Patients and
+  re-derived from the linked Patient for other resources. The updater's
+  org is never added automatically.
+
+### When you need to set accounts explicitly
+
+**Admin/ClientApplication creating a Patient** — the server has no
+AccessPolicy compartment to auto-assign from, so use `accounts=` on
+`create_resource()` or call `set_accounts()` after.
+
+**Enrolling a Patient in a second org** — an admin calls
+`set_accounts()` with both org refs. Use `propagate=True` to cascade
+to existing related resources. `$set-accounts` requires projectAdmin
+or superAdmin (returns 403 otherwise).
+
+**Overriding accounts on update** — only admin/ClientApplication
+callers can do this via `accounts=` on `update_resource()`. The server
+ignores client-provided accounts from non-admin callers.
+
+| Scenario | How accounts are set | Notes |
+|----------|---------------------|-------|
+| OBO creates Patient | Automatic from AccessPolicy compartment | Single org |
+| Any caller creates resource linked to Patient | Inherited from Patient's accounts | Multi-org if Patient has multiple |
+| Admin creates Patient or unlinked resource | `accounts=` or `set_accounts()` | Must be explicit |
+| Any caller updates a resource | Preserved (Patient) or re-derived (others) | Never re-compartmentalized to updater's org |
+| Admin updates with `accounts=` | Overrides accounts | Admin-only |
+| Enroll Patient in additional org | Admin calls `set_accounts()` | `propagate=True` to update existing related resources |
+| Enroll Patient in new org | Admin calls `set_accounts()` | Use `propagate=True` to update existing related resources |
+
+### Helpers for inspecting account assignments
+
+```python
+from pymedplum import get_resource_accounts, resource_has_account
+
+patient = client.read_resource("Patient", "patient-123")
+
+# Check if a resource is assigned to a specific account
+resource_has_account(patient, "Organization/org-456")  # True/False
+
+# List all account references on a resource
+get_resource_accounts(patient)  # ["Organization/org-456", ...]
 ```
 
 ## C-CDA export

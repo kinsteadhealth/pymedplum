@@ -90,9 +90,6 @@ print(api_payload)
 # Output: {'resourceType': 'Patient', 'birthDate': '1990-01-01', 'active': True}
 ```
 
-### `to_portable(resource)`
-Strips Medplum-specific metadata (like `meta.author` and `meta.project`) and converts Medplum's `meta.accounts` field into standard FHIR extensions. This is useful when you need to share FHIR data with a non-Medplum system.
-
 ## Token Handling
 
 ### `decode_jwt_exp(token)`

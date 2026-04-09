@@ -1,7 +1,7 @@
 import random
 import time
 from collections.abc import Iterator
-from typing import Any, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
 from urllib.parse import urlparse
 
 import httpx
@@ -18,9 +18,12 @@ from ._fhir_ops import (
 )
 from .bundle import FHIRBundle
 from .exceptions import MedplumError
+
+if TYPE_CHECKING:
+    from .fhir.operationoutcome import OperationOutcome
 from .fhir.base import MedplumFHIRBase
 from .helpers import decode_jwt_exp, to_fhir_json
-from .types import OrgMode, PatchOperation, QueryTypes, SummaryMode, TotalMode
+from .types import PatchOperation, QueryTypes, SummaryMode, TotalMode
 
 ResourceT = TypeVar("ResourceT", bound=MedplumFHIRBase)
 
@@ -157,10 +160,9 @@ class MedplumClient(BaseClient):
     def create_resource(
         self,
         resource: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT],
     ) -> ResourceT:
         pass
@@ -169,10 +171,9 @@ class MedplumClient(BaseClient):
     def create_resource(
         self,
         resource: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: None = None,
     ) -> dict[str, Any]:
         pass
@@ -180,19 +181,18 @@ class MedplumClient(BaseClient):
     def create_resource(
         self,
         resource: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT] | None = None,
     ) -> ResourceT | dict[str, Any]:
         """Create a FHIR resource.
 
         Args:
             resource: FHIR resource dict or Pydantic model
-            org_mode: Override client org_mode for this request
-            org_ref: Override client org_ref for this request
             headers: Optional HTTP headers to include in the request
+            accounts: Account references to set on meta.accounts at
+                creation time (e.g., "Organization/abc" or a list)
             as_fhir: Optional FHIR resource class for typed response
 
         Returns:
@@ -215,7 +215,8 @@ class MedplumClient(BaseClient):
         """
         data = to_fhir_json(resource)
 
-        data = self._inject_org_tag(data, org_mode=org_mode, org_ref=org_ref)
+        if accounts is not None:
+            data = self._apply_accounts(data, accounts)
 
         resource_type = data.get("resourceType")
         if not resource_type:
@@ -235,10 +236,9 @@ class MedplumClient(BaseClient):
         self,
         resource: dict[str, Any] | Any,
         if_none_exist: str,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT],
     ) -> ResourceT:
         pass
@@ -248,10 +248,9 @@ class MedplumClient(BaseClient):
         self,
         resource: dict[str, Any] | Any,
         if_none_exist: str,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: None = None,
     ) -> dict[str, Any]:
         pass
@@ -260,10 +259,9 @@ class MedplumClient(BaseClient):
         self,
         resource: dict[str, Any] | Any,
         if_none_exist: str,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT] | None = None,
     ) -> ResourceT | dict[str, Any]:
         """Conditionally create a resource only if no matching resource exists.
@@ -276,9 +274,9 @@ class MedplumClient(BaseClient):
             resource: FHIR resource dict or Pydantic model to create
             if_none_exist: Search query string for matching existing resources
                 (e.g., "identifier=http://example.org|12345")
-            org_mode: Override client org_mode for this request
-            org_ref: Override client org_ref for this request
             headers: Optional HTTP headers to include in the request
+            accounts: Account references to set on meta.accounts at
+                creation time (e.g., "Organization/abc" or a list)
             as_fhir: Optional FHIR resource class for typed response
 
         Returns:
@@ -308,7 +306,8 @@ class MedplumClient(BaseClient):
         """
         data = to_fhir_json(resource)
 
-        data = self._inject_org_tag(data, org_mode=org_mode, org_ref=org_ref)
+        if accounts is not None:
+            data = self._apply_accounts(data, accounts)
 
         resource_type = data.get("resourceType")
         if not resource_type:
@@ -462,10 +461,9 @@ class MedplumClient(BaseClient):
     def update_resource(
         self,
         resource: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT],
     ) -> ResourceT:
         pass
@@ -474,10 +472,9 @@ class MedplumClient(BaseClient):
     def update_resource(
         self,
         resource: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: None = None,
     ) -> dict[str, Any]:
         pass
@@ -485,19 +482,18 @@ class MedplumClient(BaseClient):
     def update_resource(
         self,
         resource: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
         headers: dict[str, str] | None = None,
         *,
+        accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT] | None = None,
     ) -> dict[str, Any] | ResourceT:
         """Update a FHIR resource (requires id).
 
         Args:
             resource: FHIR resource dict or Pydantic model
-            org_mode: Override client org_mode for this request
-            org_ref: Override client org_ref for this request
             headers: Optional HTTP headers (e.g., If-Match for optimistic locking)
+            accounts: Account references to set on meta.accounts
+                (e.g., "Organization/abc" or a list)
             as_fhir: Optional Pydantic model class to parse response into
 
         Returns:
@@ -523,7 +519,8 @@ class MedplumClient(BaseClient):
         """
         data = to_fhir_json(resource)
 
-        data = self._inject_org_tag(data, org_mode=org_mode, org_ref=org_ref)
+        if accounts is not None:
+            data = self._apply_accounts(data, accounts)
 
         resource_type = data.get("resourceType")
         resource_id = data.get("id")
@@ -1023,60 +1020,119 @@ class MedplumClient(BaseClient):
     def execute_batch(
         self,
         bundle: dict[str, Any] | Any,
-        org_mode: OrgMode | None = None,
-        org_ref: str | None = None,
+        *,
+        accounts: str | list[str] | None = None,
     ) -> dict[str, Any]:
         """Execute a FHIR batch/transaction bundle.
 
         Args:
             bundle: FHIR Bundle resource
-            org_mode: Override client org_mode for all bundle entries
-            org_ref: Override client org_ref for all bundle entries
+            accounts: Account references to set on each bundle entry's
+                meta.accounts (e.g., "Organization/abc" or a list)
         """
         data = to_fhir_json(bundle)
 
-        data = self._inject_org_tag(data, org_mode=org_mode, org_ref=org_ref)
+        if accounts is not None:
+            for entry in data.get("entry", []):
+                if "resource" in entry and isinstance(entry["resource"], dict):
+                    entry["resource"] = self._apply_accounts(
+                        entry["resource"], accounts
+                    )
 
         return self._request("POST", self.fhir_base_url, json=data)
 
-    def set_accounts(self, resource_ref: str, org_ref: str) -> dict[str, Any]:
-        """Explicitly set accounts using $set-accounts operation.
-        Preferred over auto-injection for AccessPolicy compatibility.
+    def set_accounts(
+        self,
+        resource_ref: str,
+        account_refs: str | list[str],
+        *,
+        propagate: bool = False,
+        prefer_async: bool = False,
+    ) -> dict[str, Any]:
+        """Assign a resource to accounts via the $set-accounts operation.
+
+        Medplum uses meta.accounts for compartment-based multi-tenant
+        access control. This operation assigns one or more account
+        references (typically Organizations or Practitioners) to a
+        resource. When propagate is True, the assignments cascade to
+        all resources in the target's FHIR compartment (e.g., a
+        Patient's Observations, Encounters, etc.).
 
         Args:
             resource_ref: Reference like "Patient/123"
-            org_ref: Organization reference like "Organization/ORG_A"
+            account_refs: Account references to assign — single string
+                or list (e.g., "Organization/abc" or
+                ["Organization/abc", "Practitioner/xyz"])
+            propagate: If True, cascade account assignments to related
+                resources (Appointments, Observations, etc.)
+            prefer_async: If True, send Prefer: respond-async header.
+                Only takes effect when propagate is also True.
+                Server returns an OperationOutcome with the async job
+                URL in issue[0].diagnostics. Poll with client.get().
 
         Returns:
-            FHIR Parameters or Patient resource with operation results
-            (response type depends on Medplum server version).
+            Synchronous: FHIR Parameters with resourcesUpdated count.
+            Async (202): OperationOutcome with job URL in
+            issue[0].diagnostics.
 
-        Example:
-            result = client.set_accounts("Patient/123", "Organization/org-456")
-            # Example response (Parameters variant):
-            # {"resourceType": "Parameters", "parameter": [{"name": "resourcesUpdated", "valueInteger": 1}]}
+        Examples:
+            # Assign patient to an organization's account
+            client.set_accounts("Patient/123", "Organization/org-a")
+
+            # Multiple accounts with propagation
+            client.set_accounts(
+                "Patient/123",
+                ["Organization/org-a", "Practitioner/prac-1"],
+                propagate=True,
+            )
+
+            # Async for large compartments
+            result = client.set_accounts(
+                "Patient/123",
+                "Organization/org-a",
+                propagate=True,
+                prefer_async=True,
+            )
+            # Wait for the async job to complete
+            job = client.wait_for_async_job(result, timeout=60)
         """
         if "/" not in resource_ref:
             raise ValueError(f"Invalid resource reference: {resource_ref}")
 
+        if prefer_async and not propagate:
+            raise ValueError("prefer_async only takes effect with propagate=True")
+
         resource_type, resource_id = resource_ref.split("/", 1)
 
-        # Build the FHIR Parameters resource as per Medplum documentation
+        if isinstance(account_refs, str):
+            account_refs = [account_refs]
+
+        parameter: list[dict[str, Any]] = [
+            {
+                "name": "accounts",
+                "valueReference": {"reference": ref},
+            }
+            for ref in account_refs
+        ]
+
+        if propagate:
+            parameter.append({"name": "propagate", "valueBoolean": True})
+
         params = {
             "resourceType": "Parameters",
-            "parameter": [
-                {
-                    "name": "accounts",
-                    "valueReference": {"reference": org_ref},
-                }
-            ],
+            "parameter": parameter,
         }
+
+        headers = None
+        if prefer_async:
+            headers = {"Prefer": "respond-async"}
 
         return self.execute_operation(
             resource_type,
             "set-accounts",
             resource_id=resource_id,
             params=params,
+            headers=headers,
         )
 
     def get(self, path: str, **kwargs) -> dict[str, Any]:
@@ -1592,80 +1648,77 @@ class MedplumClient(BaseClient):
 
     def get_async_job_status(
         self,
-        job_id: str,
+        job: "str | dict[str, Any] | OperationOutcome",
     ) -> dict[str, Any]:
-        """Get the status of an async job (BulkDataExport).
+        """Get the status of an async job.
 
-        Medplum uses the BulkDataExport resource to track the status of
-        long-running operations like bulk exports. This method retrieves
-        the current status of such a job.
+        Accepts a job ID, a job status URL, or an OperationOutcome
+        returned from an async operation (e.g., set_accounts with
+        prefer_async=True).
 
         Args:
-            job_id: The ID of the BulkDataExport resource
+            job: Job ID, full status URL, or OperationOutcome dict
+                with the job URL in issue[0].diagnostics
 
         Returns:
-            BulkDataExport resource with current status
+            AsyncJob resource with current status
 
         Example:
-            # Start a bulk export (returns immediately with job ID)
-            # Then poll for status
-            job = client.get_async_job_status("export-job-123")
-
-            if job.get("status") == "completed":
-                # Get output files
-                for output in job.get("output", []):
-                    print(f"File: {output['url']}")
-            elif job.get("status") == "error":
-                print(f"Export failed: {job.get('error')}")
+            result = client.set_accounts(
+                "Patient/123", "Organization/org-a",
+                propagate=True, prefer_async=True,
+            )
+            job = client.get_async_job_status(result)
         """
-        return self.read_resource("BulkDataExport", job_id)
+        url = self._resolve_async_job_url(job)
+        return self._request("GET", url)
 
     def wait_for_async_job(
         self,
-        job_id: str,
+        job: "str | dict[str, Any] | OperationOutcome",
         poll_interval: float = 1.0,
         timeout: float | None = None,
     ) -> dict[str, Any]:
-        """Wait for an async job to complete, polling at regular intervals.
+        """Wait for an async job to complete, polling at intervals.
 
-        Polls the job status until it reaches a terminal state (completed, error)
-        or until the timeout is reached.
+        Accepts the same inputs as get_async_job_status.
 
         Args:
-            job_id: The ID of the BulkDataExport resource
+            job: Job ID, full status URL, or OperationOutcome dict
             poll_interval: Seconds between status checks (default: 1.0)
-            timeout: Maximum seconds to wait (default: None = wait indefinitely)
+            timeout: Maximum seconds to wait (None = indefinite)
 
         Returns:
-            BulkDataExport resource with final status
+            AsyncJob resource with final status
 
         Raises:
             TimeoutError: If timeout is reached before job completes
 
         Example:
-            # Wait for a bulk export to complete
-            job = client.wait_for_async_job("export-job-123", timeout=300)
-
-            if job.get("status") == "completed":
-                for output in job.get("output", []):
-                    # Download output files
-                    content = client.get(output["url"].replace(client.base_url, ""))
+            result = client.set_accounts(
+                "Patient/123", "Organization/org-a",
+                propagate=True, prefer_async=True,
+            )
+            job = client.wait_for_async_job(result, timeout=60)
+            if job["status"] == "completed":
+                print(job["output"])
         """
+        url = self._resolve_async_job_url(job)
         start_time = time.time()
-        terminal_statuses = {"completed", "error", "stopped"}
+        terminal_statuses = {"completed", "error", "stopped", "cancelled"}
 
         while True:
-            job = self.get_async_job_status(job_id)
-            status = job.get("status", "")
+            status_response = self._request("GET", url)
+            status = status_response.get("status", "")
 
             if status in terminal_statuses:
-                return job
+                return status_response
 
             if timeout is not None:
                 elapsed = time.time() - start_time
                 if elapsed >= timeout:
                     raise TimeoutError(
-                        f"Async job {job_id} did not complete within {timeout} seconds"
+                        f"Async job did not complete within {timeout} seconds"
                     )
 
             time.sleep(poll_interval)

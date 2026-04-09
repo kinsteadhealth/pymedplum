@@ -22,11 +22,12 @@ from .helpers import (
     extract_identifier,
     get_code_display,
     get_patient_display_name,
+    get_resource_accounts,
     parse_reference,
+    resource_has_account,
     to_fhir_json,
-    to_portable,
 )
-from .types import OrgMode, PatchOperation, SummaryMode, TotalMode
+from .types import PatchOperation, SummaryMode, TotalMode
 
 __all__ = [
     "AsyncMedplumClient",
@@ -38,7 +39,6 @@ __all__ = [
     "NetworkError",
     "NotFoundError",
     "OperationOutcomeError",
-    "OrgMode",
     "PatchOperation",
     "RateLimitError",
     "ResourceNotFoundError",
@@ -52,7 +52,8 @@ __all__ = [
     "extract_identifier",
     "get_code_display",
     "get_patient_display_name",
+    "get_resource_accounts",
     "parse_reference",
+    "resource_has_account",
     "to_fhir_json",
-    "to_portable",
 ]

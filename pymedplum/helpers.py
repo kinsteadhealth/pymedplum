@@ -5,7 +5,6 @@ reduce boilerplate in application code.
 """
 
 import base64
-import copy
 import json
 from datetime import datetime, timezone
 from typing import Any
@@ -179,71 +178,63 @@ def to_fhir_json(resource: dict[str | Any, Any]) -> dict[str, Any]:
     return resource
 
 
-def to_portable(
-    resource: dict[str, Any],
-    org_ext_url: str = "https://example.org/fhir/StructureDefinition/orgLink",
-) -> dict[str, Any]:
-    """Convert Medplum-specific FHIR to portable FHIR.
+def get_resource_accounts(resource: dict[str, Any]) -> list[str]:
+    """Return the account references assigned to a resource.
 
-    Removes vendor-specific meta fields and converts Medplum's
-    multi-organization accounts to standard FHIR extensions.
+    Reads from Medplum's meta.accounts field, which stores account
+    assignments used for compartment-based multi-tenant access control.
 
     Args:
-        resource: FHIR resource with Medplum-specific fields
-        org_ext_url: Extension URL for organization links
+        resource: FHIR resource dict
 
     Returns:
-        Portable FHIR resource (deep copy, original unchanged)
+        List of reference strings (e.g., ["Organization/abc", "Practitioner/xyz"])
 
     Example:
         >>> resource = {
         ...     "resourceType": "Patient",
         ...     "meta": {
-        ...         "accounts": [{"reference": "Organization/org1"}],
-        ...         "author": {"reference": "ClientApplication/app1"}
+        ...         "accounts": [
+        ...             {"reference": "Organization/org-1"},
+        ...             {"reference": "Organization/org-2"},
+        ...         ]
         ...     }
         ... }
-        >>> portable = to_portable(resource)
-        >>> "accounts" in portable["meta"]
-        False
-        >>> "author" in portable["meta"]
+        >>> get_resource_accounts(resource)
+        ['Organization/org-1', 'Organization/org-2']
+    """
+    if hasattr(resource, "model_dump"):
+        resource = resource.model_dump()
+
+    return [
+        acc["reference"]
+        for acc in resource.get("meta", {}).get("accounts", [])
+        if isinstance(acc, dict) and "reference" in acc
+    ]
+
+
+def resource_has_account(resource: dict[str, Any], account_ref: str) -> bool:
+    """Check if a resource is assigned to a given account.
+
+    Checks Medplum's meta.accounts field for the given reference.
+
+    Args:
+        resource: FHIR resource dict
+        account_ref: Account reference to check (e.g., "Organization/abc")
+
+    Returns:
+        True if the resource is assigned to the given account
+
+    Example:
+        >>> resource = {
+        ...     "meta": {"accounts": [{"reference": "Organization/org-1"}]}
+        ... }
+        >>> resource_has_account(resource, "Organization/org-1")
+        True
+        >>> resource_has_account(resource, "Organization/org-2")
         False
     """
-    # Deep copy to avoid mutating original
-    result = copy.deepcopy(resource)
-
-    # Handle Bundle entries recursively
-    if result.get("resourceType") == "Bundle" and result.get("entry"):
-        for entry in result["entry"]:
-            if "resource" in entry:
-                entry["resource"] = to_portable(entry["resource"], org_ext_url)
-
-    # Process meta field
-    meta = result.get("meta")
-    if not meta:
-        return result
-
-    # Convert accounts to extensions
-    accounts = meta.pop("accounts", None)
-    if accounts:
-        extensions = meta.get("extension", [])
-        for account in accounts:
-            if "reference" in account:
-                extensions.append(
-                    {
-                        "url": org_ext_url,
-                        "valueReference": {"reference": account["reference"]},
-                    }
-                )
-        if extensions:
-            meta["extension"] = extensions
-
-    # Remove vendor-specific fields
-    vendor_fields = ["author", "project", "account", "compartment", "onBehalfOf"]
-    for field in vendor_fields:
-        meta.pop(field, None)
-
-    return result
+    return account_ref in get_resource_accounts(resource)
 
 
 def decode_jwt_exp(token: str) -> datetime | None:
