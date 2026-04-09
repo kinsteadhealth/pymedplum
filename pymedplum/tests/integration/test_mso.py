@@ -22,6 +22,86 @@ def _bundle_ids(bundle: dict) -> set[str]:
     return {e["resource"]["id"] for e in bundle.get("entry", []) if "resource" in e}
 
 
+def _create_mso_env(medplum_client, test_id, prefix, extra_resources=None):
+    """Create 2 orgs, a compartment policy, and 2 practitioners with
+    parameterized access. Returns (orgs, memberships, cleanup_list)."""
+    cleanup = []
+    project_id = medplum_client.project_id
+
+    org_a = medplum_client.create_resource(
+        {"resourceType": "Organization", "name": f"{prefix} A - {test_id}"}
+    )
+    org_b = medplum_client.create_resource(
+        {"resourceType": "Organization", "name": f"{prefix} B - {test_id}"}
+    )
+    cleanup.extend(
+        [
+            ("Organization", org_a["id"]),
+            ("Organization", org_b["id"]),
+        ]
+    )
+
+    resource_entries = [
+        {
+            "resourceType": "Patient",
+            "criteria": "Patient?_compartment=%organization",
+        },
+        {"resourceType": "Organization"},
+        {"resourceType": "Practitioner"},
+    ]
+    if extra_resources:
+        resource_entries.extend(extra_resources)
+
+    policy = medplum_client.create_resource(
+        {
+            "resourceType": "AccessPolicy",
+            "name": f"{prefix} Policy - {test_id}",
+            "compartment": {"reference": "%organization"},
+            "resource": resource_entries,
+        }
+    )
+    cleanup.append(("AccessPolicy", policy["id"]))
+
+    memberships = {}
+    for label, org in [("PracA", org_a), ("PracB", org_b)]:
+        email = f"{label.lower()}.{prefix.lower()}.{test_id}@test.example.com"
+        membership = medplum_client.invite_user(
+            project_id=project_id,
+            resource_type="Practitioner",
+            first_name=label,
+            last_name=test_id,
+            email=email,
+            password=secrets.token_urlsafe(32),
+            send_email=False,
+            access_policy=f"AccessPolicy/{policy['id']}",
+        )
+        if membership:
+            cleanup.append(("ProjectMembership", membership["id"]))
+            membership["access"] = [
+                {
+                    "policy": {"reference": f"AccessPolicy/{policy['id']}"},
+                    "parameter": [
+                        {
+                            "name": "organization",
+                            "valueReference": {
+                                "reference": f"Organization/{org['id']}"
+                            },
+                        }
+                    ],
+                }
+            ]
+            medplum_client.update_resource(membership)
+            memberships[label] = membership
+
+    return {
+        "org_a": org_a,
+        "org_b": org_b,
+        "policy": policy,
+        "memberships": memberships,
+        "cleanup": cleanup,
+    }
+
+
 @pytest.fixture
 def async_client(medplum_credentials):
     """Factory for authenticated async clients."""
@@ -609,130 +689,140 @@ def test_mso_compartment_isolation(medplum_client, create_scoped_client, test_id
     """Full MSO flow: compartment-based AccessPolicy with %organization,
     parameterized membership access, cross-org isolation via OBO.
     """
-    cleanup = []
-    project_id = medplum_client.project_id
-    if not project_id:
+    if not medplum_client.project_id:
         pytest.skip("MEDPLUM_PROJECT_ID must be set")
 
+    env = _create_mso_env(
+        medplum_client,
+        test_id,
+        "Iso",
+        extra_resources=[
+            {
+                "resourceType": "Observation",
+                "criteria": "Observation?_compartment=%organization",
+            }
+        ],
+    )
+    cleanup = list(env["cleanup"])
+
     try:
-        org_a = medplum_client.create_resource(
-            {
-                "resourceType": "Organization",
-                "name": f"MSO Org A - {test_id}",
-            }
-        )
-        org_b = medplum_client.create_resource(
-            {
-                "resourceType": "Organization",
-                "name": f"MSO Org B - {test_id}",
-            }
-        )
-        cleanup.extend(
-            [
-                ("Organization", org_a["id"]),
-                ("Organization", org_b["id"]),
-            ]
-        )
-
-        policy = medplum_client.create_resource(
-            {
-                "resourceType": "AccessPolicy",
-                "name": f"MSO Compartment Policy - {test_id}",
-                "compartment": {"reference": "%organization"},
-                "resource": [
-                    {
-                        "resourceType": "Patient",
-                        "criteria": ("Patient?_compartment=%organization"),
-                    },
-                    {
-                        "resourceType": "Observation",
-                        "criteria": ("Observation?_compartment=%organization"),
-                    },
-                    {"resourceType": "Organization"},
-                    {"resourceType": "Practitioner"},
-                ],
-            }
-        )
-        cleanup.append(("AccessPolicy", policy["id"]))
-
-        membership_a = None
-        for label, org in [("PracA", org_a), ("PracB", org_b)]:
-            email = f"{label.lower()}.{test_id}@test.example.com"
-            membership = medplum_client.invite_user(
-                project_id=project_id,
-                resource_type="Practitioner",
-                first_name=label,
-                last_name=test_id,
-                email=email,
-                password=secrets.token_urlsafe(32),
-                send_email=False,
-                access_policy=f"AccessPolicy/{policy['id']}",
-            )
-            if membership:
-                cleanup.append(("ProjectMembership", membership["id"]))
-                membership["access"] = [
-                    {
-                        "policy": {"reference": f"AccessPolicy/{policy['id']}"},
-                        "parameter": [
-                            {
-                                "name": "organization",
-                                "valueReference": {
-                                    "reference": (f"Organization/{org['id']}")
-                                },
-                            }
-                        ],
-                    }
-                ]
-                medplum_client.update_resource(membership)
-                if label == "PracA":
-                    membership_a = membership
-
         patient_a = medplum_client.create_resource(
             {
                 "resourceType": "Patient",
-                "name": [{"given": ["IsoAlice"], "family": f"MSO-A-{test_id}"}],
+                "name": [{"given": ["IsoAlice"], "family": f"Iso-A-{test_id}"}],
             }
         )
         cleanup.append(("Patient", patient_a["id"]))
         medplum_client.set_accounts(
             f"Patient/{patient_a['id']}",
-            f"Organization/{org_a['id']}",
+            f"Organization/{env['org_a']['id']}",
             propagate=True,
         )
 
         patient_b = medplum_client.create_resource(
             {
                 "resourceType": "Patient",
-                "name": [{"given": ["IsoBob"], "family": f"MSO-B-{test_id}"}],
+                "name": [{"given": ["IsoBob"], "family": f"Iso-B-{test_id}"}],
             }
         )
         cleanup.append(("Patient", patient_b["id"]))
         medplum_client.set_accounts(
             f"Patient/{patient_b['id']}",
-            f"Organization/{org_b['id']}",
+            f"Organization/{env['org_b']['id']}",
             propagate=True,
         )
 
-        assert membership_a is not None
-        doctor_a_client = create_scoped_client(membership_a["id"])
+        assert "PracA" in env["memberships"]
+        doctor_a_client = create_scoped_client(env["memberships"]["PracA"]["id"])
         try:
             found_a = _bundle_ids(
                 doctor_a_client.search_resources(
-                    "Patient",
-                    {"family:contains": f"MSO-A-{test_id}"},
+                    "Patient", {"family:contains": f"Iso-A-{test_id}"}
                 )
             )
             assert patient_a["id"] in found_a
 
             found_b = _bundle_ids(
                 doctor_a_client.search_resources(
-                    "Patient",
-                    {"family:contains": f"MSO-B-{test_id}"},
+                    "Patient", {"family:contains": f"Iso-B-{test_id}"}
                 )
             )
             assert patient_b["id"] not in found_b
         finally:
             doctor_a_client.close()
+
+    finally:
+        for resource_type, resource_id in reversed(cleanup):
+            try:
+                medplum_client.delete_resource(resource_type, resource_id)
+            except Exception as e:
+                print(f"Warning: Failed to delete {resource_type}/{resource_id}: {e}")
+
+
+def test_obo_auto_compartment_and_admin_multi_org(
+    medplum_client, create_scoped_client, test_id
+):
+    """OBO creates a patient (server auto-assigns compartment), then admin
+    enrolls the patient in a second org via set_accounts.
+
+    Validates:
+    1. OBO creation auto-assigns meta.accounts from AccessPolicy compartment
+    2. Admin can add a second org with set_accounts
+    3. OBO user for the second org can then see the patient
+    """
+    if not medplum_client.project_id:
+        pytest.skip("MEDPLUM_PROJECT_ID must be set")
+
+    env = _create_mso_env(medplum_client, test_id, "AutoComp")
+    cleanup = list(env["cleanup"])
+
+    try:
+        assert "PracA" in env["memberships"]
+        assert "PracB" in env["memberships"]
+
+        # Step 1: OBO user A creates a patient — no explicit accounts
+        doctor_a_client = create_scoped_client(env["memberships"]["PracA"]["id"])
+        try:
+            patient = doctor_a_client.create_resource(
+                {
+                    "resourceType": "Patient",
+                    "name": [{"given": ["AutoComp"], "family": f"Test-{test_id}"}],
+                }
+            )
+            cleanup.append(("Patient", patient["id"]))
+        finally:
+            doctor_a_client.close()
+
+        # Verify server auto-assigned org A's account
+        patient_read = medplum_client.read_resource("Patient", patient["id"])
+        org_a_ref = f"Organization/{env['org_a']['id']}"
+        org_b_ref = f"Organization/{env['org_b']['id']}"
+        assert resource_has_account(patient_read, org_a_ref), (
+            f"Expected auto-assigned {org_a_ref} in "
+            f"{get_resource_accounts(patient_read)}"
+        )
+
+        # Step 2: Admin enrolls patient in org B
+        medplum_client.set_accounts(f"Patient/{patient['id']}", [org_a_ref, org_b_ref])
+
+        patient_read = medplum_client.read_resource("Patient", patient["id"])
+        accounts = get_resource_accounts(patient_read)
+        assert org_a_ref in accounts
+        assert org_b_ref in accounts
+
+        # Step 3: OBO user B can now see the patient
+        doctor_b_client = create_scoped_client(env["memberships"]["PracB"]["id"])
+        try:
+            found = _bundle_ids(
+                doctor_b_client.search_resources(
+                    "Patient", {"family:contains": f"Test-{test_id}"}
+                )
+            )
+            assert patient["id"] in found, (
+                "Doctor B should see patient after admin enrolled in org B"
+            )
+        finally:
+            doctor_b_client.close()
 
     finally:
         for resource_type, resource_id in reversed(cleanup):
