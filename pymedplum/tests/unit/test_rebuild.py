@@ -185,9 +185,7 @@ def test_parameters_is_fully_defined():
     from pymedplum.fhir import Parameters, Patient
 
     patient = Patient(name=[{"family": "RegressionTest"}])
-    params = Parameters(
-        parameter=[{"name": "patient", "resource": patient}]
-    )
+    params = Parameters(parameter=[{"name": "patient", "resource": patient}])
     assert params.parameter[0].resource.name[0].family == "RegressionTest"
 
 
