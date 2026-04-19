@@ -19,7 +19,7 @@ client = MedplumClient(
 The best way to create a resource is to instantiate its Pydantic model. This gives you autocompletion and compile-time validation in your editor.
 
 ```python
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import Patient
 
 # Create a Patient model instance
 new_patient = Patient(
@@ -40,7 +40,7 @@ The client accepts the model instance and returns a new instance representing th
 When you read a resource, you should read it directly into its corresponding Pydantic model using the `as_fhir` parameter. This gives you a strongly-typed object to work with.
 
 ```python
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import Patient
 
 # Read a resource and get a typed model back
 patient = client.read_resource("Patient", "some-patient-id", as_fhir=Patient)

@@ -11,7 +11,7 @@ For write operations, you can provide the resource data as either a standard Pyt
 -   **Returns**: A dictionary of the created resource.
 
 ```python
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import Patient
 
 # Option 1: Using a dictionary
 patient_dict = {
@@ -49,7 +49,7 @@ The `as_fhir` parameter controls the return type.
 -   **`as_fhir=Patient` (or any model class)**: Returns an instance of that Pydantic model.
 
 ```python
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import Patient
 
 # Default: returns a dictionary
 patient_dict = client.read_resource("Patient", "some-id")
@@ -69,7 +69,7 @@ The `search_resources` method can return either a raw bundle dictionary or a hel
 -   **`return_bundle=True`**: Returns an instance of `FHIRBundle`, which provides helpful methods for iteration and type conversion.
 
 ```python
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import Patient
 
 # Get a helpful wrapper object
 bundle = client.search_resources("Patient", {"family": "Smith"}, return_bundle=True)

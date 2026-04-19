@@ -134,7 +134,7 @@ Read a FHIR resource by type and ID.
 
 **Example**:
 ```python
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import Patient
 
 # Get as dictionary
 patient_dict = client.read_resource("Patient", "123")
