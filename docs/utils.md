@@ -82,7 +82,7 @@ Converts a Pydantic model instance into a JSON-serializable dictionary. It corre
 
 ```python
 from pymedplum.helpers import to_fhir_json
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import Patient
 
 patient_model = Patient(birth_date="1990-01-01", active=True)
 api_payload = to_fhir_json(patient_model)

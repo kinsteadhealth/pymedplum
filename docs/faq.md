@@ -87,7 +87,7 @@ client = MedplumClient(
 **Use Pydantic models** for the best developer experience:
 
 ```python
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import Patient
 
 # ✅ Recommended: Type-safe, autocomplete, validation
 patient = Patient(name=[{"family": "Smith", "given": ["John"]}])
@@ -104,12 +104,29 @@ Pydantic models provide:
 - Automatic validation
 - Better error messages
 
+### Q: Can I import models from their submodules directly?
+
+**No — always import from `pymedplum.fhir`.** The generated resource
+modules (e.g. `pymedplum.fhir.patient`) only import their dependencies
+under `TYPE_CHECKING` to avoid circular imports, so the class isn't
+fully defined at runtime:
+
+```python
+# ❌ Will fail at instantiation with
+#    "PydanticUserError: <Model> is not fully defined"
+from pymedplum.fhir.patient import Patient
+
+# ✅ Use the package-level import — the lazy loader resolves
+#    forward references before returning the class.
+from pymedplum.fhir import Patient
+```
+
 ### Q: How do I handle FHIR fields that are Python keywords?
 
 Use a trailing underscore:
 
 ```python
-from pymedplum.fhir.coverage import Coverage
+from pymedplum.fhir import Coverage
 
 coverage = Coverage(
     status="active",

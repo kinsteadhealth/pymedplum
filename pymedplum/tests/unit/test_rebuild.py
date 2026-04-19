@@ -165,6 +165,30 @@ def test_multiple_resource_types_coexist():
     assert observation.id == "o1"
 
 
+def test_list_resource_does_not_shadow_builtin_list():
+    """Regression: importing `List` (FHIR resource) used to crash the lazy
+    loader because the `pymedplum.fhir.list` submodule shadowed the builtin
+    `list` used inside __getattr__.
+    """
+    from pymedplum.fhir import List
+
+    lst = List(status="current", mode="working")
+    assert lst.status == "current"
+    assert lst.mode == "working"
+
+
+def test_parameters_is_fully_defined():
+    """Regression: `Parameters` imported but was not instantiable because the
+    rebuild namespace did not include `Resource` (a runtime alias for
+    MedplumFHIRBase).
+    """
+    from pymedplum.fhir import Parameters, Patient
+
+    patient = Patient(name=[{"family": "RegressionTest"}])
+    params = Parameters(parameter=[{"name": "patient", "resource": patient}])
+    assert params.parameter[0].resource.name[0].family == "RegressionTest"
+
+
 def test_complex_observation_with_many_types():
     """Test complex Observation using many different forward-referenced types."""
 

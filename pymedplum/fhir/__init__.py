@@ -49,6 +49,7 @@ _MODEL_LOCKS_LOCK = threading.Lock()
 # Shared types namespace for Pydantic model_rebuild() forward reference resolution
 _TYPES_NS: dict[str, Any] = {
     "ResourceType": str,
+    "Resource": MedplumFHIRBase,
 }
 
 # Global rebuild coordination
@@ -798,12 +799,7 @@ def __dir__() -> list[str]:
     - All registered resource names (REGISTRY.keys())
     - Already-cached imports (globals())
     """
-    return sorted(
-        set(
-            list(REGISTRY.keys())  # All available resources
-            + list(globals().keys())  # Already-cached imports
-        )
-    )
+    return sorted({*REGISTRY.keys(), *globals().keys()})
 
 
 # Type names to skip during dependency extraction
@@ -1007,7 +1003,7 @@ def __getattr__(name: str) -> Any:
         # Rebuild all loaded models when namespace changes
         # This is expensive but necessary for forward reference resolution
         if _LAST_REBUILT_VERSION != _TYPES_NS_VERSION:
-            loaded_models = list(_TYPES_NS.values())
+            loaded_models = [*_TYPES_NS.values()]
             for model in loaded_models:
                 if hasattr(model, "model_rebuild"):
                     try:

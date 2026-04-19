@@ -14,7 +14,7 @@ These models are based on Pydantic v2, offering robust data validation and seria
 When you create or receive a resource, Pydantic automatically validates the data. If any fields are of the wrong type or are missing required values, a `ValidationError` is raised.
 
 ```python
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import Patient
 
 # This will raise a ValidationError because 'gender' is required
 invalid_data = {"resourceType": "Patient"}
@@ -58,7 +58,7 @@ This function is equivalent to calling `model.model_dump(by_alias=True, exclude_
 Some FHIR fields have names that are reserved keywords in Python (e.g., `class`, `for`). The models use a trailing underscore (`_`) for these fields.
 
 ```python
-from pymedplum.fhir.coverage import Coverage
+from pymedplum.fhir import Coverage
 
 # Use 'class_' for the 'class' field
 coverage = Coverage(
@@ -83,7 +83,7 @@ While you can always work with dictionaries, the real power of `pymedplum` comes
 Instead of passing a dictionary to `create()`, you can instantiate a model and pass it to `create_resource()`.
 
 ```python
-from pymedplum.fhir.patient import Patient
+from pymedplum.fhir import Patient
 
 # Create a Patient model instance
 new_patient = Patient(
