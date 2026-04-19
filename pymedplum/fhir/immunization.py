@@ -1,6 +1,7 @@
-# This is a generated file
-# Do not edit manually.
-# Generated from Medplum TypeScript definitions
+# This is a generated file — do not edit manually.
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -289,7 +290,7 @@ class ImmunizationProtocolApplied(MedplumFHIRBase):
         alias="targetDisease",
         description="The vaccine preventable disease the dose is being administered against.",
     )
-    dose_number_positive_int: int | float | None = Field(
+    dose_number_positive_int: int | None = Field(
         default=None,
         alias="doseNumberPositiveInt",
         description="Nominal position in a series.",
@@ -299,7 +300,7 @@ class ImmunizationProtocolApplied(MedplumFHIRBase):
         alias="doseNumberString",
         description="Nominal position in a series.",
     )
-    series_doses_positive_int: int | float | None = Field(
+    series_doses_positive_int: int | None = Field(
         default=None,
         alias="seriesDosesPositiveInt",
         description="The recommended number of doses to achieve immunity.",

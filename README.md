@@ -443,10 +443,47 @@ make test-integration
 
 See [AGENTS.md](AGENTS.md) for detailed contributor guidelines.
 
+## Security
+
+If you believe you have found a security vulnerability in PyMedplum,
+please email [security@kinsteadhealth.com](mailto:security@kinsteadhealth.com)
+rather than opening a public issue. See [`SECURITY.md`](SECURITY.md) for
+full reporting guidance.
+
 ## License
 
-Copyright 2025 Kinstead Health
+Copyright 2025-2026 Kinstead Health
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may
+not use this project except in compliance with the License. You may
+obtain a copy of the License at <http://www.apache.org/licenses/LICENSE-2.0>,
+or see the [`LICENSE`](LICENSE) file in this repository.
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an **"AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND**, either express or
+implied. See the License for the specific language governing permissions
+and limitations under the License.
+
+Every Python module under `pymedplum/fhir/` is derived from Medplum's
+`@medplum/fhirtypes` package (Copyright Orangebot, Inc. and Medplum
+contributors, Apache-2.0), which is itself derived from the HL7 FHIR R4
+specification (FHIR Version 4.0.1, published under the HL7 License
+Agreement with normative content additionally under CC0 1.0). See
+[`NOTICE`](NOTICE) for the full upstream attribution chain.
+
+### Trademarks
+
+"Medplum" is a product and trademark of Orangebot, Inc. PyMedplum is
+an independent Python client and is **not affiliated with, endorsed by,
+or sponsored by Orangebot, Inc.** "FHIR" and "HL7" are registered
+trademarks of Health Level Seven International. Use of these names here
+is purely descriptive and does not imply endorsement by HL7.
 
 ## Acknowledgments
 
-This library is inspired by the official [Medplum TypeScript SDK](https://github.com/medplum/medplum) and aims to provide a similar developer experience for Python developers.
+This library is derived from the official [Medplum TypeScript type
+definitions (`@medplum/fhirtypes`)](https://github.com/medplum/medplum/tree/main/packages/fhirtypes)
+and is inspired by the [Medplum TypeScript SDK](https://github.com/medplum/medplum).
+PyMedplum aims to provide a similar developer experience for Python
+developers.

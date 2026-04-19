@@ -1,6 +1,7 @@
-# This is a generated file
-# Do not edit manually.
-# Generated from Medplum TypeScript definitions
+# This is a generated file — do not edit manually.
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -164,7 +165,7 @@ class ElementDefinition(MedplumFHIRBase):
         alias="defaultValueDateTime",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_decimal: int | float | None = Field(
+    default_value_decimal: float | None = Field(
         default=None,
         alias="defaultValueDecimal",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
@@ -179,7 +180,7 @@ class ElementDefinition(MedplumFHIRBase):
         alias="defaultValueInstant",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_integer: int | float | None = Field(
+    default_value_integer: int | None = Field(
         default=None,
         alias="defaultValueInteger",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
@@ -194,7 +195,7 @@ class ElementDefinition(MedplumFHIRBase):
         alias="defaultValueOid",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_positive_int: int | float | None = Field(
+    default_value_positive_int: int | None = Field(
         default=None,
         alias="defaultValuePositiveInt",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
@@ -209,7 +210,7 @@ class ElementDefinition(MedplumFHIRBase):
         alias="defaultValueTime",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
     )
-    default_value_unsigned_int: int | float | None = Field(
+    default_value_unsigned_int: int | None = Field(
         default=None,
         alias="defaultValueUnsignedInt",
         description="The value that should be used if there is no value stated in the instance (e.g. 'if not otherwise specified, the abstract is false').",
@@ -424,7 +425,7 @@ class ElementDefinition(MedplumFHIRBase):
         alias="fixedDateTime",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_decimal: int | float | None = Field(
+    fixed_decimal: float | None = Field(
         default=None,
         alias="fixedDecimal",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
@@ -439,7 +440,7 @@ class ElementDefinition(MedplumFHIRBase):
         alias="fixedInstant",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_integer: int | float | None = Field(
+    fixed_integer: int | None = Field(
         default=None,
         alias="fixedInteger",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
@@ -454,7 +455,7 @@ class ElementDefinition(MedplumFHIRBase):
         alias="fixedOid",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_positive_int: int | float | None = Field(
+    fixed_positive_int: int | None = Field(
         default=None,
         alias="fixedPositiveInt",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
@@ -469,7 +470,7 @@ class ElementDefinition(MedplumFHIRBase):
         alias="fixedTime",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
     )
-    fixed_unsigned_int: int | float | None = Field(
+    fixed_unsigned_int: int | None = Field(
         default=None,
         alias="fixedUnsignedInt",
         description="Specifies a value that SHALL be exactly the value for this element in the instance. For purposes of comparison, non-significant whitespace is ignored, and all values must be an exact match (case and accent sensitive). Missing elements/attributes must also be missing.",
@@ -674,7 +675,7 @@ class ElementDefinition(MedplumFHIRBase):
         alias="patternDateTime",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_decimal: int | float | None = Field(
+    pattern_decimal: float | None = Field(
         default=None,
         alias="patternDecimal",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
@@ -689,7 +690,7 @@ class ElementDefinition(MedplumFHIRBase):
         alias="patternInstant",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_integer: int | float | None = Field(
+    pattern_integer: int | None = Field(
         default=None,
         alias="patternInteger",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
@@ -704,7 +705,7 @@ class ElementDefinition(MedplumFHIRBase):
         alias="patternOid",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_positive_int: int | float | None = Field(
+    pattern_positive_int: int | None = Field(
         default=None,
         alias="patternPositiveInt",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
@@ -719,7 +720,7 @@ class ElementDefinition(MedplumFHIRBase):
         alias="patternTime",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
     )
-    pattern_unsigned_int: int | float | None = Field(
+    pattern_unsigned_int: int | None = Field(
         default=None,
         alias="patternUnsignedInt",
         description="Specifies a value that the value in the instance SHALL follow - that is, any value in the pattern must be found in the instance. Other additional values may be found too. This is effectively constraint by example. When pattern[x] is used to constrain a primitive, it means that the value provided in the pattern[x] must match the instance value exactly. When pattern[x] is used to constrain an array, it means that each element provided in the pattern[x] array must (recursively) match at least one element from the instance array. When pattern[x] is used to constrain a complex object, it means that each property in the pattern must be present in the complex object, and its value must recursively match -- i.e., 1. If primitive: it must match exactly the pattern value 2. If a complex object: it must match (recursively) the pattern value 3. If an array: it must match (recursively) the pattern value.",
@@ -918,22 +919,22 @@ class ElementDefinition(MedplumFHIRBase):
         alias="minValueTime",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    min_value_decimal: int | float | None = Field(
+    min_value_decimal: float | None = Field(
         default=None,
         alias="minValueDecimal",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    min_value_integer: int | float | None = Field(
+    min_value_integer: int | None = Field(
         default=None,
         alias="minValueInteger",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    min_value_positive_int: int | float | None = Field(
+    min_value_positive_int: int | None = Field(
         default=None,
         alias="minValuePositiveInt",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    min_value_unsigned_int: int | float | None = Field(
+    min_value_unsigned_int: int | None = Field(
         default=None,
         alias="minValueUnsignedInt",
         description="The minimum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
@@ -963,22 +964,22 @@ class ElementDefinition(MedplumFHIRBase):
         alias="maxValueTime",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_value_decimal: int | float | None = Field(
+    max_value_decimal: float | None = Field(
         default=None,
         alias="maxValueDecimal",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_value_integer: int | float | None = Field(
+    max_value_integer: int | None = Field(
         default=None,
         alias="maxValueInteger",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_value_positive_int: int | float | None = Field(
+    max_value_positive_int: int | None = Field(
         default=None,
         alias="maxValuePositiveInt",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
     )
-    max_value_unsigned_int: int | float | None = Field(
+    max_value_unsigned_int: int | None = Field(
         default=None,
         alias="maxValueUnsignedInt",
         description="The maximum allowed value for the element. The value is inclusive. This is allowed for the types date, dateTime, instant, time, decimal, integer, and Quantity.",
@@ -1182,7 +1183,7 @@ class ElementDefinitionExample(MedplumFHIRBase):
         alias="valueDateTime",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_decimal: int | float | None = Field(
+    value_decimal: float | None = Field(
         default=None,
         alias="valueDecimal",
         description="The actual value for the element, which must be one of the types allowed for this element.",
@@ -1197,7 +1198,7 @@ class ElementDefinitionExample(MedplumFHIRBase):
         alias="valueInstant",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_integer: int | float | None = Field(
+    value_integer: int | None = Field(
         default=None,
         alias="valueInteger",
         description="The actual value for the element, which must be one of the types allowed for this element.",
@@ -1212,7 +1213,7 @@ class ElementDefinitionExample(MedplumFHIRBase):
         alias="valueOid",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_positive_int: int | float | None = Field(
+    value_positive_int: int | None = Field(
         default=None,
         alias="valuePositiveInt",
         description="The actual value for the element, which must be one of the types allowed for this element.",
@@ -1227,7 +1228,7 @@ class ElementDefinitionExample(MedplumFHIRBase):
         alias="valueTime",
         description="The actual value for the element, which must be one of the types allowed for this element.",
     )
-    value_unsigned_int: int | float | None = Field(
+    value_unsigned_int: int | None = Field(
         default=None,
         alias="valueUnsignedInt",
         description="The actual value for the element, which must be one of the types allowed for this element.",

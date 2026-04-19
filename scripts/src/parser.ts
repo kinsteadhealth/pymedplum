@@ -196,6 +196,39 @@ function mapTypeScriptTypeToPython(tsType: string): string {
 }
 
 /**
+ * Narrows a TypeScript `number` field to `int` or `float` based on the
+ * FHIR polymorphic naming convention (`value[x]` fields).
+ *
+ * Upstream TypeScript collapses every FHIR numeric primitive (`integer`,
+ * `positiveInt`, `unsignedInt`, `integer64`, `decimal`) to `number`, which
+ * would otherwise force us to emit `int | float` everywhere. For the
+ * ~108 polymorphic fields that encode the primitive in their name suffix
+ * (e.g. `valueInteger`, `multipleBirthInteger`, `valueDecimal`,
+ * `defaultValuePositiveInt`), we can recover the precise type.
+ *
+ * Non-polymorphic numeric fields like `sequence`, `rank`, `count` stay
+ * as `int | float` because the upstream types don't preserve enough
+ * information to distinguish them.
+ *
+ * Returns the narrowed Python type, or null if no narrowing applies.
+ */
+function narrowFhirNumericType(
+  fieldName: string,
+  tsType: string,
+): string | null {
+  if (tsType !== "number") {
+    return null;
+  }
+  if (/(?:Integer(?:64)?|PositiveInt|UnsignedInt)$/.test(fieldName)) {
+    return "int";
+  }
+  if (/Decimal$/.test(fieldName)) {
+    return "float";
+  }
+  return null;
+}
+
+/**
  * Extracts JSDoc comment from a TypeScript node.
  */
 function extractJSDocComment(node: ts.Node): string {
@@ -237,11 +270,13 @@ function parsePropertySignature(
     interfaceData.isResource = true;
   }
 
+  const narrowed = narrowFhirNumericType(fieldName, typeText);
+
   return {
     name: fieldName,
     pythonName: camelToSnake(fieldName),
     type: typeText,
-    pythonType: mapTypeScriptTypeToPython(typeText),
+    pythonType: narrowed ?? mapTypeScriptTypeToPython(typeText),
     optional: !!member.questionToken,
     description: extractJSDocComment(member),
     isArray,

@@ -1,6 +1,7 @@
-# This is a generated file
-# Do not edit manually.
-# Generated from Medplum TypeScript definitions
+# This is a generated file — do not edit manually.
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -573,7 +574,7 @@ class ExplanationOfBenefitBenefitBalanceFinancial(MedplumFHIRBase):
     type: CodeableConcept = Field(
         default=..., description="Classification of benefit being provided."
     )
-    allowed_unsigned_int: int | float | None = Field(
+    allowed_unsigned_int: int | None = Field(
         default=None,
         alias="allowedUnsignedInt",
         description="The quantity of the benefit which is permitted under the coverage.",
@@ -588,7 +589,7 @@ class ExplanationOfBenefitBenefitBalanceFinancial(MedplumFHIRBase):
         alias="allowedMoney",
         description="The quantity of the benefit which is permitted under the coverage.",
     )
-    used_unsigned_int: int | float | None = Field(
+    used_unsigned_int: int | None = Field(
         default=None,
         alias="usedUnsignedInt",
         description="The quantity of the benefit which have been consumed to date.",

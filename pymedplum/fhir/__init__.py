@@ -1,6 +1,8 @@
-# Generated FHIR module
-# Do not edit manually
+# Generated FHIR module — do not edit manually.
 # Source: @medplum/fhirtypes 5.1.7
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 """FHIR Resource models with lazy loading support.
 
 This module provides ~300 FHIR resource type definitions. To avoid massive
@@ -61,8 +63,10 @@ _LAST_REBUILT_VERSION = -1
 _LOADING_STACK: set[str] = set()
 _LOADING_STACK_LOCK = threading.Lock()
 
-# Registry mapping class names to their module paths
-REGISTRY: dict[str, str] = {
+# Internal registry mapping class names to their module paths.
+# Implementation detail — external callers should use FHIR_TYPES for
+# membership / introspection rather than coupling to this shape.
+_REGISTRY: dict[str, str] = {
     "AccessPolicy": "pymedplum.fhir.accesspolicy:AccessPolicy",
     "AccessPolicyIpAccessRule": "pymedplum.fhir.accesspolicy:AccessPolicyIpAccessRule",
     "AccessPolicyResource": "pymedplum.fhir.accesspolicy:AccessPolicyResource",
@@ -786,6 +790,10 @@ REGISTRY: dict[str, str] = {
     "VisionPrescriptionLensSpecificationPrism": "pymedplum.fhir.visionprescription:VisionPrescriptionLensSpecificationPrism",
 }
 
+# Public, stable set of FHIR type names this package exposes.
+# Use for membership checks or discovery; it does not leak module paths.
+FHIR_TYPES: frozenset[str] = frozenset(_REGISTRY)
+
 
 # ============================================================================
 # Introspection Support
@@ -796,10 +804,10 @@ def __dir__() -> list[str]:
     """Return all available resource names for IDE autocompletion.
 
     IDEs use this to populate autocomplete suggestions. We return:
-    - All registered resource names (REGISTRY.keys())
+    - All registered resource names (_REGISTRY.keys())
     - Already-cached imports (globals())
     """
-    return sorted({*REGISTRY.keys(), *globals().keys()})
+    return sorted({*_REGISTRY, *globals()})
 
 
 # Type names to skip during dependency extraction
@@ -855,7 +863,7 @@ def _extract_referenced_types(model_class: type[MedplumFHIRBase]) -> set[str]:
 
             for ann in base_class.__annotations__.values():
                 for m in re.findall(r"\b([A-Z][a-zA-Z0-9_]*)\b", str(ann)):
-                    if m in REGISTRY and m not in _TYPING_SKIP:
+                    if m in _REGISTRY and m not in _TYPING_SKIP:
                         out.add(m)
     except Exception:
         pass
@@ -877,7 +885,7 @@ def _load_model_and_dependencies(
     if newly_loaded is None:
         newly_loaded = set()
 
-    if name in visited or name not in REGISTRY:
+    if name in visited or name not in _REGISTRY:
         return
 
     # Detect circular dependencies
@@ -897,7 +905,7 @@ def _load_model_and_dependencies(
                 return
 
             try:
-                modpath, clsname = REGISTRY[name].split(":")
+                modpath, clsname = _REGISTRY[name].split(":")
                 mod = importlib.import_module(modpath)
                 cls = getattr(mod, clsname)
             except Exception:
@@ -962,7 +970,7 @@ def __getattr__(name: str) -> Any:
 
     if name.startswith("_"):
         raise AttributeError(name)
-    if name not in REGISTRY:
+    if name not in _REGISTRY:
         raise AttributeError(name)
 
     # First, check if already cached (fast path, no lock needed after first access)
@@ -987,7 +995,7 @@ def __getattr__(name: str) -> Any:
                 # Triple-check pattern: verify again after acquiring lock
                 if not _BASE_CLASSES_LOADED:
                     for base_name in _FHIR_BASE_CLASSES:
-                        if base_name in REGISTRY and base_name not in _TYPES_NS:
+                        if base_name in _REGISTRY and base_name not in _TYPES_NS:
                             _load_model_and_dependencies(
                                 base_name, newly_loaded=newly_loaded
                             )

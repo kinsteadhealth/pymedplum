@@ -1,6 +1,7 @@
-# This is a generated file
-# Do not edit manually.
-# Generated from Medplum TypeScript definitions
+# This is a generated file — do not edit manually.
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -124,7 +125,7 @@ class ParametersParameter(MedplumFHIRBase):
         alias="valueDateTime",
         description="If the parameter is a data type.",
     )
-    value_decimal: int | float | None = Field(
+    value_decimal: float | None = Field(
         default=None,
         alias="valueDecimal",
         description="If the parameter is a data type.",
@@ -137,7 +138,7 @@ class ParametersParameter(MedplumFHIRBase):
         alias="valueInstant",
         description="If the parameter is a data type.",
     )
-    value_integer: int | float | None = Field(
+    value_integer: int | None = Field(
         default=None,
         alias="valueInteger",
         description="If the parameter is a data type.",
@@ -150,7 +151,7 @@ class ParametersParameter(MedplumFHIRBase):
     value_oid: str | None = Field(
         default=None, alias="valueOid", description="If the parameter is a data type."
     )
-    value_positive_int: int | float | None = Field(
+    value_positive_int: int | None = Field(
         default=None,
         alias="valuePositiveInt",
         description="If the parameter is a data type.",
@@ -163,7 +164,7 @@ class ParametersParameter(MedplumFHIRBase):
     value_time: str | None = Field(
         default=None, alias="valueTime", description="If the parameter is a data type."
     )
-    value_unsigned_int: int | float | None = Field(
+    value_unsigned_int: int | None = Field(
         default=None,
         alias="valueUnsignedInt",
         description="If the parameter is a data type.",

@@ -1,6 +1,7 @@
-# This is a generated file
-# Do not edit manually.
-# Generated from Medplum TypeScript definitions
+# This is a generated file — do not edit manually.
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -89,7 +90,7 @@ class Extension(MedplumFHIRBase):
         alias="valueDateTime",
         description="Value of extension - must be one of a constrained set of the data types (see [Extensibility](extensibility.html) for a list).",
     )
-    value_decimal: int | float | None = Field(
+    value_decimal: float | None = Field(
         default=None,
         alias="valueDecimal",
         description="Value of extension - must be one of a constrained set of the data types (see [Extensibility](extensibility.html) for a list).",
@@ -104,7 +105,7 @@ class Extension(MedplumFHIRBase):
         alias="valueInstant",
         description="Value of extension - must be one of a constrained set of the data types (see [Extensibility](extensibility.html) for a list).",
     )
-    value_integer: int | float | None = Field(
+    value_integer: int | None = Field(
         default=None,
         alias="valueInteger",
         description="Value of extension - must be one of a constrained set of the data types (see [Extensibility](extensibility.html) for a list).",
@@ -119,7 +120,7 @@ class Extension(MedplumFHIRBase):
         alias="valueOid",
         description="Value of extension - must be one of a constrained set of the data types (see [Extensibility](extensibility.html) for a list).",
     )
-    value_positive_int: int | float | None = Field(
+    value_positive_int: int | None = Field(
         default=None,
         alias="valuePositiveInt",
         description="Value of extension - must be one of a constrained set of the data types (see [Extensibility](extensibility.html) for a list).",
@@ -134,7 +135,7 @@ class Extension(MedplumFHIRBase):
         alias="valueTime",
         description="Value of extension - must be one of a constrained set of the data types (see [Extensibility](extensibility.html) for a list).",
     )
-    value_unsigned_int: int | float | None = Field(
+    value_unsigned_int: int | None = Field(
         default=None,
         alias="valueUnsignedInt",
         description="Value of extension - must be one of a constrained set of the data types (see [Extensibility](extensibility.html) for a list).",

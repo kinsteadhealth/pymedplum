@@ -1,6 +1,7 @@
-# This is a generated file
-# Do not edit manually.
-# Generated from Medplum TypeScript definitions
+# This is a generated file — do not edit manually.
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -353,7 +354,7 @@ class StructureMapGroupRuleSource(MedplumFHIRBase):
         alias="defaultValueDateTime",
         description="A value to use if there is no existing value in the source object.",
     )
-    default_value_decimal: int | float | None = Field(
+    default_value_decimal: float | None = Field(
         default=None,
         alias="defaultValueDecimal",
         description="A value to use if there is no existing value in the source object.",
@@ -368,7 +369,7 @@ class StructureMapGroupRuleSource(MedplumFHIRBase):
         alias="defaultValueInstant",
         description="A value to use if there is no existing value in the source object.",
     )
-    default_value_integer: int | float | None = Field(
+    default_value_integer: int | None = Field(
         default=None,
         alias="defaultValueInteger",
         description="A value to use if there is no existing value in the source object.",
@@ -383,7 +384,7 @@ class StructureMapGroupRuleSource(MedplumFHIRBase):
         alias="defaultValueOid",
         description="A value to use if there is no existing value in the source object.",
     )
-    default_value_positive_int: int | float | None = Field(
+    default_value_positive_int: int | None = Field(
         default=None,
         alias="defaultValuePositiveInt",
         description="A value to use if there is no existing value in the source object.",
@@ -398,7 +399,7 @@ class StructureMapGroupRuleSource(MedplumFHIRBase):
         alias="defaultValueTime",
         description="A value to use if there is no existing value in the source object.",
     )
-    default_value_unsigned_int: int | float | None = Field(
+    default_value_unsigned_int: int | None = Field(
         default=None,
         alias="defaultValueUnsignedInt",
         description="A value to use if there is no existing value in the source object.",
@@ -698,12 +699,12 @@ class StructureMapGroupRuleTargetParameter(MedplumFHIRBase):
         alias="valueBoolean",
         description="Parameter value - variable or literal.",
     )
-    value_integer: int | float | None = Field(
+    value_integer: int | None = Field(
         default=None,
         alias="valueInteger",
         description="Parameter value - variable or literal.",
     )
-    value_decimal: int | float | None = Field(
+    value_decimal: float | None = Field(
         default=None,
         alias="valueDecimal",
         description="Parameter value - variable or literal.",

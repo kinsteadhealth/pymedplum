@@ -11,9 +11,10 @@ import { ParsedInterface, ParsedField, ParsedFile } from "./parser";
 // ============================================================================
 
 const PYTHON_HEADER = [
-  "# This is a generated file",
-  "# Do not edit manually.",
-  "# Generated from Medplum TypeScript definitions",
+  "# This is a generated file — do not edit manually.",
+  "# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)",
+  "# and LICENSE for terms.",
+  "# SPDX-License-Identifier: Apache-2.0",
   "",
   "from __future__ import annotations",
   "",
@@ -512,9 +513,11 @@ export function generateInitFile(
   fhirTypesVersion: string = "unknown",
 ): string {
   const lines: string[] = [
-    "# Generated FHIR module",
-    "# Do not edit manually",
+    "# Generated FHIR module — do not edit manually.",
     `# Source: @medplum/fhirtypes ${fhirTypesVersion}`,
+    "# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)",
+    "# and LICENSE for terms.",
+    "# SPDX-License-Identifier: Apache-2.0",
     '"""FHIR Resource models with lazy loading support.',
     '',
     'This module provides ~300 FHIR resource type definitions. To avoid massive',
@@ -563,6 +566,7 @@ export function generateInitFile(
     '# Shared types namespace for Pydantic model_rebuild() forward reference resolution',
     '_TYPES_NS: dict[str, Any] = {',
     '    "ResourceType": str,',
+    '    "Resource": MedplumFHIRBase,',
     '}',
     '',
     '# Global rebuild coordination',
@@ -574,8 +578,10 @@ export function generateInitFile(
     '_LOADING_STACK: set[str] = set()',
     '_LOADING_STACK_LOCK = threading.Lock()',
     '',
-    "# Registry mapping class names to their module paths",
-    "REGISTRY: dict[str, str] = {",
+    "# Internal registry mapping class names to their module paths.",
+    "# Implementation detail — external callers should use FHIR_TYPES for",
+    "# membership / introspection rather than coupling to this shape.",
+    "_REGISTRY: dict[str, str] = {",
   ];
 
   // Create the registry dictionary
@@ -587,6 +593,10 @@ export function generateInitFile(
     });
 
   lines.push("}");
+  lines.push("");
+  lines.push("# Public, stable set of FHIR type names this package exposes.");
+  lines.push("# Use for membership checks or discovery; it does not leak module paths.");
+  lines.push("FHIR_TYPES: frozenset[str] = frozenset(_REGISTRY)");
   lines.push("");
 
 	   lines.push(
@@ -600,15 +610,10 @@ export function generateInitFile(
 	       '    """Return all available resource names for IDE autocompletion.',
 	       "",
 	       '    IDEs use this to populate autocomplete suggestions. We return:',
-	       "    - All registered resource names (REGISTRY.keys())",
+	       "    - All registered resource names (_REGISTRY.keys())",
 	       "    - Already-cached imports (globals())",
 	       '    """',
-	       "    return sorted(",
-	       "        set(",
-	       "            list(REGISTRY.keys()) +  # All available resources",
-	       "            list(globals().keys())    # Already-cached imports",
-	       "        )",
-	       "    )",
+	       "    return sorted({*_REGISTRY, *globals()})",
 	       "",
 	       "",
 	       "# Type names to skip during dependency extraction",
@@ -652,7 +657,7 @@ export function generateInitFile(
 	       "",
 	       "            for ann in base_class.__annotations__.values():",
 	       '                for m in re.findall(r"\\b([A-Z][a-zA-Z0-9_]*)\\b", str(ann)):',
-	       "                    if m in REGISTRY and m not in _TYPING_SKIP:",
+	       "                    if m in _REGISTRY and m not in _TYPING_SKIP:",
 	       "                        out.add(m)",
 	       "    except Exception:",
 	       "        pass",
@@ -674,7 +679,7 @@ export function generateInitFile(
 	       "    if newly_loaded is None:",
 	       "        newly_loaded = set()",
 	       "",
-	       "    if name in visited or name not in REGISTRY:",
+	       "    if name in visited or name not in _REGISTRY:",
 	       "        return",
 	       "",
 	       "    # Detect circular dependencies",
@@ -694,7 +699,7 @@ export function generateInitFile(
 	       "                return",
 	       "",
 	       "            try:",
-	       '                modpath, clsname = REGISTRY[name].split(":")',
+	       '                modpath, clsname = _REGISTRY[name].split(":")',
 	       "                mod = importlib.import_module(modpath)",
 	       "                cls = getattr(mod, clsname)",
 	       "            except Exception:",
@@ -759,7 +764,7 @@ export function generateInitFile(
 	       "",
 	       '    if name.startswith("_"):',
 	       "        raise AttributeError(name)",
-	       "    if name not in REGISTRY:",
+	       "    if name not in _REGISTRY:",
 	       "        raise AttributeError(name)",
 	       "",
 	       "    # First, check if already cached (fast path, no lock needed after first access)",
@@ -784,7 +789,7 @@ export function generateInitFile(
 	       "                # Triple-check pattern: verify again after acquiring lock",
 	       "                if not _BASE_CLASSES_LOADED:",
 	       "                    for base_name in _FHIR_BASE_CLASSES:",
-	       "                        if base_name in REGISTRY and base_name not in _TYPES_NS:",
+	       "                        if base_name in _REGISTRY and base_name not in _TYPES_NS:",
 	       "                            _load_model_and_dependencies(",
 	       "                                base_name, newly_loaded=newly_loaded",
 	       "                            )",
@@ -800,7 +805,7 @@ export function generateInitFile(
 	       "        # Rebuild all loaded models when namespace changes",
 	       "        # This is expensive but necessary for forward reference resolution",
 	       "        if _LAST_REBUILT_VERSION != _TYPES_NS_VERSION:",
-	       "            loaded_models = list(_TYPES_NS.values())",
+	       "            loaded_models = [*_TYPES_NS.values()]",
 	       "            for model in loaded_models:",
 	       '                if hasattr(model, "model_rebuild"):',
 	       "                    try:",
