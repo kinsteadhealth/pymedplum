@@ -327,8 +327,6 @@ def test_validate_on_behalf_of_usage_warns_without_secret():
         assert "should only be used with ClientApplication" in str(w[0].message)
 
 
-
-
 def test_attempt_tracker_record_appends_monotonic():
     from datetime import datetime, timezone
 

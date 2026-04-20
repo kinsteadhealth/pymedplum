@@ -86,7 +86,9 @@ def test_validate_resource_type_warns_for_unknown(
     with caplog.at_level(logging.WARNING, logger="pymedplum.security"):
         result = validate_resource_type(plausible_but_unknown)
     assert result == plausible_but_unknown
-    assert any("not in the SDK's generated allowlist" in r.message for r in caplog.records)
+    assert any(
+        "not in the SDK's generated allowlist" in r.message for r in caplog.records
+    )
 
 
 def test_validate_resource_type_rejects_non_string() -> None:
@@ -301,9 +303,7 @@ def test_sync_read_resource_blocks_slashed_id(respx_mock: MockRouter) -> None:
 def test_sync_update_resource_blocks_slashed_id(respx_mock: MockRouter) -> None:
     client = _sync_client()
     with pytest.raises(ValueError):
-        client.update_resource(
-            {"resourceType": "Patient", "id": "123/Account/abc"}
-        )
+        client.update_resource({"resourceType": "Patient", "id": "123/Account/abc"})
     assert not respx_mock.calls
 
 

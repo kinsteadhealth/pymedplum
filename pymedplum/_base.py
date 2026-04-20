@@ -55,7 +55,6 @@ if TYPE_CHECKING:
 
 
 _hooks_logger = logging.getLogger("pymedplum.hooks")
-_request_logger = logging.getLogger("pymedplum.request")
 _auth_logger = logging.getLogger("pymedplum.auth")
 
 
@@ -103,29 +102,24 @@ _STATUS_EXCEPTIONS: dict[int, tuple[Callable[..., MedplumError], str]] = {
 }
 
 
-def _raise_or_json(response: httpx.Response) -> dict[str, Any]:
-    """Parse response or raise appropriate exception based on status code.
-
-    Args:
-        response: httpx Response object
-
-    Returns:
-        Parsed JSON if successful, None if no content (204)
-
-    Raises:
-        AuthenticationError: On 401 Unauthorized
-        AuthorizationError: On 403 Forbidden
-        NotFoundError: On 404 Not Found
-        PreconditionFailedError: On 412 Precondition Failed
-        BadRequestError: On 400 Bad Request
-        OperationOutcomeError: On other error responses
-    """
+def _raise_or_json(
+    response: httpx.Response, fhir_url_path: str | None = None
+) -> dict[str, Any]:
+    """Parse response or raise appropriate exception based on status code."""
     status = response.status_code
     if 200 <= status < 300:
         if status == 204 or not response.content:
             return {}
         data: Any = response.json()
-        return data if isinstance(data, dict) else {}
+        if isinstance(data, dict):
+            return data
+        # FHIR endpoints return objects; a list/scalar at the top level is
+        # almost always a caller hitting a non-FHIR endpoint without
+        # ``raw=True``. Surface it instead of silently returning ``{}``.
+        raise MedplumError(
+            f"Expected JSON object, got {type(data).__name__}; "
+            "use raw=True for non-FHIR endpoints"
+        )
 
     try:
         parsed = response.json()
@@ -140,7 +134,7 @@ def _raise_or_json(response: httpx.Response) -> dict[str, Any]:
 
     if status >= 500:
         method, path = _method_and_path(response)
-        _, _, _, path_template = _parse_fhir_url(path)
+        _, _, _, path_template = _parse_fhir_url(path, fhir_url_path)
         raise ServerError(
             status_code=status,
             method=method,
@@ -153,7 +147,7 @@ def _raise_or_json(response: httpx.Response) -> dict[str, Any]:
 
 
 def _finalize_response(
-    response: httpx.Response, *, raw: bool
+    response: httpx.Response, *, raw: bool, fhir_url_path: str | None = None
 ) -> dict[str, Any] | httpx.Response:
     """Return parsed JSON or the raw response, raising on error status.
 
@@ -163,9 +157,9 @@ def _finalize_response(
     :func:`_raise_or_json` so exception types stay consistent.
     """
     if not raw:
-        return _raise_or_json(response)
+        return _raise_or_json(response, fhir_url_path)
     if response.status_code >= 400:
-        _raise_or_json(response)
+        _raise_or_json(response, fhir_url_path)
     return response
 
 
@@ -248,6 +242,7 @@ class _AttemptTracker:
     attempts: list[RequestAttempt] = field(default_factory=list)
     final_status_code: int | None = None
     final_exception: BaseException | None = None
+    fhir_url_path: str | None = None
 
     def record(
         self,
@@ -269,7 +264,7 @@ class _AttemptTracker:
     def build_event(self, ended_at: datetime) -> RequestEvent:
         parsed = urlparse(self.url)
         resource_type, resource_id, operation, path_template = _parse_fhir_url(
-            parsed.path
+            parsed.path, self.fhir_url_path
         )
         return RequestEvent(
             method=self.method,
@@ -308,9 +303,7 @@ def _retry_delay(
     status = response.status_code
     if status == 429:
         return float(
-            parse_retry_after_429(
-                response, max_delay_seconds=max_retry_delay_seconds
-            )
+            parse_retry_after_429(response, max_delay_seconds=max_retry_delay_seconds)
         )
     if status in RETRYABLE_STATUS_CODES:
         backoff: float = min(0.25 * (2**attempt), 2.0)
@@ -355,6 +348,7 @@ class BaseClient:
         self.base_url = validate_base_url(
             base_url, allow_insecure_http=allow_insecure_http
         )
+        self.fhir_url_path = fhir_url_path
         self.fhir_base_url = self.base_url + fhir_url_path
         self.client_id = client_id
         self.client_secret = client_secret
@@ -416,9 +410,13 @@ class BaseClient:
             patient = client.read_resource("Patient", "123")
         """
         self.access_token = token
-        # If the caller didn't tell us when this expires, leave it as None.
-        # Reactive 401 handling will refresh on rejection.
         self.token_expires_at = expires_at
+        # Keep the token manager in sync — _finalize_headers_for_wire reads
+        # from it first, so without this the old bearer would still ship.
+        tokens = getattr(self, "_tokens", None)
+        if tokens is not None:
+            tokens.access_token = token
+            tokens.token_expires_at = expires_at
 
     def _apply_before_request(self, original: PreparedRequest) -> PreparedRequest:
         """Run the ``before_request`` hook with pre-redacted auth headers.

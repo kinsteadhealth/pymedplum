@@ -37,6 +37,7 @@ def _is_loopback_host(host_lower: str) -> bool:
     except ValueError:
         return False
 
+
 _DANGEROUS_PATH_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"(?i)^\s*https?:"),
     re.compile(r"^\s*//"),
@@ -294,9 +295,7 @@ def validate_as_fhir_class(
     from pymedplum.fhir.base import MedplumFHIRBase
 
     if not isinstance(cls, type) or not issubclass(cls, MedplumFHIRBase):
-        raise TypeError(
-            f"as_fhir must be a FHIR resource class, got {cls!r}"
-        )
+        raise TypeError(f"as_fhir must be a FHIR resource class, got {cls!r}")
     if cls.__name__ not in RESOURCE_TYPES:
         raise TypeError(
             f"as_fhir={cls.__name__!r} is not a top-level FHIR resource type "
@@ -307,5 +306,3 @@ def validate_as_fhir_class(
             f"as_fhir={cls.__name__!r} does not match resource_type="
             f"{expected_resource_type!r}"
         )
-
-

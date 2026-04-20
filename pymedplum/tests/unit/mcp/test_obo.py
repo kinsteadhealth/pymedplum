@@ -51,9 +51,7 @@ class TestObOOverrideLockdown:
         monkeypatch.setenv("MEDPLUM_ALLOW_OBO_OVERRIDE", "false")
         mock_client = AsyncMock()
         mock_client.read_resource.return_value = {"resourceType": "Patient", "id": "1"}
-        with patch(
-            "pymedplum.mcp.tools._with_obo", make_fake_obo(mock_client)
-        ):
+        with patch("pymedplum.mcp.tools._with_obo", make_fake_obo(mock_client)):
             result = await read_resource("Patient", "1")
         assert result["resourceType"] == "Patient"
 

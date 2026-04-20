@@ -541,7 +541,11 @@ def _log_token_acquired(
     token value itself.
     """
     expires_in = payload.get("expires_in")
-    source = "expires_in" if isinstance(expires_in, (int, float)) and expires_in > 0 else "none"
+    source = (
+        "expires_in"
+        if isinstance(expires_in, (int, float)) and expires_in > 0
+        else "none"
+    )
     logger.debug("token: expiry parsed from %s", source)
     if expires_at is not None:
         remaining = (expires_at - datetime.now(timezone.utc)).total_seconds()

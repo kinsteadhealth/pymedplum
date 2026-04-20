@@ -15,8 +15,7 @@ def _bundle(n: int) -> dict:
         "resourceType": "Bundle",
         "type": "searchset",
         "entry": [
-            {"resource": {"resourceType": "Patient", "id": f"p{i}"}}
-            for i in range(n)
+            {"resource": {"resourceType": "Patient", "id": f"p{i}"}} for i in range(n)
         ],
     }
 
@@ -45,9 +44,7 @@ def test_sync_paginator_caps_resources(respx_mock: respx.MockRouter) -> None:
     client = MedplumClient(access_token="t")
     try:
         out = list(
-            client.search_resource_pages(
-                "Patient", {"_count": "10"}, max_resources=3
-            )
+            client.search_resource_pages("Patient", {"_count": "10"}, max_resources=3)
         )
         assert len(out) == 3
         assert [r["id"] for r in out] == ["p0", "p1", "p2"]

@@ -59,12 +59,16 @@ class FHIRBundle(Generic[T]):
             ...     print(patient['name'])
         """
         entries = self._data.get("entry", [])
-        resources = [entry["resource"] for entry in entries if "resource" in entry]
-        if max_resources is not None and len(resources) > max_resources:
-            raise ValueError(
-                f"Bundle contains {len(resources)} resources, exceeding "
-                f"max_resources={max_resources}"
-            )
+        resources: list[dict[str, Any]] = []
+        for entry in entries:
+            if "resource" not in entry:
+                continue
+            if max_resources is not None and len(resources) >= max_resources:
+                raise ValueError(
+                    f"Bundle contains more than {max_resources} resources, "
+                    f"exceeding max_resources={max_resources}"
+                )
+            resources.append(entry["resource"])
         return resources
 
     def get_resources_typed(self, resource_class: type[T]) -> list[T]:

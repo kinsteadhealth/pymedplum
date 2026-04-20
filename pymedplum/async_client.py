@@ -207,6 +207,7 @@ class AsyncMedplumClient(BaseClient):
             method=prepared.method,
             url=prepared.url,
             started_at=datetime.now(timezone.utc),
+            fhir_url_path=self.fhir_url_path,
         )
         try:
             response = await self._send_with_retries(
@@ -217,7 +218,9 @@ class AsyncMedplumClient(BaseClient):
                 kwargs=kwargs,
             )
             tracker.final_status_code = response.status_code
-            return _finalize_response(response, raw=raw)
+            return _finalize_response(
+                response, raw=raw, fhir_url_path=self.fhir_url_path
+            )
         except BaseException as exc:
             if tracker.final_exception is None:
                 tracker.final_exception = exc
@@ -290,7 +293,9 @@ class AsyncMedplumClient(BaseClient):
         kwargs: dict[str, Any],
     ) -> httpx.Response:
         """Drive the transient-failure retry loop and the 401-refresh branch."""
-        _, _, _, path_template = _parse_fhir_url(urlparse(prepared.url).path)
+        _, _, _, path_template = _parse_fhir_url(
+            urlparse(prepared.url).path, self.fhir_url_path
+        )
         for attempt in range(MAX_WIRE_ATTEMPTS):
             wire_obo = self._resolve_on_behalf_of(on_behalf_of)
             headers = self._finalize_headers_for_wire(base_non_auth_headers, wire_obo)
@@ -310,7 +315,8 @@ class AsyncMedplumClient(BaseClient):
                     return response
                 response = refreshed
             delay = _retry_delay(
-                response, attempt,
+                response,
+                attempt,
                 max_retry_delay_seconds=self.max_retry_delay_seconds,
             )
             if delay is not None and not _retry_budget_exceeded(

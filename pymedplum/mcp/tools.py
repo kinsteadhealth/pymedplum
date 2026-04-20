@@ -10,7 +10,17 @@ import os
 from collections import Counter
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-from mcp.types import ToolAnnotations
+try:
+    from mcp.types import ToolAnnotations
+except ImportError:
+    # Optional ``mcp`` extra not installed; server.py's FastMCP shim ignores
+    # ``annotations=`` so a no-op stub keeps the module importable.
+    class ToolAnnotations:  # type: ignore[no-redef]
+        """No-op stub used when the ``mcp`` extra isn't installed."""
+
+        def __init__(self, **_kwargs: Any) -> None:
+            pass
+
 
 from pymedplum._security import build_raw_request_url
 from pymedplum.fhir import FHIR_TYPES

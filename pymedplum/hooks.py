@@ -131,11 +131,10 @@ class RequestEvent:
             ],
             "final_status_code": self.final_status_code,
             "final_exception_type": (
-                type(self.final_exception).__name__
-                if self.final_exception
-                else None
+                type(self.final_exception).__name__ if self.final_exception else None
             ),
         }
+
 
 def _serialize_exception(
     exc: BaseException | None,
@@ -163,12 +162,13 @@ OnRequestCompleteHook = Callable[[RequestEvent], None]
 AsyncOnRequestCompleteHook = Callable[[RequestEvent], Awaitable[None]]
 
 
-_FHIR_PREFIX_RE = re.compile(r"^/fhir/R\d+/")
+_FHIR_PREFIX_RE = re.compile(r"^/fhir/R\d+[A-Za-z]*/")
 _RESOURCE_TYPE_RE = re.compile(r"^[A-Z][A-Za-z]+$")
 
 
 def _parse_fhir_url(
     path: str,
+    fhir_url_path: str | None = None,
 ) -> tuple[str | None, str | None, str | None, str]:
     """Parse a FHIR URL path into (resource_type, resource_id, operation, path_template).
 
@@ -183,12 +183,23 @@ def _parse_fhir_url(
     path_template substitutes "{id}" for resource and version IDs so it is
     safe to use as a metric tag or non-PHI log field. Non-FHIR paths
     return (None, None, None, path) unchanged.
-    """
-    prefix_match = _FHIR_PREFIX_RE.match(path)
-    if prefix_match is None:
-        return None, None, None, path
 
-    prefix = prefix_match.group(0)
+    ``fhir_url_path`` matches the client's configured prefix literally when
+    given (e.g. ``"fhir/R4B/"``, ``"fhir/"``). Otherwise the standard
+    ``/fhir/R<version>/`` shape is accepted.
+    """
+    if fhir_url_path is not None:
+        configured = "/" + fhir_url_path.lstrip("/")
+        if not configured.endswith("/"):
+            configured = configured + "/"
+        if not path.startswith(configured):
+            return None, None, None, path
+        prefix = configured
+    else:
+        prefix_match = _FHIR_PREFIX_RE.match(path)
+        if prefix_match is None:
+            return None, None, None, path
+        prefix = prefix_match.group(0)
     segments = [s for s in path[len(prefix) :].split("/") if s]
     if not segments or not _RESOURCE_TYPE_RE.match(segments[0]):
         return None, None, None, path
