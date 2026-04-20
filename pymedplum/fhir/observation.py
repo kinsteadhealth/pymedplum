@@ -1,6 +1,7 @@
-# This is a generated file
-# Do not edit manually.
-# Generated from Medplum TypeScript definitions
+# This is a generated file — do not edit manually.
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -157,7 +158,7 @@ class Observation(MedplumFHIRBase):
         alias="valueBoolean",
         description="The information determined as a result of making the observation, if the information has a simple value.",
     )
-    value_integer: int | float | None = Field(
+    value_integer: int | None = Field(
         default=None,
         alias="valueInteger",
         description="The information determined as a result of making the observation, if the information has a simple value.",
@@ -286,7 +287,7 @@ class ObservationComponent(MedplumFHIRBase):
         alias="valueBoolean",
         description="The information determined as a result of making the observation, if the information has a simple value.",
     )
-    value_integer: int | float | None = Field(
+    value_integer: int | None = Field(
         default=None,
         alias="valueInteger",
         description="The information determined as a result of making the observation, if the information has a simple value.",

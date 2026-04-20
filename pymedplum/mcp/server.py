@@ -24,7 +24,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from pymedplum import AsyncMedplumClient
-from pymedplum.fhir import REGISTRY as FHIR_REGISTRY
+from pymedplum.fhir import FHIR_TYPES
 
 # ---------------------------------------------------------------------------
 # FastMCP instance (with fallback shim when mcp extras aren't installed)
@@ -238,7 +238,7 @@ def _get_fhir_model(resource_type: str) -> type[BaseModel] | None:
     """
     if resource_type in _MODEL_CACHE:
         return _MODEL_CACHE[resource_type]
-    if resource_type not in FHIR_REGISTRY:
+    if resource_type not in FHIR_TYPES:
         _MODEL_CACHE[resource_type] = None
         return None
     from pymedplum import fhir
@@ -254,7 +254,7 @@ def _annotate_response(result: dict[str, Any]) -> dict[str, Any]:
     if not resource_type:
         return result
 
-    if resource_type in FHIR_REGISTRY:
+    if resource_type in FHIR_TYPES:
         result["_PHI_WARNING"] = (
             "This response contains PROTECTED HEALTH INFORMATION (PHI). "
             "Handle with care — do not send to external services or "

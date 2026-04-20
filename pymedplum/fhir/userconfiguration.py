@@ -1,6 +1,7 @@
-# This is a generated file
-# Do not edit manually.
-# Generated from Medplum TypeScript definitions
+# This is a generated file — do not edit manually.
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -101,12 +102,12 @@ class UserConfigurationOption(MedplumFHIRBase):
         alias="valueCode",
         description="Value of option - must be one of a constrained set of the data types (see [Extensibility](extensibility.html) for a list).",
     )
-    value_decimal: int | float | None = Field(
+    value_decimal: float | None = Field(
         default=None,
         alias="valueDecimal",
         description="Value of option - must be one of a constrained set of the data types (see [Extensibility](extensibility.html) for a list).",
     )
-    value_integer: int | float | None = Field(
+    value_integer: int | None = Field(
         default=None,
         alias="valueInteger",
         description="Value of option - must be one of a constrained set of the data types (see [Extensibility](extensibility.html) for a list).",

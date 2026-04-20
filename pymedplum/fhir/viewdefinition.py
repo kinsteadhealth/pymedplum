@@ -1,6 +1,7 @@
-# This is a generated file
-# Do not edit manually.
-# Generated from Medplum TypeScript definitions
+# This is a generated file — do not edit manually.
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -168,7 +169,7 @@ class ViewDefinitionConstant(MedplumFHIRBase):
         alias="valueDateTime",
         description="The value that will be substituted in place of the constant reference. This is done by including `%your_constant_name` in a FHIRPath expression, which effectively converts the FHIR literal defined here to a FHIRPath literal used in the path expression. Support for additional types may be added in the future.",
     )
-    value_decimal: int | float | None = Field(
+    value_decimal: float | None = Field(
         default=None,
         alias="valueDecimal",
         description="The value that will be substituted in place of the constant reference. This is done by including `%your_constant_name` in a FHIRPath expression, which effectively converts the FHIR literal defined here to a FHIRPath literal used in the path expression. Support for additional types may be added in the future.",
@@ -183,7 +184,7 @@ class ViewDefinitionConstant(MedplumFHIRBase):
         alias="valueInstant",
         description="The value that will be substituted in place of the constant reference. This is done by including `%your_constant_name` in a FHIRPath expression, which effectively converts the FHIR literal defined here to a FHIRPath literal used in the path expression. Support for additional types may be added in the future.",
     )
-    value_integer: int | float | None = Field(
+    value_integer: int | None = Field(
         default=None,
         alias="valueInteger",
         description="The value that will be substituted in place of the constant reference. This is done by including `%your_constant_name` in a FHIRPath expression, which effectively converts the FHIR literal defined here to a FHIRPath literal used in the path expression. Support for additional types may be added in the future.",
@@ -203,7 +204,7 @@ class ViewDefinitionConstant(MedplumFHIRBase):
         alias="valueString",
         description="The value that will be substituted in place of the constant reference. This is done by including `%your_constant_name` in a FHIRPath expression, which effectively converts the FHIR literal defined here to a FHIRPath literal used in the path expression. Support for additional types may be added in the future.",
     )
-    value_positive_int: int | float | None = Field(
+    value_positive_int: int | None = Field(
         default=None,
         alias="valuePositiveInt",
         description="The value that will be substituted in place of the constant reference. This is done by including `%your_constant_name` in a FHIRPath expression, which effectively converts the FHIR literal defined here to a FHIRPath literal used in the path expression. Support for additional types may be added in the future.",
@@ -213,7 +214,7 @@ class ViewDefinitionConstant(MedplumFHIRBase):
         alias="valueTime",
         description="The value that will be substituted in place of the constant reference. This is done by including `%your_constant_name` in a FHIRPath expression, which effectively converts the FHIR literal defined here to a FHIRPath literal used in the path expression. Support for additional types may be added in the future.",
     )
-    value_unsigned_int: int | float | None = Field(
+    value_unsigned_int: int | None = Field(
         default=None,
         alias="valueUnsignedInt",
         description="The value that will be substituted in place of the constant reference. This is done by including `%your_constant_name` in a FHIRPath expression, which effectively converts the FHIR literal defined here to a FHIRPath literal used in the path expression. Support for additional types may be added in the future.",

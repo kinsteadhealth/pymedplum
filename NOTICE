@@ -1,0 +1,63 @@
+PyMedplum
+Copyright 2025-2026 Dahlia Health, Inc. (Kinstead Health)
+
+This product includes software and content developed by third parties,
+listed below.
+
+-------------------------------------------------------------------------------
+@medplum/fhirtypes
+-------------------------------------------------------------------------------
+
+Every Python module under `pymedplum/fhir/` is generated from the TypeScript
+FHIR type definitions published by Medplum as the `@medplum/fhirtypes`
+npm package:
+
+    https://www.npmjs.com/package/@medplum/fhirtypes
+    https://github.com/medplum/medplum/tree/main/packages/fhirtypes
+
+Copyright Orangebot, Inc. and Medplum contributors
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may
+not use the upstream work except in compliance with the License. You may
+obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+The generator that transforms those TypeScript definitions into Pydantic
+models lives in `scripts/src/` and is part of PyMedplum's own source.
+
+-------------------------------------------------------------------------------
+HL7 FHIR R4 Specification
+-------------------------------------------------------------------------------
+
+The upstream `@medplum/fhirtypes` definitions — and therefore the generated
+Python models under `pymedplum/fhir/` — are derived from the HL7 FHIR R4
+specification:
+
+    https://www.hl7.org/fhir/R4/
+    FHIR Version 4.0.1
+
+The FHIR specification is published by Health Level Seven International
+(HL7) under the HL7 License Agreement:
+
+    https://www.hl7.org/fhir/license.html
+
+Normative and definitional content in FHIR is additionally made available
+by HL7 under CC0 1.0 Universal:
+
+    https://creativecommons.org/publicdomain/zero/1.0/
+
+No endorsement by HL7 of PyMedplum, Medplum, or Orangebot, Inc. is implied
+by the inclusion of FHIR-derived content in this project.
+
+-------------------------------------------------------------------------------
+Trademarks
+-------------------------------------------------------------------------------
+
+"Medplum" is a product and trademark of Orangebot, Inc. PyMedplum is an
+independent Python client and is not affiliated with, endorsed by, or
+sponsored by Orangebot, Inc.
+
+"FHIR" and "HL7" are registered trademarks of Health Level Seven
+International. Use of these names here is purely descriptive and does not
+imply endorsement by HL7.

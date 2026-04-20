@@ -1,6 +1,7 @@
-# This is a generated file
-# Do not edit manually.
-# Generated from Medplum TypeScript definitions
+# This is a generated file — do not edit manually.
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -291,7 +292,7 @@ class TaskInput(MedplumFHIRBase):
         alias="valueDateTime",
         description="The value of the input parameter as a basic type.",
     )
-    value_decimal: int | float | None = Field(
+    value_decimal: float | None = Field(
         default=None,
         alias="valueDecimal",
         description="The value of the input parameter as a basic type.",
@@ -306,7 +307,7 @@ class TaskInput(MedplumFHIRBase):
         alias="valueInstant",
         description="The value of the input parameter as a basic type.",
     )
-    value_integer: int | float | None = Field(
+    value_integer: int | None = Field(
         default=None,
         alias="valueInteger",
         description="The value of the input parameter as a basic type.",
@@ -321,7 +322,7 @@ class TaskInput(MedplumFHIRBase):
         alias="valueOid",
         description="The value of the input parameter as a basic type.",
     )
-    value_positive_int: int | float | None = Field(
+    value_positive_int: int | None = Field(
         default=None,
         alias="valuePositiveInt",
         description="The value of the input parameter as a basic type.",
@@ -336,7 +337,7 @@ class TaskInput(MedplumFHIRBase):
         alias="valueTime",
         description="The value of the input parameter as a basic type.",
     )
-    value_unsigned_int: int | float | None = Field(
+    value_unsigned_int: int | None = Field(
         default=None,
         alias="valueUnsignedInt",
         description="The value of the input parameter as a basic type.",
@@ -562,7 +563,7 @@ class TaskOutput(MedplumFHIRBase):
         alias="valueDateTime",
         description="The value of the Output parameter as a basic type.",
     )
-    value_decimal: int | float | None = Field(
+    value_decimal: float | None = Field(
         default=None,
         alias="valueDecimal",
         description="The value of the Output parameter as a basic type.",
@@ -577,7 +578,7 @@ class TaskOutput(MedplumFHIRBase):
         alias="valueInstant",
         description="The value of the Output parameter as a basic type.",
     )
-    value_integer: int | float | None = Field(
+    value_integer: int | None = Field(
         default=None,
         alias="valueInteger",
         description="The value of the Output parameter as a basic type.",
@@ -592,7 +593,7 @@ class TaskOutput(MedplumFHIRBase):
         alias="valueOid",
         description="The value of the Output parameter as a basic type.",
     )
-    value_positive_int: int | float | None = Field(
+    value_positive_int: int | None = Field(
         default=None,
         alias="valuePositiveInt",
         description="The value of the Output parameter as a basic type.",
@@ -607,7 +608,7 @@ class TaskOutput(MedplumFHIRBase):
         alias="valueTime",
         description="The value of the Output parameter as a basic type.",
     )
-    value_unsigned_int: int | float | None = Field(
+    value_unsigned_int: int | None = Field(
         default=None,
         alias="valueUnsignedInt",
         description="The value of the Output parameter as a basic type.",

@@ -104,10 +104,13 @@ VALIDATION_FAILED=false
 # Quick smoke test: import the module and a few common types
 python3 -c "
 from pymedplum.fhir import Patient, Observation, Practitioner, Encounter
-from pymedplum.fhir import REGISTRY
-print(f'  Registry: {len(REGISTRY)} classes')
+from pymedplum.fhir import List, Parameters, FHIR_TYPES
+print(f'  Registry: {len(FHIR_TYPES)} classes')
 p = Patient(resource_type='Patient')
 assert p.resource_type == 'Patient', 'Patient resourceType mismatch'
+# Regression: these used to crash the loader / fail Pydantic rebuild
+List(status='current', mode='working')
+Parameters(parameter=[{'name': 'patient', 'resource': p}])
 print('  Smoke test: PASSED')
 " || {
     echo "  WARNING: Smoke test failed. Generated models may have issues."

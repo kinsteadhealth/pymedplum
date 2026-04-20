@@ -1,6 +1,7 @@
-# This is a generated file
-# Do not edit manually.
-# Generated from Medplum TypeScript definitions
+# This is a generated file — do not edit manually.
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -893,12 +894,12 @@ class ContractTermOfferAnswer(MedplumFHIRBase):
         alias="valueBoolean",
         description="Response to an offer clause or question text, which enables selection of values to be agreed to, e.g., the period of participation, the date of occupancy of a rental, warrently duration, or whether biospecimen may be used for further research.",
     )
-    value_decimal: int | float | None = Field(
+    value_decimal: float | None = Field(
         default=None,
         alias="valueDecimal",
         description="Response to an offer clause or question text, which enables selection of values to be agreed to, e.g., the period of participation, the date of occupancy of a rental, warrently duration, or whether biospecimen may be used for further research.",
     )
-    value_integer: int | float | None = Field(
+    value_integer: int | None = Field(
         default=None,
         alias="valueInteger",
         description="Response to an offer clause or question text, which enables selection of values to be agreed to, e.g., the period of participation, the date of occupancy of a rental, warrently duration, or whether biospecimen may be used for further research.",

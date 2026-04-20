@@ -11,7 +11,7 @@ import re
 from collections import Counter
 from typing import Any, Literal
 
-from pymedplum.fhir import REGISTRY as FHIR_REGISTRY
+from pymedplum.fhir import FHIR_TYPES
 from pymedplum.mcp.server import (
     _READ_ONLY_OPERATIONS,
     BundleInput,
@@ -68,7 +68,7 @@ async def get_resource_schema(
     """
     model_class = _get_fhir_model(resource_type)
     if model_class is None:
-        available = sorted(FHIR_REGISTRY.keys())
+        available = sorted(FHIR_TYPES)
         msg = (
             f"Unknown FHIR type '{resource_type}'. "
             f"Available types include: {', '.join(available[:30])}... "

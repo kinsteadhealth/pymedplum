@@ -1,6 +1,7 @@
-# This is a generated file
-# Do not edit manually.
-# Generated from Medplum TypeScript definitions
+# This is a generated file — do not edit manually.
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -280,7 +281,7 @@ class CodeSystemConceptProperty(MedplumFHIRBase):
     value_string: str | None = Field(
         default=None, alias="valueString", description="The value of this property."
     )
-    value_integer: int | float | None = Field(
+    value_integer: int | None = Field(
         default=None, alias="valueInteger", description="The value of this property."
     )
     value_boolean: bool | None = Field(
@@ -289,7 +290,7 @@ class CodeSystemConceptProperty(MedplumFHIRBase):
     value_date_time: str | None = Field(
         default=None, alias="valueDateTime", description="The value of this property."
     )
-    value_decimal: int | float | None = Field(
+    value_decimal: float | None = Field(
         default=None, alias="valueDecimal", description="The value of this property."
     )
 

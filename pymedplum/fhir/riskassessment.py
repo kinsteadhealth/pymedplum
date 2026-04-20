@@ -1,6 +1,7 @@
-# This is a generated file
-# Do not edit manually.
-# Generated from Medplum TypeScript definitions
+# This is a generated file — do not edit manually.
+# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)
+# and LICENSE for terms.
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -166,7 +167,7 @@ class RiskAssessmentPrediction(MedplumFHIRBase):
         default=None,
         description="One of the potential outcomes for the patient (e.g. remission, death, a particular condition).",
     )
-    probability_decimal: int | float | None = Field(
+    probability_decimal: float | None = Field(
         default=None,
         alias="probabilityDecimal",
         description="Indicates how likely the outcome is (in the specified timeframe).",
