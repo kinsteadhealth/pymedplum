@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from pymedplum.fhir.identifier import Identifier
     from pymedplum.fhir.meta import Meta
     from pymedplum.fhir.narrative import Narrative
+    from pymedplum.fhir.resourcetype import ResourceType
     from pymedplum.fhir.usagecontext import UsageContext
 
 
@@ -162,10 +163,6 @@ class ExampleScenarioActor(MedplumFHIRBase):
 class ExampleScenarioInstance(MedplumFHIRBase):
     """Each resource and each version that is present in the workflow."""
 
-    resource_type: Literal["ExampleScenarioInstance"] = Field(
-        default="ExampleScenarioInstance", alias="resourceType"
-    )
-
     id: str | None = Field(
         default=None,
         description="Unique id for the element within a resource (for internal references). This may be any string value that does not contain spaces.",
@@ -183,6 +180,9 @@ class ExampleScenarioInstance(MedplumFHIRBase):
         default=...,
         alias="resourceId",
         description="The id of the resource for referencing.",
+    )
+    resource_type: ResourceType = Field(
+        default=..., alias="resourceType", description="The type of the resource."
     )
     name: str | None = Field(
         default=None, description="A short name for the resource instance."

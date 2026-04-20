@@ -393,8 +393,13 @@ function generateClass(
     lines.push("");
   }
 
-  // Regular fields
-  const regularFields = parsed.fields.filter((f) => f.name !== "resourceType");
+  // Regular fields. For top-level resources we re-emit resourceType above as
+  // a Literal discriminator, so strip it here. For non-resources that happen
+  // to carry a resourceType data field (e.g. AccessPolicyResource describing
+  // which FHIR type a rule applies to), keep it — it's a real data field.
+  const regularFields = parsed.isResource
+    ? parsed.fields.filter((f) => f.name !== "resourceType")
+    : parsed.fields;
 
   if (regularFields.length === 0) {
     lines.push("    pass");
@@ -942,8 +947,53 @@ export function generateStubFile(
   sortedResources.forEach((name) => {
     lines.push(`    "${name}",`);
   });
-  
+
   lines.push("]");
 
+  return lines.join("\n") + "\n";
+}
+
+/**
+ * Generates a standalone _resource_types.py data module.
+ *
+ * Kept separate from __init__.py so the client's path-segment validator
+ * can import the allowlist without triggering the fhir package's lazy
+ * model loader. Pure data, no side effects.
+ */
+export function generateResourceTypesFile(
+  topLevelResourceTypes: Set<string>,
+): string {
+  const lines: string[] = [
+    "# Generated FHIR resource-type allowlist — do not edit manually.",
+    "# See NOTICE for attribution (HL7 FHIR R4 / @medplum/fhirtypes / PyMedplum)",
+    "# and LICENSE for terms.",
+    "# SPDX-License-Identifier: Apache-2.0",
+    '"""Allowlist of top-level FHIR resource types emitted by the code generator.',
+    "",
+    "Authoritative for path-segment validation in the client layer. Medplum's",
+    "supported resource set is closed: a resource type either appears in the",
+    "@medplum/fhirtypes package or it is not a valid FHIR route segment. This",
+    "module is regenerated whenever the fhirtypes dependency bumps.",
+    "",
+    "Includes standard FHIR R4 resources and Medplum-specific resources (Bot,",
+    "Project, ProjectMembership, AccessPolicy, etc.). Excludes datatypes",
+    "(Address, HumanName, Age), backbone elements, and abstract bases.",
+    "",
+    "Importing this module evaluates one frozenset literal; it does not trigger",
+    "the lazy model loader in ``pymedplum.fhir.__init__``.",
+    '"""',
+    "",
+    "from __future__ import annotations",
+    "",
+    "RESOURCE_TYPES: frozenset[str] = frozenset({",
+  ];
+  Array.from(topLevelResourceTypes)
+    .sort()
+    .forEach((name) => {
+      lines.push(`    "${name}",`);
+    });
+  lines.push("})");
+  lines.push("");
+  lines.push('__all__ = ["RESOURCE_TYPES"]');
   return lines.join("\n") + "\n";
 }

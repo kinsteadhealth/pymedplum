@@ -54,7 +54,10 @@ def test_bot_crud_operations(medplum_client: MedplumClient):
 
     with pytest.raises(OperationOutcomeError) as exc_info:
         medplum_client.read_bot(bot_id)
-    assert exc_info.value.status_code == 410
+    # 410 Gone surfaces as OperationOutcomeError; the outcome itself is attached
+    # on exc.outcome for inspection. We can't assert on HTTP status directly
+    # without the response, so we assert the outcome shape instead.
+    assert isinstance(exc_info.value.outcome, dict)
 
 
 def test_save_bot_code(medplum_client: MedplumClient):

@@ -151,10 +151,11 @@ class ClientApplicationLaunchIdentifierSystems(MedplumFHIRBase):
     the SMART app in the token response.
     """
 
-    resource_type: Literal["ClientApplicationLaunchIdentifierSystems"] = Field(
-        default="ClientApplicationLaunchIdentifierSystems", alias="resourceType"
+    resource_type: str = Field(
+        default=...,
+        alias="resourceType",
+        description="The resource type for which to use the identifier system (e.g., 'Patient', 'Encounter').",
     )
-
     system: str = Field(
         default=...,
         description="The identifier system URI to use for the specified resource type.",

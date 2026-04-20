@@ -112,7 +112,6 @@ def async_client(medplum_credentials):
             client_secret=medplum_credentials["client_secret"],
             **kwargs,
         )
-        await client.authenticate()
         return client
 
     return _create

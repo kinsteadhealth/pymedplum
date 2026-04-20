@@ -10,4 +10,5 @@
 - [Binary & DocumentReference](advanced/binary_and_documents.md)
 - [GraphQL](advanced/graphql.md)
 - [On-Behalf-Of](advanced/on_behalf_of.md)
+- [Audit Logging](advanced/audit_logging.md)
 - [Administration](advanced/admin.md)

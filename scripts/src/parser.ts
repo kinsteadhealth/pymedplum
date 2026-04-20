@@ -265,9 +265,21 @@ function parsePropertySignature(
     typeText = typeNode.elementType.getText();
   }
 
-  // Track resourceType fields
+  // Track resourceType discriminators. A top-level FHIR resource in Medplum's
+  // TypeScript definitions has its resourceType field typed as a string literal
+  // matching the interface name (e.g. `readonly resourceType: 'Patient';`).
+  // Backbone elements that happen to carry a resourceType field for metadata
+  // purposes are typed as `string` or `ResourceType` — those are NOT resources
+  // and must be excluded so downstream allowlist consumers don't accept
+  // backbone names like `AccessPolicyResource` as FHIR route segments.
   if (fieldName === "resourceType") {
-    interfaceData.isResource = true;
+    const literalName = typeText.replace(/^['"]|['"]$/g, "");
+    const isStringLiteral =
+      (typeText.startsWith("'") && typeText.endsWith("'")) ||
+      (typeText.startsWith('"') && typeText.endsWith('"'));
+    if (isStringLiteral && literalName === interfaceData.name) {
+      interfaceData.isResource = true;
+    }
   }
 
   const narrowed = narrowFhirNumericType(fieldName, typeText);

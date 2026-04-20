@@ -1616,7 +1616,9 @@ def test_sync_set_access_token(medplum_credentials):
         client_id=medplum_credentials["client_id"],
         client_secret=medplum_credentials["client_secret"],
     )
-    token = auth_client.authenticate()
+    auth_client._tokens.force_refresh(auth_client._http)
+    token = auth_client._tokens.access_token
+    assert token is not None
     auth_client.close()
 
     # Create a new client without credentials and set the token
@@ -1642,7 +1644,9 @@ def test_sync_client_with_access_token_in_constructor(medplum_credentials):
         client_id=medplum_credentials["client_id"],
         client_secret=medplum_credentials["client_secret"],
     )
-    token = auth_client.authenticate()
+    auth_client._tokens.force_refresh(auth_client._http)
+    token = auth_client._tokens.access_token
+    assert token is not None
     auth_client.close()
 
     # Create a new client directly with the access_token
@@ -1666,7 +1670,9 @@ async def test_async_set_access_token(medplum_credentials):
         client_id=medplum_credentials["client_id"],
         client_secret=medplum_credentials["client_secret"],
     )
-    token = await auth_client.authenticate()
+    await auth_client._tokens.force_refresh(auth_client._http)
+    token = auth_client._tokens.access_token
+    assert token is not None
     await auth_client.close()
 
     # Create a new client without credentials and set the token
@@ -1696,7 +1702,9 @@ async def test_async_client_with_access_token_in_constructor(medplum_credentials
         client_id=medplum_credentials["client_id"],
         client_secret=medplum_credentials["client_secret"],
     )
-    token = await auth_client.authenticate()
+    await auth_client._tokens.force_refresh(auth_client._http)
+    token = auth_client._tokens.access_token
+    assert token is not None
     await auth_client.close()
 
     # Create a new client directly with the access_token
@@ -1725,7 +1733,9 @@ def test_sync_set_access_token_with_explicit_expiry(medplum_credentials):
         client_id=medplum_credentials["client_id"],
         client_secret=medplum_credentials["client_secret"],
     )
-    token = auth_client.authenticate()
+    auth_client._tokens.force_refresh(auth_client._http)
+    token = auth_client._tokens.access_token
+    assert token is not None
     auth_client.close()
 
     # Create a new client and set token with explicit expiry

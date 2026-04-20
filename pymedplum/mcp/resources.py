@@ -10,15 +10,18 @@ from pymedplum.mcp.server import _is_read_only, mcp
 
 @mcp.resource("medplum://server-info")
 async def server_info() -> dict[str, Any]:
-    """Server connection info and configuration."""
+    """Server connection info and configuration.
+
+    Deliberately does not expose the raw value of ``MEDPLUM_ON_BEHALF_OF``;
+    a boolean flag is enough for the LLM to know whether the server is
+    operating under an OBO scope, and the raw UUID is tenant-structure
+    information we do not want in the prompt context.
+    """
     info: dict[str, Any] = {
         "base_url": os.getenv("MEDPLUM_BASE_URL", "https://api.medplum.com/"),
         "read_only": _is_read_only(),
+        "default_on_behalf_of_set": bool(os.getenv("MEDPLUM_ON_BEHALF_OF")),
     }
-
-    default_obo = os.getenv("MEDPLUM_ON_BEHALF_OF")
-    if default_obo:
-        info["default_on_behalf_of"] = default_obo
 
     info["description"] = (
         "Medplum FHIR server MCP interface. "

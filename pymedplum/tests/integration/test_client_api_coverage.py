@@ -15,14 +15,6 @@ from pymedplum.fhir import Patient
 # ============================================================================
 
 
-def test_sync_authenticate(medplum_client):
-    """Test sync client authentication."""
-    token = medplum_client.authenticate()
-    assert token
-    assert isinstance(token, str)
-    assert len(token) > 0
-
-
 def test_sync_create_resource(medplum_client):
     """Test sync client create_resource method."""
     patient = Patient(
@@ -310,15 +302,6 @@ def test_sync_on_behalf_of_context_manager(medplum_client, medplum_membership):
 # ============================================================================
 # ASYNC CLIENT TESTS
 # ============================================================================
-
-
-@pytest.mark.asyncio
-async def test_async_authenticate(async_medplum_client):
-    """Test async client authentication."""
-    token = await async_medplum_client.authenticate()
-    assert token
-    assert isinstance(token, str)
-    assert len(token) > 0
 
 
 @pytest.mark.asyncio

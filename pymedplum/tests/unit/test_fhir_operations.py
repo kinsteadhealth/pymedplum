@@ -1409,7 +1409,7 @@ def test_create_resource_if_none_exist_rejects_empty_query(
     """Test that empty query string raises ValueError."""
     import pytest
 
-    with pytest.raises(ValueError, match="cannot be empty"):
+    with pytest.raises(ValueError, match="non-empty"):
         client.create_resource_if_none_exist(
             {"resourceType": "Patient"},
             if_none_exist="",

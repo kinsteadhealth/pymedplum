@@ -6,18 +6,31 @@ If you like the official Medplum TypeScript SDK experience, this aims to feel fa
 
 ## The heavy hitters
 
-- **Auth + refresh**: Client credentials flow with automatic token refresh
-- **Typed models (Pydantic v2)**: Auto-generated FHIR models with IDE autocomplete
-- **CRUD + patching**: Create/read/update/delete + JSON Patch
-- **Safe concurrency**: Optimistic locking via `If-Match`
-- **Real-world search**: `_include`, `_revinclude`, chaining, modifiers, paging
-- **FHIR operations**: `execute_operation` + terminology helpers + C-CDA export
-- **Bundles**: Transactions (atomic) and batch bundles (independent)
-- **Binary + DocumentReference**: Upload/download and clinical document linking
-- **GraphQL**: GraphQL query execution
-- **On-behalf-of (OBO)**: Act as a `ProjectMembership` (sync + async context managers)
-- **Bot management**: CRUD + deploy + execute Medplum Bots
-- **MCP server**: Model Context Protocol server with runtime schema discovery, client-side FHIR validation, and healthcare-aware guardrails for AI agent workflows
+- **Auth + refresh**: Client-credentials flow with first-request auth,
+  single-flight refresh, cooldown on OAuth outages, and explicit 401
+  retry with forced refresh.
+- **Typed models (Pydantic v2)**: Auto-generated FHIR models with IDE autocomplete.
+- **CRUD + patching**: Create/read/update/delete + JSON Patch.
+  `update_resource` auto-attaches `If-Match` from `meta.versionId` by
+  default (opt-out available).
+- **Real-world search**: `_include`, `_revinclude`, chaining, modifiers, paging.
+- **FHIR operations**: `execute_operation` + terminology helpers + C-CDA export.
+- **Bundles**: Transactions (atomic) and batch bundles (independent).
+- **Binary + DocumentReference**: Upload/download and clinical document linking.
+- **GraphQL**: GraphQL query execution.
+- **On-behalf-of (OBO)**: Per-client isolation via `ContextVar`.
+  Three ways to pass: per-call kwarg, context manager, or client
+  default. Safe across concurrent async tasks.
+- **PHI-access audit hook**: One `on_request_complete` callback per
+  logical call, capturing method, resource type/id, OBO-as-sent per
+  attempt, timings, and outcome. Two serialization shapes:
+  `to_phi_audit_dict()` for HIPAA-approved audit sinks and
+  `to_non_phi_dict()` for general observability backends. Bearer
+  tokens, request bodies, and raw query strings are never included.
+- **HTTPS by default**: Plain `http://` requires explicit opt-in;
+  loopback hosts are allowed with a WARNING.
+- **Bot management**: CRUD + deploy + execute Medplum Bots.
+- **MCP server**: Model Context Protocol server with runtime schema discovery, client-side FHIR validation, and healthcare-aware guardrails for AI agent workflows.
 
 ## Installation
 
@@ -43,30 +56,70 @@ uv add "pymedplum[mcp]"
 ```python
 from pymedplum import MedplumClient
 
-# Create client
 client = MedplumClient(
+    # base_url="https://api.medplum.com/",   # default; self-hosted? set yours.
     client_id="YOUR_CLIENT_ID",
     client_secret="YOUR_CLIENT_SECRET",
 )
 
-# Create a patient
 patient = client.create_resource({
     "resourceType": "Patient",
     "name": [{"given": ["John"], "family": "Doe"}],
     "gender": "male",
-    "birthDate": "1990-01-01"
+    "birthDate": "1990-01-01",
 })
 
-# Read a resource
 patient = client.read_resource("Patient", "patient-123")
-
-# Search for resources
 patients = client.search_resources("Patient", {"family": "Doe"})
 
-# Update a resource
 patient["active"] = True
 updated = client.update_resource(patient)
 ```
+
+## Observability and audit logging
+
+PyMedplum exposes a single completion hook, `on_request_complete`,
+that fires once per logical SDK call. The event carries method,
+path, resource type/id, OBO-as-sent per wire attempt, timings, and
+outcome. Bearer tokens, request bodies, and raw query strings are
+never included in the event.
+
+The event payload still contains PHI by default (resolved paths
+include resource IDs, and `on_behalf_of` is a tenant identifier).
+The hook exposes two serialization shapes — pick the one that
+matches the destination:
+
+- `event.to_phi_audit_dict()` — full payload, for sinks contractually
+  approved to receive PHI (your HIPAA-compliant audit log).
+- `event.to_non_phi_dict()` — shape-only payload (`path_template`,
+  `resource_type`, status codes, durations, exception type names),
+  for metrics, APM, error trackers, and other general observability.
+
+```python
+from pymedplum import MedplumClient
+from pymedplum.hooks import RequestEvent
+
+def on_complete(event: RequestEvent) -> None:
+    # PHI-bearing detail goes to the audit sink only.
+    phi_audit_log.info(
+        "medplum_request_complete", extra={"event": event.to_phi_audit_dict()}
+    )
+    # Shape-only metrics go to the general observability backend.
+    metrics_log.info(
+        "medplum_request_metrics", extra={"event": event.to_non_phi_dict()}
+    )
+
+client = MedplumClient(
+    base_url="https://api.medplum.com/",
+    client_id="YOUR_CLIENT_ID",
+    client_secret="YOUR_CLIENT_SECRET",
+    on_request_complete=on_complete,
+)
+```
+
+See [docs/advanced/audit_logging.md](docs/advanced/audit_logging.md)
+for the full hook contract, DataDog and async variants, and the
+per-resource-type query-param opt-in pattern.
 
 ## MCP Server
 
@@ -253,18 +306,32 @@ print(result["data"]["Patient"])
 ### On-Behalf-Of Operations
 
 ```python
-# Temporarily act on behalf of a patient's membership
-with client.on_behalf_of("ProjectMembership/membership-123") as patient_client:
-    # This operation has the patient's permissions
-    response = patient_client.create_resource({
+# 1. Per-call kwarg — wins over ambient state, obvious at the call site.
+client.read_resource(
+    "Patient",
+    "123",
+    on_behalf_of="ProjectMembership/membership-123",
+)
+
+# 2. Context manager — ambient for a block of related calls.
+with client.on_behalf_of("ProjectMembership/membership-123"):
+    response = client.create_resource({
         "resourceType": "QuestionnaireResponse",
         "status": "completed",
-        # ...
     })
 
-# Back to original user context
-practitioner_note = client.create_resource({"resourceType": "Observation", ...})
+# 3. Client default — baseline for this client's lifetime.
+per_user_client = MedplumClient(
+    base_url="https://api.medplum.com/",
+    client_id="YOUR_CLIENT_ID",
+    client_secret="YOUR_CLIENT_SECRET",
+    default_on_behalf_of="ProjectMembership/membership-123",
+)
 ```
+
+See [docs/advanced/on_behalf_of.md](docs/advanced/on_behalf_of.md)
+for precedence rules, per-client isolation guarantees, and the
+`ThreadPoolExecutor` context-propagation caveat.
 
 ### Bot Management
 
@@ -365,7 +432,7 @@ if not bundle.is_empty():
 
 ```python
 from pymedplum import (
-    ResourceNotFoundError,
+    NotFoundError,
     AuthorizationError,
     ValidationError,
     RateLimitError
@@ -373,7 +440,7 @@ from pymedplum import (
 
 try:
     patient = client.read_resource("Patient", "123")
-except ResourceNotFoundError:
+except NotFoundError:
     print("Patient not found")
 except AuthorizationError:
     print("Access denied")

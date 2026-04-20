@@ -7,16 +7,19 @@ All tools are registered on the shared ``mcp`` FastMCP instance from
 from __future__ import annotations
 
 import os
-import re
 from collections import Counter
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
+from mcp.types import ToolAnnotations
+
+from pymedplum._security import build_raw_request_url
 from pymedplum.fhir import FHIR_TYPES
 from pymedplum.mcp.server import (
     _READ_ONLY_OPERATIONS,
     BundleInput,
     PatchOp,
     _annotate_response,
+    _check_bot_allowed,
     _check_write_allowed,
     _collect_refs,
     _get_client,
@@ -31,12 +34,15 @@ from pymedplum.types import (  # noqa: TC001 — runtime use by FastMCP schema g
     TotalMode,
 )
 
+if TYPE_CHECKING:
+    from pymedplum.types import PatchOperation
+
 
 @mcp.tool(
-    annotations={
-        "title": "Get FHIR Resource Schema",
-        "readOnlyHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Get FHIR Resource Schema",
+        readOnlyHint=True,
+    )
 )
 async def get_resource_schema(
     resource_type: str,
@@ -110,10 +116,10 @@ async def get_resource_schema(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Read FHIR Resource",
-        "readOnlyHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Read FHIR Resource",
+        readOnlyHint=True,
+    )
 )
 async def read_resource(
     resource_type: str,
@@ -139,10 +145,10 @@ async def read_resource(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Search FHIR Resources",
-        "readOnlyHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Search FHIR Resources",
+        readOnlyHint=True,
+    )
 )
 async def search_resources(
     resource_type: str,
@@ -208,27 +214,30 @@ async def search_resources(
             total=total,
         )
 
-    if isinstance(result, dict):
-        if result.get("total") == 0:
-            result["_hint"] = (
-                f"No results found. Use get_resource_capabilities('{resource_type}') "
-                f"to see valid search parameters for {resource_type}."
-            )
-        result["_schema_hint"] = (
-            f"Search results show only populated fields. BEFORE creating "
-            f"or modifying a {resource_type}, call "
-            f"get_resource_schema('{resource_type}') to see all required "
-            f"fields, types, and constraints."
+    if not isinstance(result, dict):
+        msg = "search_with_options returned unexpected type"
+        raise TypeError(msg)
+
+    if result.get("total") == 0:
+        result["_hint"] = (
+            f"No results found. Use get_resource_capabilities('{resource_type}') "
+            f"to see valid search parameters for {resource_type}."
         )
+    result["_schema_hint"] = (
+        f"Search results show only populated fields. BEFORE creating "
+        f"or modifying a {resource_type}, call "
+        f"get_resource_schema('{resource_type}') to see all required "
+        f"fields, types, and constraints."
+    )
 
     return result
 
 
 @mcp.tool(
-    annotations={
-        "title": "Search Single FHIR Resource",
-        "readOnlyHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Search Single FHIR Resource",
+        readOnlyHint=True,
+    )
 )
 async def search_one(
     resource_type: str,
@@ -272,10 +281,10 @@ _DEFAULT_MAX_RESOURCES = 50
 
 
 @mcp.tool(
-    annotations={
-        "title": "Search All FHIR Resources",
-        "readOnlyHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Search All FHIR Resources",
+        readOnlyHint=True,
+    )
 )
 async def search_all_resources(
     resource_type: str,
@@ -352,11 +361,11 @@ async def search_all_resources(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Create FHIR Resource",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-    }
+    annotations=ToolAnnotations(
+        title="Create FHIR Resource",
+        readOnlyHint=False,
+        destructiveHint=False,
+    )
 )
 async def create_resource(
     resource: dict[str, Any],
@@ -394,11 +403,11 @@ async def create_resource(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Create FHIR Resource If None Exist",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-    }
+    annotations=ToolAnnotations(
+        title="Create FHIR Resource If None Exist",
+        readOnlyHint=False,
+        destructiveHint=False,
+    )
 )
 async def create_resource_if_none_exist(
     resource: dict[str, Any],
@@ -452,11 +461,11 @@ async def create_resource_if_none_exist(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Update FHIR Resource",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Update FHIR Resource",
+        readOnlyHint=False,
+        destructiveHint=True,
+    )
 )
 async def update_resource(
     resource: dict[str, Any],
@@ -508,11 +517,11 @@ async def update_resource(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Patch FHIR Resource",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Patch FHIR Resource",
+        readOnlyHint=False,
+        destructiveHint=True,
+    )
 )
 async def patch_resource(
     resource_type: str,
@@ -556,18 +565,21 @@ async def patch_resource(
         msg = "At least one patch operation is required."
         raise ValueError(msg)
 
-    raw_ops = [op.model_dump(exclude_unset=True, by_alias=True) for op in operations]
+    raw_ops = [
+        cast("PatchOperation", op.model_dump(exclude_unset=True, by_alias=True))
+        for op in operations
+    ]
     async with _with_obo(on_behalf_of) as client:
         result = await client.patch_resource(resource_type, resource_id, raw_ops)
     return _annotate_response(result)
 
 
 @mcp.tool(
-    annotations={
-        "title": "Delete FHIR Resource",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Delete FHIR Resource",
+        readOnlyHint=False,
+        destructiveHint=True,
+    )
 )
 async def delete_resource(
     resource_type: str,
@@ -602,10 +614,10 @@ async def delete_resource(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Get FHIR Capabilities",
-        "readOnlyHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Get FHIR Capabilities",
+        readOnlyHint=True,
+    )
 )
 async def get_resource_capabilities(
     resource_type: str | None = None,
@@ -649,7 +661,7 @@ async def get_resource_capabilities(
             key=lambda r: r.get("mode") != "server",
         ):
             for r in rest.get("resource", []):
-                if r.get("type") == resource_type:
+                if isinstance(r, dict) and r.get("type") == resource_type:
                     r["_search_syntax"] = (
                         "FHIR search param names are NOT resource field "
                         "names (e.g., field is 'name' but search params "
@@ -672,10 +684,10 @@ async def get_resource_capabilities(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Get Patient Everything",
-        "readOnlyHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Get Patient Everything",
+        readOnlyHint=True,
+    )
 )
 async def get_patient_everything(
     patient_id: str,
@@ -717,10 +729,10 @@ async def get_patient_everything(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Validate Code in ValueSet",
-        "readOnlyHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Validate Code in ValueSet",
+        readOnlyHint=True,
+    )
 )
 async def validate_code(
     code: str,
@@ -760,10 +772,10 @@ async def validate_code(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Validate Code in CodeSystem",
-        "readOnlyHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Validate Code in CodeSystem",
+        readOnlyHint=True,
+    )
 )
 async def validate_codesystem_code(
     code: str | None = None,
@@ -806,10 +818,10 @@ async def validate_codesystem_code(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Expand ValueSet",
-        "readOnlyHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Expand ValueSet",
+        readOnlyHint=True,
+    )
 )
 async def expand_valueset(
     valueset_url: str | None = None,
@@ -852,10 +864,10 @@ async def expand_valueset(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Lookup Code in CodeSystem",
-        "readOnlyHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Lookup Code in CodeSystem",
+        readOnlyHint=True,
+    )
 )
 async def lookup_concept(
     code: str,
@@ -894,10 +906,10 @@ async def lookup_concept(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Translate Code Between Systems",
-        "readOnlyHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Translate Code Between Systems",
+        readOnlyHint=True,
+    )
 )
 async def translate_concept(
     code: str,
@@ -938,11 +950,11 @@ async def translate_concept(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Execute FHIR Operation",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Execute FHIR Operation",
+        readOnlyHint=False,
+        destructiveHint=True,
+    )
 )
 async def execute_operation(
     resource_type: str,
@@ -992,8 +1004,10 @@ async def execute_operation(
     if _is_read_only() and op_name not in _READ_ONLY_OPERATIONS:
         msg = (
             f"Operation '${operation}' is not in the read-only allowlist. "
-            f"Server is in read-only mode (MEDPLUM_READ_ONLY=true). "
-            f"Allowed operations: {', '.join(sorted('$' + o for o in _READ_ONLY_OPERATIONS))}"
+            f"Server is in read-only mode; set MEDPLUM_ENABLE_WRITES=true "
+            f"to enable write-capable operations. "
+            f"Allowed in read-only mode: "
+            f"{', '.join(sorted('$' + o for o in _READ_ONLY_OPERATIONS))}"
         )
         raise PermissionError(msg)
 
@@ -1010,22 +1024,28 @@ async def execute_operation(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Execute GraphQL Query",
-        "readOnlyHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Execute GraphQL Query",
+        readOnlyHint=False,
+        destructiveHint=True,
+    )
 )
 async def execute_graphql(
     query: str,
     variables: dict[str, Any] | None = None,
     on_behalf_of: str | None = None,
 ) -> dict[str, Any]:
-    """Execute a FHIR GraphQL query against the Medplum server.
+    """Execute a FHIR GraphQL query (or mutation) against the Medplum server.
+
+    Treated as a write-capable tool: GraphQL queries are arbitrary text and
+    cannot be reliably distinguished from mutations or subscription requests
+    without a full parser. Rather than attempting per-query gating, this tool
+    is blocked entirely in read-only mode (the default) and is unrestricted
+    once the operator opts into writes via ``MEDPLUM_ENABLE_WRITES=true``.
 
     Prefer normal FHIR search/read unless GraphQL is clearly better —
     e.g., traversing resource references or fetching specific fields
-    across multiple resource types in a single request. Medplum's
-    GraphQL endpoint is read-only (queries only, no mutations).
+    across multiple resource types in a single request.
 
     Args:
         query: GraphQL query string. Example:
@@ -1036,23 +1056,18 @@ async def execute_graphql(
     Returns:
         GraphQL response
     """
-    if _is_read_only() and re.search(r"\bmutation\b", query, re.IGNORECASE):
-        msg = (
-            "GraphQL mutations are blocked in read-only mode (MEDPLUM_READ_ONLY=true)."
-        )
-        raise PermissionError(msg)
-
+    _check_write_allowed()
     async with _with_obo(on_behalf_of) as client:
         result = await client.execute_graphql(query, variables)
     return _annotate_response(result)
 
 
 @mcp.tool(
-    annotations={
-        "title": "Execute Medplum Bot",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Execute Medplum Bot",
+        readOnlyHint=False,
+        destructiveHint=True,
+    )
 )
 async def execute_bot(
     bot_id: str,
@@ -1068,21 +1083,26 @@ async def execute_bot(
     Only execute a bot when the user explicitly asks, and only when you
     know what the bot does.
 
+    Operators can restrict which bots an LLM may invoke by setting
+    ``MEDPLUM_ALLOWED_BOT_IDS=uuid1,uuid2`` — the curated set acts as a
+    safety net even when writes are enabled.
+
     The bot must already be deployed via save_and_deploy_bot. The bot's
     code receives input_data and can read/write FHIR resources on the server.
     """
     _check_write_allowed()
+    _check_bot_allowed(bot_id)
     async with _with_obo(on_behalf_of) as client:
         result = await client.execute_bot(bot_id, input_data, content_type=content_type)
     return _annotate_response(result)
 
 
 @mcp.tool(
-    annotations={
-        "title": "Create Medplum Bot",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-    }
+    annotations=ToolAnnotations(
+        title="Create Medplum Bot",
+        readOnlyHint=False,
+        destructiveHint=False,
+    )
 )
 async def create_bot(
     name: str,
@@ -1136,11 +1156,11 @@ async def create_bot(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Save And Deploy Medplum Bot",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Save And Deploy Medplum Bot",
+        readOnlyHint=False,
+        destructiveHint=True,
+    )
 )
 async def save_and_deploy_bot(
     bot_id: str,
@@ -1178,11 +1198,11 @@ async def save_and_deploy_bot(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Execute FHIR Batch or Transaction",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Execute FHIR Batch or Transaction",
+        readOnlyHint=False,
+        destructiveHint=True,
+    )
 )
 async def execute_batch(
     bundle: BundleInput,
@@ -1255,11 +1275,11 @@ async def execute_batch(
 
 
 @mcp.tool(
-    annotations={
-        "title": "Raw Medplum HTTP Request",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-    }
+    annotations=ToolAnnotations(
+        title="Raw Medplum HTTP Request",
+        readOnlyHint=False,
+        destructiveHint=True,
+    )
 )
 async def raw_request(
     method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"],
@@ -1313,7 +1333,7 @@ async def raw_request(
         _check_write_allowed()
 
     async with _with_obo(on_behalf_of) as client:
-        url = f"{client.base_url}{path}"
+        url = build_raw_request_url(client.base_url, path)
         kwargs: dict[str, Any] = {}
         if body is not None:
             kwargs["json"] = body

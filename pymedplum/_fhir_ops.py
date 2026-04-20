@@ -3,7 +3,38 @@
 This module is not part of the public API and is subject to change.
 """
 
+import json
 from typing import Any
+
+
+def _encode_dict(name: str, value: dict[str, Any]) -> dict[str, Any]:
+    """Build a Parameters entry for a dict value, picking the right FHIR shape."""
+    if "resourceType" in value:
+        return {"name": name, "resource": value}
+    if "system" in value and "code" in value:
+        return {"name": name, "valueCoding": value}
+    if "reference" in value:
+        return {"name": name, "valueReference": value}
+    return {"name": name, "valueString": json.dumps(value)}
+
+
+def _encode_scalar(name: str, value: Any) -> dict[str, Any]:
+    """Build a single FHIR Parameters entry for a scalar or dict value.
+
+    Returns ``{"name": name}`` plus exactly one of ``valueX`` / ``resource``
+    based on the value's type.
+    """
+    if isinstance(value, bool):
+        return {"name": name, "valueBoolean": value}
+    if isinstance(value, int):
+        return {"name": name, "valueInteger": value}
+    if isinstance(value, float):
+        return {"name": name, "valueDecimal": value}
+    if isinstance(value, str):
+        return {"name": name, "valueString": value}
+    if isinstance(value, dict):
+        return _encode_dict(name, value)
+    return {"name": name, "valueString": str(value)}
 
 
 def dict_to_parameters(params: dict[str, Any]) -> dict[str, Any]:
@@ -37,69 +68,12 @@ def dict_to_parameters(params: dict[str, Any]) -> dict[str, Any]:
     parameter_list: list[dict[str, Any]] = []
 
     for name, value in params.items():
-        param: dict[str, Any] = {"name": name}
-
         if value is None:
-            continue  # Skip None values
-        elif isinstance(value, bool):
-            param["valueBoolean"] = value
-        elif isinstance(value, int):
-            param["valueInteger"] = value
-        elif isinstance(value, float):
-            param["valueDecimal"] = value
-        elif isinstance(value, str):
-            param["valueString"] = value
-        elif isinstance(value, dict):
-            # Check for special dict types
-            if "resourceType" in value:
-                # It's a FHIR resource
-                param["resource"] = value
-            elif "system" in value and "code" in value:
-                # It's a Coding
-                param["valueCoding"] = value
-            elif "reference" in value:
-                # It's a Reference
-                param["valueReference"] = value
-            else:
-                # Treat as generic extension or nested structure
-                import json
-
-                param["valueString"] = json.dumps(value)
-        elif isinstance(value, list):
-            # Multiple values with same name
-            for item in value:
-                if isinstance(item, str):
-                    parameter_list.append({"name": name, "valueString": item})
-                elif isinstance(item, dict):
-                    if "resourceType" in item:
-                        # It's a FHIR resource
-                        parameter_list.append({"name": name, "resource": item})
-                    elif "system" in item and "code" in item:
-                        # It's a Coding
-                        parameter_list.append({"name": name, "valueCoding": item})
-                    elif "reference" in item:
-                        # It's a Reference
-                        parameter_list.append({"name": name, "valueReference": item})
-                    else:
-                        import json
-
-                        parameter_list.append(
-                            {"name": name, "valueString": json.dumps(item)}
-                        )
-                elif isinstance(item, bool):
-                    parameter_list.append({"name": name, "valueBoolean": item})
-                elif isinstance(item, int):
-                    parameter_list.append({"name": name, "valueInteger": item})
-                elif isinstance(item, float):
-                    parameter_list.append({"name": name, "valueDecimal": item})
-                else:
-                    parameter_list.append({"name": name, "valueString": str(item)})
-            continue  # Already added to list
-        else:
-            # Fallback: convert to string
-            param["valueString"] = str(value)
-
-        parameter_list.append(param)
+            continue
+        if isinstance(value, list):
+            parameter_list.extend(_encode_scalar(name, item) for item in value)
+            continue
+        parameter_list.append(_encode_scalar(name, value))
 
     return {"resourceType": "Parameters", "parameter": parameter_list}
 
@@ -107,9 +81,28 @@ def dict_to_parameters(params: dict[str, Any]) -> dict[str, Any]:
 def is_parameters_resource(obj: Any) -> bool:
     """Check if an object is already a FHIR Parameters resource."""
     if isinstance(obj, dict):
-        return obj.get("resourceType") == "Parameters"
+        return bool(obj.get("resourceType") == "Parameters")
     # Check for Pydantic model with resource_type
-    return getattr(obj, "resource_type", None) == "Parameters"
+    return bool(getattr(obj, "resource_type", None) == "Parameters")
+
+
+def _append_optional(
+    params: list[dict[str, Any]],
+    name: str,
+    value: Any,
+    value_key: str,
+    *,
+    include_false: bool = False,
+) -> None:
+    """Append ``{"name": name, value_key: value}`` if value is meaningful.
+
+    Falsy strings/lists are skipped; booleans are only skipped when ``None``
+    (pass ``include_false=True`` to include ``False`` values).
+    """
+    if value is None:
+        return
+    if include_false or value or value is False:
+        params.append({"name": name, value_key: value})
 
 
 def build_valueset_validate_params(
@@ -248,39 +241,38 @@ def build_valueset_expand_params(
     """
     params: list[dict[str, Any]] = []
 
-    if valueset_url:
-        params.append({"name": "url", "valueUri": valueset_url})
-
-    if filter:
-        params.append({"name": "filter", "valueString": filter})
-
-    if offset is not None:
-        params.append({"name": "offset", "valueInteger": offset})
-
-    if count is not None:
-        params.append({"name": "count", "valueInteger": count})
-
-    if include_designations is not None:
-        params.append(
-            {"name": "includeDesignations", "valueBoolean": include_designations}
-        )
-
-    if active_only is not None:
-        params.append({"name": "activeOnly", "valueBoolean": active_only})
-
-    if exclude_nested is not None:
-        params.append({"name": "excludeNested", "valueBoolean": exclude_nested})
-
-    if exclude_not_for_ui is not None:
-        params.append({"name": "excludeNotForUI", "valueBoolean": exclude_not_for_ui})
-
-    if exclude_post_coordinated is not None:
-        params.append(
-            {"name": "excludePostCoordinated", "valueBoolean": exclude_post_coordinated}
-        )
-
-    if display_language:
-        params.append({"name": "displayLanguage", "valueCode": display_language})
+    _append_optional(params, "url", valueset_url or None, "valueUri")
+    _append_optional(params, "filter", filter or None, "valueString")
+    _append_optional(params, "offset", offset, "valueInteger", include_false=True)
+    _append_optional(params, "count", count, "valueInteger", include_false=True)
+    _append_optional(
+        params,
+        "includeDesignations",
+        include_designations,
+        "valueBoolean",
+        include_false=True,
+    )
+    _append_optional(
+        params, "activeOnly", active_only, "valueBoolean", include_false=True
+    )
+    _append_optional(
+        params, "excludeNested", exclude_nested, "valueBoolean", include_false=True
+    )
+    _append_optional(
+        params,
+        "excludeNotForUI",
+        exclude_not_for_ui,
+        "valueBoolean",
+        include_false=True,
+    )
+    _append_optional(
+        params,
+        "excludePostCoordinated",
+        exclude_post_coordinated,
+        "valueBoolean",
+        include_false=True,
+    )
+    _append_optional(params, "displayLanguage", display_language or None, "valueCode")
 
     if property:
         params.extend({"name": "property", "valueString": prop} for prop in property)
@@ -341,6 +333,29 @@ def build_codesystem_lookup_params(
     return {"resourceType": "Parameters", "parameter": params}
 
 
+def _append_translate_source(
+    params: list[dict[str, Any]],
+    *,
+    code: str | None,
+    system: str | None,
+    coding: dict[str, Any | None] | None,
+    codeable_concept: dict[str, Any | None] | None,
+) -> None:
+    """Append exactly one source term (codeableConcept > coding > code+system)."""
+    if codeable_concept:
+        params.append(
+            {"name": "codeableConcept", "valueCodeableConcept": codeable_concept}
+        )
+        return
+    if coding:
+        params.append({"name": "coding", "valueCoding": coding})
+        return
+    if code:
+        params.append({"name": "code", "valueCode": code})
+    if system:
+        params.append({"name": "system", "valueUri": system})
+
+
 def build_conceptmap_translate_params(
     code: str | None = None,
     system: str | None = None,
@@ -378,34 +393,20 @@ def build_conceptmap_translate_params(
     """
     params: list[dict[str, Any]] = []
 
-    if conceptmap_url:
-        params.append({"name": "url", "valueUri": conceptmap_url})
+    _append_optional(params, "url", conceptmap_url or None, "valueUri")
+    _append_optional(params, "conceptMapVersion", version or None, "valueString")
 
-    if version:
-        params.append({"name": "conceptMapVersion", "valueString": version})
+    _append_translate_source(
+        params,
+        code=code,
+        system=system,
+        coding=coding,
+        codeable_concept=codeable_concept,
+    )
 
-    if codeable_concept:
-        params.append(
-            {"name": "codeableConcept", "valueCodeableConcept": codeable_concept}
-        )
-    elif coding:
-        params.append({"name": "coding", "valueCoding": coding})
-    else:
-        if code:
-            params.append({"name": "code", "valueCode": code})
-        if system:
-            params.append({"name": "system", "valueUri": system})
-
-    if source:
-        params.append({"name": "source", "valueUri": source})
-
-    if target:
-        params.append({"name": "target", "valueUri": target})
-
-    if target_system:
-        params.append({"name": "targetSystem", "valueUri": target_system})
-
-    if reverse is not None:
-        params.append({"name": "reverse", "valueBoolean": reverse})
+    _append_optional(params, "source", source or None, "valueUri")
+    _append_optional(params, "target", target or None, "valueUri")
+    _append_optional(params, "targetSystem", target_system or None, "valueUri")
+    _append_optional(params, "reverse", reverse, "valueBoolean", include_false=True)
 
     return {"resourceType": "Parameters", "parameter": params}

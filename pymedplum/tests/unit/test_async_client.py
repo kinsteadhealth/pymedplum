@@ -10,14 +10,13 @@ from respx import MockRouter
 # Import pymedplum.fhir first to trigger model rebuilding
 import pymedplum.fhir  # noqa: F401
 from pymedplum.async_client import AsyncMedplumClient
-from pymedplum.exceptions import AuthenticationError, NotFoundError
+from pymedplum.exceptions import NotFoundError
 from pymedplum.fhir import Patient
 
 
 @pytest.mark.asyncio
 async def test_async_client_context_manager(respx_mock: MockRouter):
     """Test AsyncMedplumClient as async context manager."""
-    # Mock authentication
     respx_mock.post("https://api.medplum.com/oauth2/token").mock(
         return_value=httpx.Response(
             200,
@@ -28,46 +27,15 @@ async def test_async_client_context_manager(respx_mock: MockRouter):
             },
         )
     )
+    respx_mock.get("https://api.medplum.com/fhir/R4/Patient/abc").mock(
+        return_value=httpx.Response(200, json={"resourceType": "Patient", "id": "abc"})
+    )
 
     async with AsyncMedplumClient(
         client_id="test-client", client_secret="test-secret"
     ) as client:
-        await client.authenticate()
+        await client.read_resource("Patient", "abc")
         assert client.access_token == "test-token"
-
-    # Client should be closed after exiting context
-
-
-@pytest.mark.asyncio
-async def test_async_authenticate_missing_credentials():
-    """Test async authentication without credentials raises error."""
-    async with AsyncMedplumClient() as client:
-        with pytest.raises(ValueError, match="client_id and client_secret required"):
-            await client.authenticate()
-
-
-@pytest.mark.asyncio
-async def test_async_authenticate_server_error(respx_mock: MockRouter):
-    """Test async authentication with server error."""
-    respx_mock.post("https://api.medplum.com/oauth2/token").mock(
-        return_value=httpx.Response(
-            401,
-            json={
-                "resourceType": "OperationOutcome",
-                "issue": [
-                    {
-                        "severity": "error",
-                        "code": "invalid",
-                        "details": {"text": "Invalid credentials"},
-                    }
-                ],
-            },
-        )
-    )
-
-    async with AsyncMedplumClient(client_id="bad", client_secret="bad") as client:
-        with pytest.raises(AuthenticationError):
-            await client.authenticate()
 
 
 @pytest.mark.asyncio
@@ -293,12 +261,11 @@ async def test_async_on_behalf_of_async_context(respx_mock: MockRouter):
         client_id="test", client_secret="test", access_token="test-token"
     ) as client:
         # Verify no OBO before context
-        assert len(client._obo_stack) == 0
+        assert client._obo_var.get() is None
 
         async with client.on_behalf_of("membership-123"):
             # Verify OBO is active
-            assert len(client._obo_stack) == 1
-            assert client._obo_stack[-1] == "ProjectMembership/membership-123"
+            assert client._obo_var.get() == "ProjectMembership/membership-123"
 
             # Make a request in context
             result = await client.create_resource(
@@ -307,7 +274,7 @@ async def test_async_on_behalf_of_async_context(respx_mock: MockRouter):
             assert result["id"] == "123"
 
         # Verify OBO is cleared
-        assert len(client._obo_stack) == 0
+        assert client._obo_var.get() is None
 
 
 @pytest.mark.asyncio
@@ -356,8 +323,15 @@ async def test_async_token_refresh(respx_mock: MockRouter):
     async with AsyncMedplumClient(
         client_id="test", client_secret="test", access_token="old-token"
     ) as client:
-        # Set token to expire in the past
-        client.token_expires_at = datetime.now(timezone.utc) - timedelta(seconds=120)
+        # Set the token manager's source to MANAGED so the client auto
+        # refreshes on near-expiry. Externally-supplied tokens are not
+        # auto-refreshed by design; this test predates that contract.
+        from pymedplum._auth import TokenSource
+
+        client._tokens.source = TokenSource.MANAGED
+        past = datetime.now(timezone.utc) - timedelta(seconds=120)
+        client.token_expires_at = past
+        client._tokens.token_expires_at = past
 
         # Should trigger token refresh
         await client.search_resources("Patient")

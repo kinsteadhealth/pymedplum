@@ -1,7 +1,6 @@
-from collections.abc import Callable
 from typing import Any, Literal, TypedDict
 
-QueryTypes = str | dict[str, Any] | list[tuple]
+QueryTypes = str | dict[str, Any] | list[tuple[str, Any]]
 
 # Search result summary modes per FHIR spec
 SummaryMode = Literal["true", "text", "data", "count", "false"]
@@ -23,6 +22,3 @@ class PatchOperation(TypedDict):
     op: str  # 'add', 'remove', 'replace', 'copy', 'move', 'test'
     path: str
     value: Any | None
-
-
-BeforeRequestCallback = Callable[[str, str, dict[str, str], dict[str, Any]], None]

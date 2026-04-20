@@ -1,13 +1,27 @@
+from __future__ import annotations
+
 import asyncio
-import random
+import logging
 import time
-from collections.abc import AsyncIterator
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
 from urllib.parse import urlparse
 
 import httpx
 
-from ._base import AsyncOnBehalfOfContext, BaseClient, _raise_or_json
+from ._auth import AsyncTokenManager, TokenSource
+from ._base import (
+    MAX_WIRE_ATTEMPTS,
+    AsyncOnBehalfOfContext,
+    BaseClient,
+    _append_search_options,
+    _AttemptTracker,
+    _finalize_response,
+    _merge_params_into_url,
+    _resolve_if_match,
+    _retry_budget_exceeded,
+    _retry_delay,
+)
 from ._fhir_ops import (
     build_codesystem_lookup_params,
     build_codesystem_validate_params,
@@ -17,14 +31,37 @@ from ._fhir_ops import (
     dict_to_parameters,
     is_parameters_resource,
 )
+from ._security import (
+    assert_same_origin,
+    build_raw_request_url,
+    sanitize_if_none_exist,
+    validate_as_fhir_class,
+    validate_operation_name,
+    validate_resource_id,
+    validate_resource_type,
+)
 from .bundle import FHIRBundle
-from .exceptions import MedplumError
+from .exceptions import (
+    MedplumError,
+    TokenRefreshCooldownError,
+)
 from .fhir.base import MedplumFHIRBase
+from .helpers import to_fhir_json
+from .hooks import (
+    AsyncOnRequestCompleteHook,
+    BeforeRequestHook,
+    OnRequestCompleteHook,
+    PreparedRequest,
+    _parse_fhir_url,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from .fhir.operationoutcome import OperationOutcome
-from .helpers import decode_jwt_exp, to_fhir_json
-from .types import PatchOperation, QueryTypes, SummaryMode, TotalMode
+    from .types import PatchOperation, QueryTypes, SummaryMode, TotalMode
+
+_request_logger = logging.getLogger("pymedplum.request")
 
 ResourceT = TypeVar("ResourceT", bound=MedplumFHIRBase)
 
@@ -32,108 +69,302 @@ ResourceT = TypeVar("ResourceT", bound=MedplumFHIRBase)
 class AsyncMedplumClient(BaseClient):
     """Asynchronous Medplum client with retry logic and production features"""
 
-    def __init__(self, http_client: httpx.AsyncClient | None = None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(
+        self,
+        base_url: str = "https://api.medplum.com/",
+        *,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        access_token: str | None = None,
+        project_id: str | None = None,
+        fhir_url_path: str = "fhir/R4/",
+        timeout: float = 30.0,
+        http_client: httpx.AsyncClient | None = None,
+        before_request: BeforeRequestHook | None = None,
+        on_request_complete: OnRequestCompleteHook
+        | AsyncOnRequestCompleteHook
+        | None = None,
+        allow_insecure_http: bool = False,
+        failed_refresh_cooldown: float = 1.0,
+        default_on_behalf_of: str | None = None,
+        max_retry_delay_seconds: float = 60.0,
+    ) -> None:
+        from datetime import timedelta
 
-        if http_client:
+        super().__init__(
+            base_url,
+            client_id=client_id,
+            client_secret=client_secret,
+            access_token=access_token,
+            project_id=project_id,
+            fhir_url_path=fhir_url_path,
+            before_request=before_request,
+            on_request_complete=on_request_complete,
+            allow_insecure_http=allow_insecure_http,
+            default_on_behalf_of=default_on_behalf_of,
+            max_retry_delay_seconds=max_retry_delay_seconds,
+        )
+
+        if http_client is not None:
+            if http_client.follow_redirects is not False:
+                raise ValueError(
+                    "http_client must be constructed with "
+                    "follow_redirects=False. The SDK handles pagination and "
+                    "async-job polling with explicit same-origin validation; "
+                    "auto-followed redirects can leak auth headers to a "
+                    "different origin."
+                )
             self._http = http_client
         else:
-            self._http = httpx.AsyncClient(timeout=30.0)
+            self._http = httpx.AsyncClient(timeout=timeout, follow_redirects=False)
         self._owns_http_client = http_client is None
 
-    async def __aenter__(self):
+        if self.client_id and self.client_secret:
+            source = TokenSource.MANAGED
+        elif self.access_token:
+            source = TokenSource.EXTERNAL
+        else:
+            source = TokenSource.MANAGED
+        self._tokens: AsyncTokenManager = AsyncTokenManager(
+            client_id=self.client_id,
+            client_secret=self.client_secret,
+            access_token=self.access_token,
+            token_expires_at=self.token_expires_at,
+            token_url=f"{self.base_url}oauth2/token",
+            source=source,
+            failed_refresh_cooldown=timedelta(seconds=failed_refresh_cooldown),
+        )
+        self._tokens.set_auth_event_dispatcher(self._dispatch_auth_event_async)
+
+    async def __aenter__(self) -> AsyncMedplumClient:
         return self
 
-    async def __aexit__(self, *exc):
+    async def __aexit__(self, *exc: object) -> None:
         await self.close()
 
-    async def close(self):
-        """Close HTTP client if we own it"""
+    async def close(self) -> None:
+        """Close HTTP client if we own it."""
         if self._owns_http_client:
             await self._http.aclose()
 
-    async def authenticate(self) -> str:
-        """Authenticate using client credentials flow.
+    async def aclose(self) -> None:
+        """Alias for :meth:`close` matching httpx's convention."""
+        await self.close()
 
-        Returns:
-            Access token string
-        """
-        if not (self.client_id and self.client_secret):
-            raise ValueError("client_id and client_secret required for authentication")
+    @overload
+    async def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        on_behalf_of: str | None = ...,
+        raw: Literal[False] = ...,
+        **kwargs: Any,
+    ) -> dict[str, Any]: ...
 
-        response = await self._http.post(
-            f"{self.base_url}oauth2/token",
-            data={
-                "grant_type": "client_credentials",
-                "client_id": self.client_id,
-                "client_secret": self.client_secret,
-            },
-            timeout=30.0,
-        )
+    @overload
+    async def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        on_behalf_of: str | None = ...,
+        raw: Literal[True],
+        **kwargs: Any,
+    ) -> httpx.Response: ...
 
-        data = _raise_or_json(response)
-        self.access_token = data["access_token"]
-        self.token_expires_at = decode_jwt_exp(self.access_token)
-
-        return self.access_token
-
-    async def _request(self, method: str, url: str, **kwargs) -> dict[str, Any] | None:
+    async def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        on_behalf_of: str | None = None,
+        raw: bool = False,
+        **kwargs: Any,
+    ) -> dict[str, Any] | httpx.Response:
         """Make async HTTP request with retry logic.
 
-        Args:
-            method: HTTP method (GET, POST, etc.)
-            url: Request URL
-            **kwargs: Additional httpx request options
-
-        Returns:
-            Parsed JSON response or None
+        When ``raw=True``, the underlying :class:`httpx.Response` is returned
+        for successful (2xx) responses instead of the parsed JSON body — for
+        binary/non-JSON endpoints like ``download_binary`` and ``export_ccda``.
+        Error responses still flow through :func:`_raise_or_json` and raise.
+        The ``on_request_complete`` hook fires exactly once regardless.
         """
-        if self._should_refresh_token():
-            await self.authenticate()
+        await self._ensure_authenticated()
+        final_url = _merge_params_into_url(url, kwargs.pop("params", None))
+        prepared = self._apply_before_request(
+            self._build_initial_prepared(
+                method,
+                final_url,
+                caller_headers=kwargs.pop("headers", None),
+                json_body=kwargs.get("json"),
+            )
+        )
+        if prepared.json_body is not None:
+            kwargs["json"] = prepared.json_body
+        base_non_auth_headers = dict(prepared.headers)
+        tracker = _AttemptTracker(
+            method=prepared.method,
+            url=prepared.url,
+            started_at=datetime.now(timezone.utc),
+        )
+        try:
+            response = await self._send_with_retries(
+                prepared,
+                base_non_auth_headers,
+                tracker,
+                on_behalf_of=on_behalf_of,
+                kwargs=kwargs,
+            )
+            tracker.final_status_code = response.status_code
+            return _finalize_response(response, raw=raw)
+        except BaseException as exc:
+            if tracker.final_exception is None:
+                tracker.final_exception = exc
+            raise
+        finally:
+            await self._dispatch_on_request_complete_async(
+                tracker.build_event(datetime.now(timezone.utc))
+            )
 
-        headers = self._get_headers()
-        headers.update(kwargs.pop("headers", {}) or {})
+    async def _send_one(
+        self,
+        prepared: PreparedRequest,
+        headers: dict[str, str],
+        wire_obo: str | None,
+        tracker: _AttemptTracker,
+        kwargs: dict[str, Any],
+        path_template: str,
+    ) -> httpx.Response:
+        """Issue one wire call, record it on the tracker, raise on transport error."""
+        attempt_number = len(tracker.attempts) + 1
+        _request_logger.debug(
+            "request: %s %s (attempt %d)",
+            prepared.method,
+            path_template,
+            attempt_number,
+        )
+        perf = time.perf_counter()
+        exc: BaseException | None = None
+        response: httpx.Response | None = None
+        try:
+            response = await self._http.request(
+                prepared.method, prepared.url, headers=headers, **kwargs
+            )
+        except Exception as e:
+            exc = e
+        duration = time.perf_counter() - perf
+        tracker.record(
+            status_code=response.status_code if response is not None else None,
+            duration_seconds=duration,
+            on_behalf_of=wire_obo,
+            exception=exc,
+        )
+        if exc is not None:
+            _request_logger.debug(
+                "request: %s %s failed in %.3fs (%s)",
+                prepared.method,
+                path_template,
+                duration,
+                type(exc).__name__,
+            )
+            tracker.final_exception = exc
+            raise exc
+        assert response is not None
+        _request_logger.debug(
+            "request: %s %s completed in %.3fs with status %d",
+            prepared.method,
+            path_template,
+            duration,
+            response.status_code,
+        )
+        return response
 
-        if self.before_request:
-            self.before_request(method, url, headers, kwargs)
-
-        for attempt in range(6):
-            response = await self._http.request(method, url, headers=headers, **kwargs)
-
-            max_retries = 5 if response.status_code == 429 else 2
-            if response.status_code in (429, 502, 503, 504) and attempt < max_retries:
-                delay = 0.25
-
-                if response.status_code == 429:
-                    try:
-                        data = response.json()
-                        if data.get("resourceType") == "OperationOutcome":
-                            for issue in data.get("issue", []):
-                                diagnostics = issue.get("diagnostics", "")
-                                if diagnostics:
-                                    import json
-
-                                    diag_data = json.loads(diagnostics)
-                                    ms_before_next = diag_data.get("_msBeforeNext", 0)
-                                    if ms_before_next:
-                                        delay = (ms_before_next / 1000.0) + 0.1
-                                        break
-                    except (ValueError, KeyError, json.JSONDecodeError):
-                        pass
-
-                if delay == 0.25:
-                    retry_after = response.headers.get("Retry-After")
-                    if retry_after and retry_after.isdigit():
-                        delay = min(int(retry_after), 30)
-                    else:
-                        delay = min(0.25 * (2**attempt), 2.0) + random.random() * 0.2
-
+    async def _send_with_retries(
+        self,
+        prepared: PreparedRequest,
+        base_non_auth_headers: dict[str, str],
+        tracker: _AttemptTracker,
+        *,
+        on_behalf_of: str | None,
+        kwargs: dict[str, Any],
+    ) -> httpx.Response:
+        """Drive the transient-failure retry loop and the 401-refresh branch."""
+        _, _, _, path_template = _parse_fhir_url(urlparse(prepared.url).path)
+        for attempt in range(MAX_WIRE_ATTEMPTS):
+            wire_obo = self._resolve_on_behalf_of(on_behalf_of)
+            headers = self._finalize_headers_for_wire(base_non_auth_headers, wire_obo)
+            response = await self._send_one(
+                prepared, headers, wire_obo, tracker, kwargs, path_template
+            )
+            if self._should_refresh_on_401(response, attempt):
+                refreshed = await self._refresh_and_retry_once(
+                    prepared,
+                    base_non_auth_headers,
+                    tracker,
+                    on_behalf_of=on_behalf_of,
+                    kwargs=kwargs,
+                    path_template=path_template,
+                )
+                if refreshed is None:
+                    return response
+                response = refreshed
+            delay = _retry_delay(
+                response, attempt,
+                max_retry_delay_seconds=self.max_retry_delay_seconds,
+            )
+            if delay is not None and not _retry_budget_exceeded(
+                response.status_code, attempt
+            ):
+                reason = "429" if response.status_code == 429 else "5xx"
+                _request_logger.debug(
+                    "request: retry scheduled in %.3fs (reason: %s)",
+                    delay,
+                    reason,
+                )
                 await asyncio.sleep(delay)
                 continue
-
-            return _raise_or_json(response)
-
+            return response
+        _request_logger.debug("request: retry budget exhausted")
         raise MedplumError("Request failed after retries")
+
+    async def _refresh_and_retry_once(
+        self,
+        prepared: PreparedRequest,
+        base_non_auth_headers: dict[str, str],
+        tracker: _AttemptTracker,
+        *,
+        on_behalf_of: str | None,
+        kwargs: dict[str, Any],
+        path_template: str,
+    ) -> httpx.Response | None:
+        """Force-refresh the token and replay the request exactly once.
+
+        Returns ``None`` if the refresh failed so the caller surfaces the
+        original 401; otherwise returns the replayed response.
+        """
+        try:
+            await self._tokens.force_refresh(self._http)
+        except (MedplumError, TokenRefreshCooldownError):
+            return None
+        self.access_token = self._tokens.access_token
+        self.token_expires_at = self._tokens.token_expires_at
+        wire_obo = self._resolve_on_behalf_of(on_behalf_of)
+        headers = self._finalize_headers_for_wire(base_non_auth_headers, wire_obo)
+        return await self._send_one(
+            prepared, headers, wire_obo, tracker, kwargs, path_template
+        )
+
+    async def _ensure_authenticated(self) -> None:
+        """Run the token manager's proactive refresh and mirror state
+        back onto the ``access_token`` / ``token_expires_at`` attrs so
+        callers see the freshly-fetched values.
+        """
+        await self._tokens.ensure_authenticated(self._http)
+        if self._tokens.access_token is not None:
+            self.access_token = self._tokens.access_token
+        if self._tokens.token_expires_at is not None:
+            self.token_expires_at = self._tokens.token_expires_at
 
     def on_behalf_of(self, membership: str | Any) -> AsyncOnBehalfOfContext:
         """Create async context manager for on-behalf-of operations"""
@@ -143,10 +374,11 @@ class AsyncMedplumClient(BaseClient):
     async def create_resource(
         self,
         resource: dict[str, Any] | Any,
-        headers: dict[str, str] | None = None,
         *,
+        headers: dict[str, str] | None = None,
         accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT],
+        on_behalf_of: str | None = None,
     ) -> ResourceT:
         pass
 
@@ -154,20 +386,22 @@ class AsyncMedplumClient(BaseClient):
     async def create_resource(
         self,
         resource: dict[str, Any] | Any,
-        headers: dict[str, str] | None = None,
         *,
+        headers: dict[str, str] | None = None,
         accounts: str | list[str] | None = None,
         as_fhir: None = None,
+        on_behalf_of: str | None = None,
     ) -> dict[str, Any]:
         pass
 
     async def create_resource(
         self,
         resource: dict[str, Any] | Any,
-        headers: dict[str, str] | None = None,
         *,
+        headers: dict[str, str] | None = None,
         accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT] | None = None,
+        on_behalf_of: str | None = None,
     ) -> ResourceT | dict[str, Any]:
         """Create a FHIR resource.
 
@@ -177,6 +411,8 @@ class AsyncMedplumClient(BaseClient):
             accounts: Account references to set on meta.accounts at
                 creation time (e.g., "Organization/abc" or a list)
             as_fhir: Optional FHIR resource class for typed response
+            on_behalf_of: Per-call OBO override. ``None`` uses the
+                ambient client OBO; empty string clears it for this call.
 
         Returns:
             Typed resource if as_fhir provided, else dict
@@ -204,12 +440,18 @@ class AsyncMedplumClient(BaseClient):
         resource_type = data.get("resourceType")
         if not resource_type:
             raise ValueError("Resource must have resourceType")
+        validate_resource_type(resource_type)
 
         response = await self._request(
-            "POST", f"{self.fhir_base_url}{resource_type}", json=data, headers=headers
+            "POST",
+            f"{self.fhir_base_url}{resource_type}",
+            json=data,
+            headers=headers,
+            on_behalf_of=on_behalf_of,
         )
 
         if as_fhir:
+            validate_as_fhir_class(as_fhir, expected_resource_type=resource_type)
             return as_fhir(**response)
 
         return response
@@ -219,10 +461,11 @@ class AsyncMedplumClient(BaseClient):
         self,
         resource: dict[str, Any] | Any,
         if_none_exist: str,
-        headers: dict[str, str] | None = None,
         *,
+        headers: dict[str, str] | None = None,
         accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT],
+        on_behalf_of: str | None = None,
     ) -> ResourceT:
         pass
 
@@ -231,10 +474,11 @@ class AsyncMedplumClient(BaseClient):
         self,
         resource: dict[str, Any] | Any,
         if_none_exist: str,
-        headers: dict[str, str] | None = None,
         *,
+        headers: dict[str, str] | None = None,
         accounts: str | list[str] | None = None,
         as_fhir: None = None,
+        on_behalf_of: str | None = None,
     ) -> dict[str, Any]:
         pass
 
@@ -242,10 +486,11 @@ class AsyncMedplumClient(BaseClient):
         self,
         resource: dict[str, Any] | Any,
         if_none_exist: str,
-        headers: dict[str, str] | None = None,
         *,
+        headers: dict[str, str] | None = None,
         accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT] | None = None,
+        on_behalf_of: str | None = None,
     ) -> ResourceT | dict[str, Any]:
         """Conditionally create a resource only if no matching resource exists.
 
@@ -261,6 +506,8 @@ class AsyncMedplumClient(BaseClient):
             accounts: Account references to set on meta.accounts at
                 creation time (e.g., "Organization/abc" or a list)
             as_fhir: Optional FHIR resource class for typed response
+            on_behalf_of: Optional ProjectMembership ID to act on behalf
+                of for this request (overrides any context-bound value)
 
         Returns:
             Created or existing resource (as dict or typed model if as_fhir provided)
@@ -295,19 +542,9 @@ class AsyncMedplumClient(BaseClient):
         resource_type = data.get("resourceType")
         if not resource_type:
             raise ValueError("Resource must have resourceType")
+        validate_resource_type(resource_type)
 
-        # Normalize query string: handle full URLs, ?-prefixed, or plain query strings
-        if if_none_exist.startswith(("http://", "https://")):
-            # Full URL - extract just the query portion
-            parsed = urlparse(if_none_exist)
-            normalized_query = parsed.query
-        else:
-            # Plain query string - just strip leading ? if present
-            normalized_query = if_none_exist.lstrip("?")
-
-        normalized_query = normalized_query.strip()
-        if not normalized_query:
-            raise ValueError("if_none_exist query string cannot be empty")
+        normalized_query = sanitize_if_none_exist(if_none_exist, self.base_url)
 
         request_headers = {"If-None-Exist": normalized_query}
         if headers:
@@ -318,9 +555,11 @@ class AsyncMedplumClient(BaseClient):
             f"{self.fhir_base_url}{resource_type}",
             json=data,
             headers=request_headers,
+            on_behalf_of=on_behalf_of,
         )
 
         if as_fhir:
+            validate_as_fhir_class(as_fhir, expected_resource_type=resource_type)
             return as_fhir(**response)
 
         return response
@@ -342,7 +581,9 @@ class AsyncMedplumClient(BaseClient):
         resource_type: str,
         resource_id: str,
         as_fhir: type[ResourceT] | None = None,
+        *,
         headers: dict[str, str] | None = None,
+        on_behalf_of: str | None = None,
     ) -> ResourceT | dict[str, Any]:
         """Read a FHIR resource by type and ID.
 
@@ -351,24 +592,23 @@ class AsyncMedplumClient(BaseClient):
             resource_id: Resource ID
             as_fhir: Optional FHIR resource class for typed response
             headers: Optional HTTP headers to include in the request
+            on_behalf_of: Per-call OBO override. ``None`` uses the
+                ambient client OBO; empty string clears it for this call.
 
         Returns:
             Typed resource if as_fhir provided, else dict
-
-        Examples:
-            # Get resource as dict
-            patient_dict = await client.read_resource("Patient", "123")
-
-            # Type-safe access with Pydantic models
-            from pymedplum.fhir import Patient
-            patient = await client.read_resource("Patient", "123", as_fhir=Patient)
-            print(patient.name[0].given)  # Full IDE autocomplete and type checking!
         """
+        validate_resource_type(resource_type)
+        validate_resource_id(resource_id)
         response = await self._request(
-            "GET", f"{self.fhir_base_url}{resource_type}/{resource_id}", headers=headers
+            "GET",
+            f"{self.fhir_base_url}{resource_type}/{resource_id}",
+            headers=headers,
+            on_behalf_of=on_behalf_of,
         )
 
         if as_fhir:
+            validate_as_fhir_class(as_fhir, expected_resource_type=resource_type)
             return as_fhir(**response)
 
         return response
@@ -390,7 +630,7 @@ class AsyncMedplumClient(BaseClient):
         resource_id: str,
         version_id: str,
         as_fhir: None = None,
-    ) -> dict[str, Any]:  # type: ignore[overload-cannot-match]
+    ) -> dict[str, Any]:
         pass
 
     async def vread_resource(
@@ -399,7 +639,9 @@ class AsyncMedplumClient(BaseClient):
         resource_id: str,
         version_id: str,
         as_fhir: type[ResourceT] | None = None,
+        *,
         headers: dict[str, str] | None = None,
+        on_behalf_of: str | None = None,
     ) -> ResourceT | dict[str, Any]:
         """Read a specific version of a FHIR resource (vread).
 
@@ -412,6 +654,8 @@ class AsyncMedplumClient(BaseClient):
             version_id: Version ID (found in meta.versionId)
             as_fhir: Optional FHIR resource class for typed response
             headers: Optional HTTP headers to include in the request
+            on_behalf_of: Optional ProjectMembership ID to act on behalf
+                of for this request (overrides any context-bound value)
 
         Returns:
             Typed resource if as_fhir provided, else dict
@@ -429,13 +673,18 @@ class AsyncMedplumClient(BaseClient):
             version_id = current["meta"]["versionId"]
             previous = await client.vread_resource("Patient", "123", str(int(version_id) - 1))
         """
+        validate_resource_type(resource_type)
+        validate_resource_id(resource_id)
+        validate_resource_id(version_id, field="version_id")
         response = await self._request(
             "GET",
             f"{self.fhir_base_url}{resource_type}/{resource_id}/_history/{version_id}",
             headers=headers,
+            on_behalf_of=on_behalf_of,
         )
 
         if as_fhir:
+            validate_as_fhir_class(as_fhir, expected_resource_type=resource_type)
             return as_fhir(**response)
 
         return response
@@ -444,10 +693,12 @@ class AsyncMedplumClient(BaseClient):
     async def update_resource(
         self,
         resource: dict[str, Any] | Any,
-        headers: dict[str, str] | None = None,
         *,
+        headers: dict[str, str] | None = None,
         accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT],
+        on_behalf_of: str | None = None,
+        if_match: bool | str = True,
     ) -> ResourceT:
         pass
 
@@ -455,54 +706,49 @@ class AsyncMedplumClient(BaseClient):
     async def update_resource(
         self,
         resource: dict[str, Any] | Any,
-        headers: dict[str, str] | None = None,
         *,
+        headers: dict[str, str] | None = None,
         accounts: str | list[str] | None = None,
         as_fhir: None = None,
+        on_behalf_of: str | None = None,
+        if_match: bool | str = True,
     ) -> dict[str, Any]:
         pass
 
     async def update_resource(
         self,
         resource: dict[str, Any] | Any,
-        headers: dict[str, str] | None = None,
         *,
+        headers: dict[str, str] | None = None,
         accounts: str | list[str] | None = None,
         as_fhir: type[ResourceT] | None = None,
+        on_behalf_of: str | None = None,
+        if_match: bool | str = True,
     ) -> ResourceT | dict[str, Any]:
         """Update a FHIR resource (requires id).
 
         Args:
             resource: FHIR resource dict or Pydantic model
-            headers: Optional HTTP headers (e.g., If-Match for optimistic locking)
+            headers: Optional HTTP headers. An explicit ``If-Match`` here
+                always wins over the ``if_match`` keyword.
             accounts: Account references to set on meta.accounts
                 (e.g., "Organization/abc" or a list)
             as_fhir: Optional FHIR resource class for typed response
+            on_behalf_of: Per-call OBO override. ``None`` uses the
+                ambient client OBO; empty string clears it for this call.
+            if_match: Optimistic-concurrency control. ``True`` (default)
+                auto-attaches ``If-Match: W/"<versionId>"`` from
+                ``resource.meta.versionId`` if present. ``False`` opts
+                out. A string is sent verbatim as the ``If-Match`` value.
 
         Returns:
             Typed resource if as_fhir provided, else dict
 
         Examples:
-            # Update and get as dict
+            # If-Match is auto-attached from meta.versionId by default.
             patient = await client.read_resource("Patient", "123")
             patient["active"] = True
             updated = await client.update_resource(patient)
-
-            # Type-safe update with Pydantic models
-            from pymedplum.fhir import Patient
-            patient = await client.read_resource("Patient", "123", as_fhir=Patient)
-            patient.active = True
-            updated = await client.update_resource(patient, as_fhir=Patient)
-            print(updated.name[0].given)  # Full IDE autocomplete!
-
-            # With optimistic locking
-            patient = await client.read_resource("Patient", "123")
-            patient["active"] = True
-            updated = await client.update_resource(
-                patient,
-                headers={"If-Match": f'W/"{patient["meta"]["versionId"]}"'},
-                as_fhir=Patient
-            )
         """
         data = to_fhir_json(resource)
 
@@ -514,15 +760,26 @@ class AsyncMedplumClient(BaseClient):
 
         if not resource_type or not resource_id:
             raise ValueError("Resource must have resourceType and id for update")
+        validate_resource_type(resource_type)
+        validate_resource_id(resource_id)
+
+        resolved_if_match = _resolve_if_match(resource, if_match)
+        merged_headers: dict[str, str] = {}
+        if resolved_if_match is not None:
+            merged_headers["If-Match"] = resolved_if_match
+        if headers:
+            merged_headers.update(headers)
 
         response = await self._request(
             "PUT",
             f"{self.fhir_base_url}{resource_type}/{resource_id}",
             json=data,
-            headers=headers,
+            headers=merged_headers or None,
+            on_behalf_of=on_behalf_of,
         )
 
         if as_fhir:
+            validate_as_fhir_class(as_fhir, expected_resource_type=resource_type)
             return as_fhir(**response)
 
         return response
@@ -533,9 +790,10 @@ class AsyncMedplumClient(BaseClient):
         resource_type: str,
         resource_id: str,
         operations: list[PatchOperation],
-        headers: dict[str, str] | None = None,
         *,
+        headers: dict[str, str] | None = None,
         as_fhir: type[ResourceT],
+        on_behalf_of: str | None = None,
     ) -> ResourceT:
         pass
 
@@ -545,9 +803,10 @@ class AsyncMedplumClient(BaseClient):
         resource_type: str,
         resource_id: str,
         operations: list[PatchOperation],
-        headers: dict[str, str] | None = None,
         *,
+        headers: dict[str, str] | None = None,
         as_fhir: None = None,
+        on_behalf_of: str | None = None,
     ) -> dict[str, Any]:
         pass
 
@@ -556,9 +815,10 @@ class AsyncMedplumClient(BaseClient):
         resource_type: str,
         resource_id: str,
         operations: list[PatchOperation],
-        headers: dict[str, str] | None = None,
         *,
+        headers: dict[str, str] | None = None,
         as_fhir: type[ResourceT] | None = None,
+        on_behalf_of: str | None = None,
     ) -> ResourceT | dict[str, Any]:
         """Apply JSON Patch operations to a resource.
 
@@ -568,6 +828,8 @@ class AsyncMedplumClient(BaseClient):
             operations: List of JSON Patch operations
             headers: Optional HTTP headers (e.g., If-Match for optimistic locking)
             as_fhir: Optional FHIR resource class for typed response
+            on_behalf_of: Per-call OBO override. ``None`` uses the
+                ambient client OBO; empty string clears it for this call.
 
         Returns:
             Typed resource if as_fhir provided, else dict
@@ -583,6 +845,8 @@ class AsyncMedplumClient(BaseClient):
             patched = await client.patch_resource("Patient", "123", operations, as_fhir=Patient)
             print(patched.active)  # Full IDE autocomplete!
         """
+        validate_resource_type(resource_type)
+        validate_resource_id(resource_id)
         patch_headers = {"Content-Type": "application/json-patch+json"}
         if headers:
             patch_headers.update(headers)
@@ -592,9 +856,11 @@ class AsyncMedplumClient(BaseClient):
             f"{self.fhir_base_url}{resource_type}/{resource_id}",
             json=operations,
             headers=patch_headers,
+            on_behalf_of=on_behalf_of,
         )
 
         if as_fhir:
+            validate_as_fhir_class(as_fhir, expected_resource_type=resource_type)
             return as_fhir(**response)
 
         return response
@@ -603,19 +869,18 @@ class AsyncMedplumClient(BaseClient):
         self,
         resource_type: str,
         resource_id: str,
+        *,
         headers: dict[str, str] | None = None,
+        on_behalf_of: str | None = None,
     ) -> None:
-        """Delete a FHIR resource.
-
-        Args:
-            resource_type: FHIR resource type (e.g., "Patient")
-            resource_id: Resource ID
-            headers: Optional HTTP headers to include in the request
-        """
+        """Delete a FHIR resource."""
+        validate_resource_type(resource_type)
+        validate_resource_id(resource_id)
         await self._request(
             "DELETE",
             f"{self.fhir_base_url}{resource_type}/{resource_id}",
             headers=headers,
+            on_behalf_of=on_behalf_of,
         )
 
     @overload
@@ -625,6 +890,8 @@ class AsyncMedplumClient(BaseClient):
         query: QueryTypes | None = None,
         return_bundle: Literal[False] = False,
         as_fhir: None = None,
+        *,
+        on_behalf_of: str | None = None,
     ) -> dict[str, Any]:
         pass
 
@@ -635,6 +902,8 @@ class AsyncMedplumClient(BaseClient):
         query: QueryTypes | None = None,
         return_bundle: Literal[True] = ...,
         as_fhir: None = None,
+        *,
+        on_behalf_of: str | None = None,
     ) -> FHIRBundle[dict[str, Any]]:
         pass
 
@@ -645,6 +914,8 @@ class AsyncMedplumClient(BaseClient):
         query: QueryTypes | None = None,
         return_bundle: Literal[True] = ...,
         as_fhir: type[ResourceT] = ...,
+        *,
+        on_behalf_of: str | None = None,
     ) -> FHIRBundle[ResourceT]:
         pass
 
@@ -654,6 +925,8 @@ class AsyncMedplumClient(BaseClient):
         query: QueryTypes | None = None,
         return_bundle: bool = False,
         as_fhir: type[ResourceT] | None = None,
+        *,
+        on_behalf_of: str | None = None,
     ) -> FHIRBundle[ResourceT] | FHIRBundle[dict[str, Any]] | dict[str, Any]:
         """Search for FHIR resources.
 
@@ -662,6 +935,8 @@ class AsyncMedplumClient(BaseClient):
             query: Search parameters
             return_bundle: If True, wrap in FHIRBundle helper
             as_fhir: Optional FHIR resource class for typed response (only applies when return_bundle=True)
+            on_behalf_of: Per-call OBO override. ``None`` uses the
+                ambient client OBO; empty string clears it for this call.
 
         Returns:
             FHIRBundle wrapper, or raw dict
@@ -680,34 +955,47 @@ class AsyncMedplumClient(BaseClient):
             bundle = await client.search_resources("Patient", {}, return_bundle=True, as_fhir=Patient)
             patients = bundle.get_resources_typed(Patient)
         """
+        validate_resource_type(resource_type)
         params = self._build_query_params(query)
         response = await self._request(
-            "GET", f"{self.fhir_base_url}{resource_type}", params=params
+            "GET",
+            f"{self.fhir_base_url}{resource_type}",
+            params=params,
+            on_behalf_of=on_behalf_of,
         )
 
         if return_bundle:
             bundle: FHIRBundle[Any] = FHIRBundle(response)
             if as_fhir:
+                validate_as_fhir_class(as_fhir, expected_resource_type=resource_type)
                 bundle._resource_class = as_fhir
             return bundle
 
         return response
 
     async def search_one(
-        self, resource_type: str, query: QueryTypes | None = None
+        self,
+        resource_type: str,
+        query: QueryTypes | None = None,
+        *,
+        on_behalf_of: str | None = None,
     ) -> dict[str, Any] | None:
         """Search for a single resource"""
+        validate_resource_type(resource_type)
         params = self._build_query_params(query)
         params.append(("_count", "1"))
 
-        bundle: dict[str, Any] | None = await self._request(
-            "GET", f"{self.fhir_base_url}{resource_type}", params=params
+        bundle = await self._request(
+            "GET",
+            f"{self.fhir_base_url}{resource_type}",
+            params=params,
+            on_behalf_of=on_behalf_of,
         )
-        assert bundle is not None
         entries = bundle.get("entry", [])
 
         if entries and "resource" in entries[0]:
-            return entries[0]["resource"]
+            resource = entries[0]["resource"]
+            return resource if isinstance(resource, dict) else None
         return None
 
     async def search_resource_pages(
@@ -715,6 +1003,9 @@ class AsyncMedplumClient(BaseClient):
         resource_type: str,
         query: QueryTypes | None = None,
         as_fhir: type[ResourceT] | None = None,
+        *,
+        on_behalf_of: str | None = None,
+        max_resources: int | None = None,
     ) -> AsyncIterator[ResourceT | dict[str, Any]]:
         """Search resources with automatic pagination.
 
@@ -722,6 +1013,12 @@ class AsyncMedplumClient(BaseClient):
             resource_type: FHIR resource type
             query: Search parameters
             as_fhir: Optional FHIR resource class for typed response
+            on_behalf_of: Optional ProjectMembership ID to act on behalf
+                of for this request (overrides any context-bound value)
+            max_resources: Optional cap on total resources yielded across
+                pages. Stops following ``next`` links once the cap is hit.
+                Default ``None`` preserves the historical unbounded
+                behavior for legitimate bulk-data flows.
 
         Yields:
             Individual resources from paginated results
@@ -736,18 +1033,26 @@ class AsyncMedplumClient(BaseClient):
             async for patient in client.search_resource_pages("Patient", {"family": "Smith"}, as_fhir=Patient):
                 print(patient.name[0].given)  # Full type safety and IDE autocomplete!
         """
-        bundle_response = await self.search_resources(resource_type, query)
-        assert isinstance(bundle_response, dict)
-        bundle: dict[str, Any] | None = bundle_response
+        if as_fhir:
+            validate_as_fhir_class(as_fhir, expected_resource_type=resource_type)
 
+        bundle = await self.search_resources(
+            resource_type, query, on_behalf_of=on_behalf_of
+        )
+        assert isinstance(bundle, dict)
+
+        yielded = 0
         while bundle:
             for entry in bundle.get("entry", []):
                 if "resource" in entry:
+                    if max_resources is not None and yielded >= max_resources:
+                        return
                     resource = entry["resource"]
                     if as_fhir:
                         yield as_fhir(**resource)
                     else:
                         yield resource
+                    yielded += 1
 
             next_url = None
             for link in bundle.get("link", []):
@@ -757,8 +1062,11 @@ class AsyncMedplumClient(BaseClient):
 
             if not next_url:
                 break
+            if max_resources is not None and yielded >= max_resources:
+                return
 
-            bundle = await self._request("GET", next_url)
+            assert_same_origin(self.base_url, next_url)
+            bundle = await self._request("GET", next_url, on_behalf_of=on_behalf_of)
 
     @overload
     async def search_with_options(
@@ -844,6 +1152,7 @@ class AsyncMedplumClient(BaseClient):
         revinclude_iterate: str | list[str] | None = None,
         return_bundle: bool = False,
         as_fhir: type[ResourceT] | None = None,
+        on_behalf_of: str | None = None,
     ) -> FHIRBundle[ResourceT] | FHIRBundle[dict[str, Any]] | dict[str, Any]:
         """Search for FHIR resources with explicit search parameter helpers.
 
@@ -878,6 +1187,8 @@ class AsyncMedplumClient(BaseClient):
                 follows references on reverse-included resources
             return_bundle: If True, wrap result in FHIRBundle helper
             as_fhir: Optional FHIR resource class for typed responses
+            on_behalf_of: Optional ProjectMembership ID to act on behalf
+                of for this request (overrides any context-bound value)
 
         Returns:
             FHIRBundle wrapper or raw dict based on return_bundle parameter
@@ -917,83 +1228,52 @@ class AsyncMedplumClient(BaseClient):
                 return_bundle=True
             )
         """
+        validate_resource_type(resource_type)
         params = self._build_query_params(query)
-
-        if summary:
-            params.append(("_summary", summary))
-
-        if elements:
-            params.append(("_elements", ",".join(elements)))
-
-        if total:
-            params.append(("_total", total))
-
-        if at:
-            params.append(("_at", at))
-
-        if count is not None:
-            params.append(("_count", str(count)))
-
-        if offset is not None:
-            params.append(("_offset", str(offset)))
-
-        if sort:
-            if isinstance(sort, list):
-                params.append(("_sort", ",".join(sort)))
-            else:
-                params.append(("_sort", sort))
-
-        if include:
-            if isinstance(include, list):
-                for inc in include:
-                    params.append(("_include", inc))
-            else:
-                params.append(("_include", include))
-
-        if include_iterate:
-            if isinstance(include_iterate, list):
-                for inc in include_iterate:
-                    params.append(("_include:iterate", inc))
-            else:
-                params.append(("_include:iterate", include_iterate))
-
-        if revinclude:
-            if isinstance(revinclude, list):
-                for rev in revinclude:
-                    params.append(("_revinclude", rev))
-            else:
-                params.append(("_revinclude", revinclude))
-
-        if revinclude_iterate:
-            if isinstance(revinclude_iterate, list):
-                for rev in revinclude_iterate:
-                    params.append(("_revinclude:iterate", rev))
-            else:
-                params.append(("_revinclude:iterate", revinclude_iterate))
+        _append_search_options(
+            params,
+            summary=summary,
+            elements=elements,
+            total=total,
+            at=at,
+            count=count,
+            offset=offset,
+            sort=sort,
+            include=include,
+            include_iterate=include_iterate,
+            revinclude=revinclude,
+            revinclude_iterate=revinclude_iterate,
+        )
 
         response = await self._request(
-            "GET", f"{self.fhir_base_url}{resource_type}", params=params
+            "GET",
+            f"{self.fhir_base_url}{resource_type}",
+            params=params,
+            on_behalf_of=on_behalf_of,
         )
 
         if return_bundle:
             bundle_obj: FHIRBundle[Any] = FHIRBundle(response)
             if as_fhir:
+                validate_as_fhir_class(as_fhir, expected_resource_type=resource_type)
                 bundle_obj._resource_class = as_fhir
             return bundle_obj
 
         return response
 
-    # Alias for TypeScript compatibility
-    searchWithOptions = search_with_options
-
     async def execute_graphql(
-        self, query: str, variables: dict | None = None
+        self,
+        query: str,
+        variables: dict[str, Any] | None = None,
+        *,
+        on_behalf_of: str | None = None,
     ) -> dict[str, Any]:
-        """Execute a GraphQL query"""
+        """Execute a GraphQL query."""
         return await self._request(
             "POST",
             f"{self.fhir_base_url}$graphql",
             json={"query": query, "variables": variables or {}},
+            on_behalf_of=on_behalf_of,
         )
 
     async def execute_batch(
@@ -1001,6 +1281,7 @@ class AsyncMedplumClient(BaseClient):
         bundle: dict[str, Any] | Any,
         *,
         accounts: str | list[str] | None = None,
+        on_behalf_of: str | None = None,
     ) -> dict[str, Any]:
         """Execute a FHIR batch/transaction bundle.
 
@@ -1008,6 +1289,8 @@ class AsyncMedplumClient(BaseClient):
             bundle: FHIR Bundle resource
             accounts: Account references to set on each bundle entry's
                 meta.accounts (e.g., "Organization/abc" or a list)
+            on_behalf_of: Per-call OBO override. ``None`` uses the
+                ambient client OBO; empty string clears it for this call.
         """
         data = to_fhir_json(bundle)
 
@@ -1018,7 +1301,9 @@ class AsyncMedplumClient(BaseClient):
                         entry["resource"], accounts
                     )
 
-        return await self._request("POST", self.fhir_base_url, json=data)
+        return await self._request(
+            "POST", self.fhir_base_url, json=data, on_behalf_of=on_behalf_of
+        )
 
     async def set_accounts(
         self,
@@ -1113,7 +1398,7 @@ class AsyncMedplumClient(BaseClient):
             headers=headers,
         )
 
-    async def get(self, path: str, **kwargs) -> dict[str, Any]:
+    async def get(self, path: str, **kwargs: Any) -> dict[str, Any]:
         """GET from any Medplum endpoint (not just FHIR).
 
         Args:
@@ -1123,8 +1408,11 @@ class AsyncMedplumClient(BaseClient):
         Returns:
             Response JSON
         """
-        url = f"{self.base_url}{path}"
-        return await self._request("GET", url, **kwargs)
+        url = build_raw_request_url(self.base_url, path)
+        kwargs.pop("raw", None)
+        result = await self._request("GET", url, **kwargs)
+        assert isinstance(result, dict)
+        return result
 
     async def post(self, path: str, data: Any) -> dict[str, Any]:
         """POST to any Medplum endpoint (not just FHIR).
@@ -1136,7 +1424,7 @@ class AsyncMedplumClient(BaseClient):
         Returns:
             Response JSON
         """
-        url = f"{self.base_url}{path}"
+        url = build_raw_request_url(self.base_url, path)
         return await self._request("POST", url, json=data)
 
     async def invite_user(
@@ -1190,6 +1478,8 @@ class AsyncMedplumClient(BaseClient):
                 admin=True
             )
         """
+        validate_resource_id(project_id, field="project_id")
+        validate_resource_type(resource_type)
         payload: dict[str, Any] = {
             "resourceType": resource_type,
             "firstName": first_name,
@@ -1211,11 +1501,15 @@ class AsyncMedplumClient(BaseClient):
 
         return await self.post(f"admin/projects/{project_id}/invite", payload)
 
-    async def export_ccda(self, patient_id: str) -> str:
+    async def export_ccda(
+        self, patient_id: str, *, on_behalf_of: str | None = None
+    ) -> str:
         """Export a patient's complete history as a C-CDA XML document.
 
         Args:
             patient_id: The ID of the patient to export
+            on_behalf_of: Per-call OBO override. ``None`` uses the
+                ambient client OBO; empty string clears it for this call.
 
         Returns:
             C-CDA XML document as a string
@@ -1225,14 +1519,13 @@ class AsyncMedplumClient(BaseClient):
             with open("patient-record.xml", "w") as f:
                 f.write(ccda_xml)
         """
-        response = await self._http.get(
+        validate_resource_id(patient_id, field="patient_id")
+        response = await self._request(
+            "GET",
             f"{self.fhir_base_url}Patient/{patient_id}/$ccda-export",
-            headers=self._get_headers(),
+            raw=True,
+            on_behalf_of=on_behalf_of,
         )
-        if response.status_code >= 400:
-            from ._base import _raise_or_json
-
-            _raise_or_json(response)
         return response.text
 
     async def validate_valueset_code(
@@ -1241,8 +1534,8 @@ class AsyncMedplumClient(BaseClient):
         valueset_id: str | None = None,
         code: str | None = None,
         system: str | None = None,
-        coding: dict | None = None,
-        codeable_concept: dict | None = None,
+        coding: dict[str, Any] | None = None,
+        codeable_concept: dict[str, Any] | None = None,
         display: str | None = None,
         abstract: bool | None = None,
     ) -> dict[str, Any]:
@@ -1297,7 +1590,7 @@ class AsyncMedplumClient(BaseClient):
         codesystem_url: str | None = None,
         codesystem_id: str | None = None,
         code: str | None = None,
-        coding: dict | None = None,
+        coding: dict[str, Any] | None = None,
         version: str | None = None,
     ) -> dict[str, Any]:
         """Validate if a code exists in a CodeSystem.
@@ -1422,7 +1715,7 @@ class AsyncMedplumClient(BaseClient):
         system: str | None = None,
         codesystem_id: str | None = None,
         version: str | None = None,
-        coding: dict | None = None,
+        coding: dict[str, Any] | None = None,
         date: str | None = None,
         display_language: str | None = None,
         property: list[str] | None = None,
@@ -1490,8 +1783,8 @@ class AsyncMedplumClient(BaseClient):
         version: str | None = None,
         source: str | None = None,
         target: str | None = None,
-        coding: dict | None = None,
-        codeable_concept: dict | None = None,
+        coding: dict[str, Any] | None = None,
+        codeable_concept: dict[str, Any] | None = None,
         target_system: str | None = None,
         reverse: bool | None = None,
     ) -> dict[str, Any]:
@@ -1618,6 +1911,8 @@ class AsyncMedplumClient(BaseClient):
             # Permanently delete a patient and all related resources
             await client.expunge_resource("Patient", "patient-456", everything=True)
         """
+        validate_resource_type(resource_type)
+        validate_resource_id(resource_id)
         url = f"{self.fhir_base_url}{resource_type}/{resource_id}/$expunge"
         if everything:
             url += "?everything=true"
@@ -1626,7 +1921,7 @@ class AsyncMedplumClient(BaseClient):
 
     async def get_async_job_status(
         self,
-        job: "str | dict[str, Any] | OperationOutcome",
+        job: str | dict[str, Any] | OperationOutcome,
     ) -> dict[str, Any]:
         """Get the status of an async job.
 
@@ -1653,7 +1948,7 @@ class AsyncMedplumClient(BaseClient):
 
     async def wait_for_async_job(
         self,
-        job: "str | dict[str, Any] | OperationOutcome",
+        job: str | dict[str, Any] | OperationOutcome,
         poll_interval: float = 1.0,
         timeout: float | None = None,
     ) -> dict[str, Any]:
@@ -1701,7 +1996,12 @@ class AsyncMedplumClient(BaseClient):
 
             await asyncio.sleep(poll_interval)
 
-    async def execute_transaction(self, bundle: dict | Any) -> dict[str, Any]:
+    async def execute_transaction(
+        self,
+        bundle: dict[str, Any] | Any,
+        *,
+        on_behalf_of: str | None = None,
+    ) -> dict[str, Any]:
         """Execute a transaction bundle atomically.
 
         All operations in a transaction bundle succeed or fail together.
@@ -1709,6 +2009,8 @@ class AsyncMedplumClient(BaseClient):
 
         Args:
             bundle: Bundle resource with type="transaction" or dict with entries
+            on_behalf_of: Optional ProjectMembership ID to act on behalf
+                of for this request (overrides any context-bound value)
 
         Returns:
             Bundle with type="transaction-response" containing results
@@ -1730,27 +2032,32 @@ class AsyncMedplumClient(BaseClient):
             }
             result = await client.execute_transaction(bundle)
         """
-        from .helpers import to_fhir_json
-
-        bundle_data = to_fhir_json(bundle) if hasattr(bundle, "model_dump") else bundle
+        bundle_data = to_fhir_json(bundle)
 
         if bundle_data.get("type") != "transaction":
             bundle_data["type"] = "transaction"
 
         return await self._request(
-            "POST", self.fhir_base_url.rstrip("/"), json=bundle_data
+            "POST",
+            self.fhir_base_url.rstrip("/"),
+            json=bundle_data,
+            on_behalf_of=on_behalf_of,
         )
 
     async def upload_binary(
         self,
         content: bytes,
         content_type: str,
+        *,
+        on_behalf_of: str | None = None,
     ) -> dict[str, Any]:
         """Upload binary content (like documents, images, PDFs).
 
         Args:
             content: Binary content as bytes
             content_type: MIME type (e.g., "application/pdf", "application/xml")
+            on_behalf_of: Per-call OBO override. ``None`` uses the
+                ambient client OBO; empty string clears it for this call.
 
         Returns:
             Binary resource
@@ -1764,19 +2071,38 @@ class AsyncMedplumClient(BaseClient):
             f"{self.fhir_base_url}Binary",
             data=content,
             headers={"Content-Type": content_type},
+            on_behalf_of=on_behalf_of,
         )
 
-    async def download_binary(self, binary_id: str) -> bytes:
+    async def download_binary(
+        self,
+        binary_id: str,
+        *,
+        on_behalf_of: str | None = None,
+        max_bytes: int | None = None,
+    ) -> bytes:
         """Download binary content.
 
         Args:
             binary_id: ID of the Binary resource
+            on_behalf_of: Per-call OBO override. ``None`` uses the
+                ambient client OBO; empty string clears it for this call.
+            max_bytes: Optional cap on the response size. The check
+                consults ``Content-Length`` first (cheap reject before
+                materialization) and validates the actual byte count
+                after read. Without a cap a hostile or misbehaving server
+                can OOM the SDK process by serving an unbounded blob;
+                set this when the expected payload size is known.
 
         Returns:
             Binary content as bytes
 
+        Raises:
+            ValueError: If ``max_bytes`` is set and the response advertises
+                or returns more bytes than allowed.
+
         Example:
-            content = await client.download_binary("binary-123")
+            content = await client.download_binary("binary-123", max_bytes=10 * 1024 * 1024)
             with open("downloaded.pdf", "wb") as f:
                 f.write(content)
 
@@ -1786,21 +2112,34 @@ class AsyncMedplumClient(BaseClient):
             when Accept: */* or Accept matches the contentType, the server returns raw bytes.
             When Accept: application/fhir+json, it returns the FHIR resource with base64 data.
         """
-        # Request raw binary content using Accept: */*
-        # This is FHIR-compliant and more efficient than fetching the resource
-        # and decoding base64 (Medplum correctly implements this per FHIR spec)
-        # Use _get_headers() to ensure token refresh and on-behalf-of handling
-        headers = self._get_headers()
-        headers["Accept"] = "*/*"
-        headers.pop("Content-Type", None)  # Not needed for GET
-        response = await self._http.get(
+        validate_resource_id(binary_id, field="binary_id")
+        response = await self._request(
+            "GET",
             f"{self.fhir_base_url}Binary/{binary_id}",
-            headers=headers,
+            headers={"Accept": "*/*", "Content-Type": None},
+            raw=True,
+            on_behalf_of=on_behalf_of,
         )
-        if response.status_code >= 400:
-            from ._base import _raise_or_json
-
-            _raise_or_json(response)
+        if max_bytes is not None:
+            advertised_int: int | None = None
+            advertised = response.headers.get("Content-Length")
+            if advertised is not None:
+                try:
+                    advertised_int = int(advertised)
+                except ValueError:
+                    advertised_int = None
+            if advertised_int is not None and advertised_int > max_bytes:
+                raise ValueError(
+                    f"Binary {binary_id!r} advertises {advertised_int} "
+                    f"bytes, exceeding max_bytes={max_bytes}"
+                )
+            content = response.content
+            if len(content) > max_bytes:
+                raise ValueError(
+                    f"Binary {binary_id!r} returned {len(content)} bytes, "
+                    f"exceeding max_bytes={max_bytes}"
+                )
+            return content
         return response.content
 
     async def create_document_reference(
@@ -1810,7 +2149,7 @@ class AsyncMedplumClient(BaseClient):
         content_type: str,
         title: str,
         description: str | None = None,
-        doc_type_code: dict | None = None,
+        doc_type_code: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Create a DocumentReference pointing to binary content.
 
@@ -1895,9 +2234,11 @@ class AsyncMedplumClient(BaseClient):
         operation: str,
         resource_id: str | None = None,
         params: dict[str, Any] | Any | None = None,
+        *,
         headers: dict[str, str] | None = None,
         method: Literal["GET", "POST"] = "POST",
         wrap_params: bool = False,
+        on_behalf_of: str | None = None,
     ) -> dict[str, Any]:
         """Execute a FHIR operation (standard or custom).
 
@@ -1913,6 +2254,8 @@ class AsyncMedplumClient(BaseClient):
             method: HTTP method - "GET" for query params, "POST" for body (default)
             wrap_params: If True and params is a simple dict (not Parameters),
                 auto-wrap it into a Parameters resource for POST requests
+            on_behalf_of: Per-call OBO override. ``None`` uses the
+                ambient client OBO; empty string clears it for this call.
 
         Returns:
             Operation response (typically Parameters or resource-specific)
@@ -1957,8 +2300,10 @@ class AsyncMedplumClient(BaseClient):
             )
         """
         # Build the URL
-        operation_name = operation.lstrip("$")  # Allow both "match" and "$match"
+        validate_resource_type(resource_type)
+        operation_name = validate_operation_name(operation)
         if resource_id:
+            validate_resource_id(resource_id)
             url = f"{self.fhir_base_url}{resource_type}/{resource_id}/${operation_name}"
         else:
             url = f"{self.fhir_base_url}{resource_type}/${operation_name}"
@@ -1968,9 +2313,15 @@ class AsyncMedplumClient(BaseClient):
             if params:
                 query_params = self._build_query_params(params)
                 return await self._request(
-                    "GET", url, params=query_params, headers=headers
+                    "GET",
+                    url,
+                    params=query_params,
+                    headers=headers,
+                    on_behalf_of=on_behalf_of,
                 )
-            return await self._request("GET", url, headers=headers)
+            return await self._request(
+                "GET", url, headers=headers, on_behalf_of=on_behalf_of
+            )
         else:
             # POST with body
             body = None
@@ -1984,7 +2335,13 @@ class AsyncMedplumClient(BaseClient):
                 ):
                     body = dict_to_parameters(body)
 
-            return await self._request("POST", url, json=body, headers=headers)
+            return await self._request(
+                "POST",
+                url,
+                json=body,
+                headers=headers,
+                on_behalf_of=on_behalf_of,
+            )
 
     async def deploy_bot(
         self,
@@ -2202,32 +2559,3 @@ class AsyncMedplumClient(BaseClient):
             bots = await client.list_bots(name="my-bot")
         """
         return await self.search_resources("Bot", search_params)
-
-    # TypeScript-compatible aliases
-    createResource = create_resource
-    createResourceIfNoneExist = create_resource_if_none_exist
-    readResource = read_resource
-    vreadResource = vread_resource
-    updateResource = update_resource
-    patchResource = patch_resource
-    searchResources = search_resources
-    graphql = execute_graphql
-    executeBatch = execute_batch
-    inviteUser = invite_user
-    executeBot = execute_bot
-    executeOperation = execute_operation
-    deployBot = deploy_bot
-    saveBotCode = save_bot_code
-    saveAndDeployBot = save_and_deploy_bot
-    createBot = create_bot
-    readBot = read_bot
-    updateBot = update_bot
-    deleteBot = delete_bot
-    listBots = list_bots
-    expandValueSet = expand_valueset
-    lookupConcept = lookup_concept
-    translateConcept = translate_concept
-    cloneResource = clone_resource
-    expungeResource = expunge_resource
-    getAsyncJobStatus = get_async_job_status
-    waitForAsyncJob = wait_for_async_job

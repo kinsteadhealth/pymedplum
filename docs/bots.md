@@ -25,13 +25,16 @@ Medplum supports two runtime versions:
 
 ### Creating Bots with Runtime
 
+The client authenticates automatically on the first request and
+refreshes tokens proactively, so the examples below just construct a
+client and start making calls.
+
 Always specify the runtime version when creating a bot:
 
 ```python
 from pymedplum import MedplumClient
 
 client = MedplumClient(base_url="https://api.medplum.com")
-client.authenticate()
 
 # Create bot with AWS Lambda runtime (required for execution!)
 bot = client.create_bot(
@@ -51,7 +54,6 @@ Bot management is built directly into the `MedplumClient`:
 from pymedplum import MedplumClient
 
 client = MedplumClient(base_url="https://api.medplum.com")
-client.authenticate()
 
 # All bot methods are available on the client
 client.create_bot(...)
@@ -68,9 +70,8 @@ Deploy compiled JavaScript code to a bot:
 ```python
 from pymedplum import MedplumClient
 
-# Initialize client and authenticate
+# Initialize the client — auth happens on the first request
 client = MedplumClient(base_url="https://api.medplum.com")
-client.authenticate()
 
 # Read your compiled bot code
 with open("dist/my-bot.js") as f:
@@ -157,8 +158,6 @@ All bot management methods are available on `AsyncMedplumClient`:
 from pymedplum import AsyncMedplumClient
 
 async with AsyncMedplumClient(base_url="https://api.medplum.com") as client:
-    await client.authenticate()
-
     # Deploy bot asynchronously
     with open("dist/my-bot.js") as f:
         compiled_code = f.read()
@@ -182,9 +181,8 @@ Here's a complete example showing how to create, deploy, and execute a bot:
 ```python
 from pymedplum import MedplumClient
 
-# Initialize and authenticate
+# Initialize — auth happens on the first request
 client = MedplumClient(base_url="https://api.medplum.com")
-client.authenticate()
 
 # Create a new Bot resource
 bot = client.create_bot(

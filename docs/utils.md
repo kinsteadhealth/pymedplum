@@ -90,16 +90,3 @@ print(api_payload)
 # Output: {'resourceType': 'Patient', 'birthDate': '1990-01-01', 'active': True}
 ```
 
-## Token Handling
-
-### `decode_jwt_exp(token)`
-Decodes a JWT token and returns its expiration time as a timezone-aware `datetime` object. Returns `None` if the token is invalid or has no expiration.
-
-```python
-from pymedplum.helpers import decode_jwt_exp
-
-# Assume client is an authenticated MedplumClient
-token = client.access_token 
-expiration_time = decode_jwt_exp(token)
-if expiration_time:
-    print(f"Token expires at: {expiration_time}")

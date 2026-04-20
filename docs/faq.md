@@ -19,7 +19,8 @@ See [Installation](installation.md) for details.
 
 ### Q: What Python versions are supported?
 
-`pymedplum` requires Python 3.8 or higher. It's tested on Python 3.8, 3.9, 3.10, 3.11, and 3.12.
+`pymedplum` requires Python 3.10 or higher. It's tested on 3.10, 3.11,
+3.12, and 3.13 (including the experimental no-GIL build).
 
 ### Q: Do I need to install Pydantic separately?
 
@@ -38,7 +39,8 @@ client = MedplumClient(
     client_id="YOUR_CLIENT_ID",
     client_secret="YOUR_CLIENT_SECRET"
 )
-client.authenticate()  # Obtains token automatically
+# The client authenticates automatically on the first request and
+# refreshes the token proactively before expiration.
 ```
 
 2. **Direct Token** (if you already have one):
@@ -53,12 +55,12 @@ client = MedplumClient(
 
 ### Q: How do I know when my token expires?
 
-```python
-from pymedplum.helpers import decode_jwt_exp
-
-expiration = decode_jwt_exp(client.access_token)
-print(f"Token expires at: {expiration}")
-```
+The client tracks expiry from the OAuth ``expires_in`` field on the token
+response and refreshes proactively. If you supplied an externally-acquired
+``access_token`` without an ``expires_at``, the SDK does not parse the
+token; it simply waits for the server to return ``401`` and reactively
+refreshes. Read ``client.token_expires_at`` to check the currently-known
+expiry (``None`` means "no hint, will refresh on rejection").
 
 ### Q: I'm getting 401 Unauthorized errors
 
@@ -68,11 +70,14 @@ print(f"Token expires at: {expiration}")
 - Revoked access
 
 **Solutions**:
-```python
-# Force re-authentication
-client.authenticate()
 
-# Or create a new client
+The client auto-retries on `401 Unauthorized` with a forced token
+refresh, so transient expirations are handled for you. You only need
+to intervene if the underlying credentials are bad or revoked.
+
+```python
+# If credentials have been rotated or revoked, construct a new client
+# with the new values.
 client = MedplumClient(
     base_url="https://api.medplum.com/",
     client_id="YOUR_CLIENT_ID",
@@ -400,24 +405,45 @@ logging.getLogger("httpx").setLevel(logging.DEBUG)
 ### Q: How do I handle errors gracefully?
 
 ```python
-from pymedplum.exceptions import (
-    NotFoundError,
+from pymedplum import (
     AuthorizationError,
+    InsecureTransportError,
+    NotFoundError,
+    OperationOutcomeError,
+    PreconditionFailedError,
+    RateLimitError,
+    ServerError,
+    TokenRefreshCooldownError,
+    UnsafeRedirectError,
     ValidationError,
-    RateLimitError
 )
 
 try:
     patient = client.read_resource("Patient", "123")
 except NotFoundError:
-    print("Patient not found")
+    ...
 except AuthorizationError:
-    print("Access denied")
-except ValidationError as e:
-    print(f"Invalid data: {e}")
+    ...
+except ValidationError:
+    ...
 except RateLimitError:
-    print("Rate limited, wait before retrying")
+    ...
+except PreconditionFailedError:
+    # If-Match / If-None-Exist version mismatch
+    ...
+except (OperationOutcomeError, ServerError) as exc:
+    # exc.sanitize_for_logging() returns a PHI-safe dict for logs.
+    raise
+except TokenRefreshCooldownError as exc:
+    # Retry later; exc.retry_after tells you how long to wait.
+    raise
 ```
+
+`pymedplum.*` also re-exports `InsecureTransportError` (raised at
+construction for a non-HTTPS URL without opt-in) and
+`UnsafeRedirectError` (raised when a follow-up URL — pagination, async
+job polling, or a same-origin extraction from `if_none_exist` — points
+at a different origin).
 
 ### Q: I'm getting rate limited (429 errors)
 
@@ -432,17 +458,68 @@ The client automatically retries with exponential backoff for rate limit errors.
 
 ### Q: How do I use on-behalf-of functionality?
 
-```python
-# Get the patient's ProjectMembership ID
-membership_id = "ProjectMembership/abc123"
+There are three ways to pass OBO, with a well-defined precedence order:
+per-call kwarg beats the context manager, which beats the client
+default. The empty-string kwarg (`on_behalf_of=""`) clears ambient OBO
+for one call.
 
-# Execute operations as that user
-with client.on_behalf_of(membership_id) as obo_client:
-    # This read uses the patient's permissions
-    result = obo_client.read_resource("Questionnaire", "456")
+```python
+# Per-call (wins over ambient state)
+client.read_resource("Patient", "123", on_behalf_of="ProjectMembership/abc")
+
+# Context manager (ambient for a block)
+with client.on_behalf_of("ProjectMembership/abc"):
+    client.read_resource("Patient", "123")
+
+# Client default (baseline for the client's lifetime)
+client = MedplumClient(
+    base_url="https://api.medplum.com/",
+    client_id="...",
+    client_secret="...",
+    default_on_behalf_of="ProjectMembership/abc",
+)
 ```
 
-See [On-Behalf-Of](advanced/on_behalf_of.md) for details.
+See [On-Behalf-Of](advanced/on_behalf_of.md) for the full precedence
+rules, per-client isolation guarantees, and the `ThreadPoolExecutor`
+propagation caveat.
+
+### Q: How do I log every FHIR call for a PHI access audit trail?
+
+Register an `on_request_complete` hook on the client. The hook fires
+once per logical SDK call and receives a `RequestEvent` with method,
+path, resource type/ID, OBO-as-sent per attempt, timings, and outcome.
+Bodies and bearer tokens are never exposed. See
+[Audit Logging](advanced/audit_logging.md) for the full contract and
+worked examples (including DataDog and async hook variants).
+
+### Q: What's `TokenRefreshCooldownError` and how should I handle it?
+
+After a token-refresh failure, the client enters a cooldown window
+(default 1 second, configurable via `failed_refresh_cooldown=`).
+Subsequent calls that would trigger a refresh raise
+`TokenRefreshCooldownError` instead of hammering the OAuth endpoint.
+The exception carries `retry_after: float` (seconds remaining).
+
+**Do not catch and retry in a tight loop.** Surface the error to your
+caller or framework and respect `retry_after`:
+
+```python
+from pymedplum import TokenRefreshCooldownError
+
+try:
+    patient = client.read_resource("Patient", "123")
+except TokenRefreshCooldownError as exc:
+    raise TransientAuthError(retry_after=exc.retry_after) from exc
+```
+
+### Q: Why does my `http://` URL raise `InsecureTransportError`?
+
+PyMedplum requires `https://` on `base_url` by default. Loopback hosts
+(`127.0.0.1`, `::1`, `localhost`) are allowed without a flag — so
+`http://localhost:8103/` works for local Docker setups. For any other
+plain-HTTP URL, pass `allow_insecure_http=True` explicitly (logs a
+WARNING). This is not recommended for production.
 
 ### Q: How do I access admin APIs?
 

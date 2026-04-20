@@ -1,5 +1,6 @@
 """Unit tests for MedplumClient error handling with mocked HTTP responses"""
 
+import json
 from datetime import datetime, timedelta
 
 import httpx
@@ -10,8 +11,9 @@ from pymedplum.client import MedplumClient
 from pymedplum.exceptions import (
     AuthorizationError,
     BadRequestError,
-    MedplumError,
     NotFoundError,
+    OperationOutcomeError,
+    ServerError,
 )
 
 
@@ -136,13 +138,14 @@ def test_bad_request_error_on_400(mock_client):
     with pytest.raises(BadRequestError) as exc_info:
         mock_client.create_resource({"resourceType": "Patient"})
 
-    assert "Invalid resource" in str(exc_info.value)
+    # Server-provided text must not leak into the exception message (PHI).
+    assert "Invalid resource" not in str(exc_info.value)
+    assert "Bad Request" in str(exc_info.value)
 
 
 @respx.mock
 def test_generic_error_on_500(mock_client):
-    """Test that 500 responses raise generic MedplumError"""
-    # Mock successful auth
+    """500 responses raise ServerError with method/path but no body content."""
     respx.post("https://api.medplum.com/oauth2/token").mock(
         return_value=httpx.Response(
             status_code=200,
@@ -154,7 +157,6 @@ def test_generic_error_on_500(mock_client):
         )
     )
 
-    # Mock the read request to return 500
     respx.get("https://api.medplum.com/fhir/R4/Patient/123").mock(
         return_value=httpx.Response(
             status_code=500,
@@ -171,10 +173,17 @@ def test_generic_error_on_500(mock_client):
         )
     )
 
-    with pytest.raises(MedplumError) as exc_info:
+    with pytest.raises(ServerError) as exc_info:
         mock_client.read_resource("Patient", "123")
 
-    assert "Internal server error" in str(exc_info.value)
+    message = str(exc_info.value)
+    assert "500" in message
+    assert "GET" in message
+    # Uses path_template so resource IDs never leak into the exception str.
+    assert "/fhir/R4/Patient/{id}" in message
+    assert "/fhir/R4/Patient/123" not in message
+    assert "Internal server error" not in message
+    assert exc_info.value.response is not None
 
 
 @respx.mock
@@ -305,3 +314,120 @@ def test_on_behalf_of_context_cleanup(mock_client):
     # Request outside context should NOT have header
     mock_client.read_resource("Patient", "123")
     assert read_route.calls[1].request.headers.get("X-Medplum-On-Behalf-Of") is None
+
+
+def test_server_error_str_omits_body():
+    response = httpx.Response(500, text="PHI leak: patient MRN 1234567")
+    exc = ServerError(
+        status_code=500,
+        method="GET",
+        path="/fhir/Patient/abc",
+        path_template="/fhir/Patient/{id}",
+        response=response,
+    )
+    s = str(exc)
+    assert "500" in s and "GET" in s and "/fhir/Patient/{id}" in s
+    # Raw path (with id) and body must never appear in str.
+    assert "/fhir/Patient/abc" not in s
+    assert "PHI leak" not in s
+    assert "MRN" not in s
+
+
+def test_server_error_response_attached_for_explicit_inspection():
+    response = httpx.Response(500, text="server detail")
+    exc = ServerError(
+        status_code=500,
+        method="GET",
+        path="/fhir/Patient/abc",
+        path_template="/fhir/Patient/{id}",
+        response=response,
+    )
+    assert exc.response is response
+    assert exc.status_code == 500
+
+
+def test_server_error_sanitize_for_logging_drops_body():
+    response = httpx.Response(503, text="hidden")
+    exc = ServerError(
+        status_code=503,
+        method="POST",
+        path="/fhir/Observation",
+        path_template="/fhir/Observation",
+        response=response,
+    )
+    safe = exc.sanitize_for_logging()
+    # path_template is safe; raw path never present.
+    assert safe["type"] == "ServerError"
+    assert safe["status"] == 503
+    assert safe["method"] == "POST"
+    assert safe["path_template"] == "/fhir/Observation"
+    assert "hidden" not in json.dumps(safe)
+
+
+def test_operation_outcome_error_str_includes_diagnostics():
+    """str(exc) must surface the server's diagnostic text — developers triaging
+    a failed call need "reference target not found" / etc. to show up without
+    having to dig into ``exc.response_data["issue"][0]["diagnostics"]``."""
+    outcome = {
+        "resourceType": "OperationOutcome",
+        "issue": [
+            {
+                "severity": "error",
+                "code": "invalid",
+                "diagnostics": "reference target not found",
+                "details": {"text": "Subject reference is unresolved"},
+            }
+        ],
+    }
+    exc = OperationOutcomeError(outcome=outcome)
+    s = str(exc)
+    assert "error" in s.lower()
+    assert "invalid" in s.lower()
+    assert "reference target not found" in s
+    assert "Subject reference is unresolved" in s
+
+
+def test_operation_outcome_error_sanitize_for_logging_strips_diagnostics():
+    """sanitize_for_logging is the PHI-restricted path; it still strips."""
+    outcome = {
+        "resourceType": "OperationOutcome",
+        "issue": [
+            {
+                "severity": "error",
+                "code": "invalid",
+                "diagnostics": "Patient MRN 123 not allowed in cohort",
+                "details": {"text": "Name: Bob Sensitive"},
+            }
+        ],
+    }
+    exc = OperationOutcomeError(outcome=outcome)
+    safe = exc.sanitize_for_logging()
+    dumped = json.dumps(safe)
+    assert "MRN" not in dumped
+    assert "123" not in dumped
+    assert "Bob Sensitive" not in dumped
+
+
+def test_operation_outcome_error_outcome_attached():
+    outcome = {"resourceType": "OperationOutcome", "issue": []}
+    exc = OperationOutcomeError(outcome=outcome)
+    assert exc.outcome == outcome
+
+
+def test_operation_outcome_error_sanitize_for_logging():
+    outcome = {
+        "resourceType": "OperationOutcome",
+        "issue": [
+            {
+                "severity": "error",
+                "code": "invalid",
+                "diagnostics": "sensitive",
+            }
+        ],
+    }
+    exc = OperationOutcomeError(outcome=outcome)
+    safe = exc.sanitize_for_logging()
+    assert safe == {
+        "type": "OperationOutcomeError",
+        "issues": [{"severity": "error", "code": "invalid"}],
+    }
