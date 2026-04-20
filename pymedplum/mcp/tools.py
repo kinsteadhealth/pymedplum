@@ -11,7 +11,9 @@ from collections import Counter
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 try:
-    from mcp.types import ToolAnnotations
+    from mcp.types import (
+        ToolAnnotations,  # type: ignore[import-not-found,unused-ignore]
+    )
 except ImportError:
     # Optional ``mcp`` extra not installed; server.py's FastMCP shim ignores
     # ``annotations=`` so a no-op stub keeps the module importable.
