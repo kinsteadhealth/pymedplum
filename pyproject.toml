@@ -203,3 +203,43 @@ disallow_any_generics = false
 disallow_any_unimported = false
 disallow_subclassing_any = false
 no_implicit_reexport = false
+
+# Strict typing for hardened modules. The generator-produced pymedplum.fhir.*
+# tree stays at the relaxed defaults above; a later PR tightens that.
+[[tool.mypy.overrides]]
+module = [
+    "pymedplum._security",
+    "pymedplum._auth",
+    "pymedplum._retry",
+    "pymedplum._base",
+    "pymedplum.client",
+    "pymedplum.async_client",
+    "pymedplum.exceptions",
+    "pymedplum.helpers",
+    "pymedplum.mcp.tools",
+    "pymedplum.hooks",
+]
+strict = true
+
+# pymedplum.fhir.* is generator-produced; keep at the relaxed top-level defaults.
+# A follow-up PR tightens this once the generator emits stricter annotations.
+[[tool.mypy.overrides]]
+module = "pymedplum.fhir.*"
+strict = false
+check_untyped_defs = false
+disallow_untyped_defs = false
+warn_return_any = false
+disallow_any_generics = false
+
+# The ``mcp`` extra is optional; the base install has no stubs for it.
+[[tool.mypy.overrides]]
+module = "mcp.*"
+ignore_missing_imports = true
+
+# When the ``mcp`` extra isn't installed, FastMCP/ToolAnnotations resolve
+# to Any and every ``@mcp.tool(...)`` decorator trips untyped-decorator.
+# The stub in server.py/tools.py keeps behavior correct; skip the strict
+# decorator check so CI without the extra still passes.
+[[tool.mypy.overrides]]
+module = ["pymedplum.mcp.tools", "pymedplum.mcp.resources"]
+disallow_untyped_decorators = false

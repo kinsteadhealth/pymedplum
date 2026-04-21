@@ -112,7 +112,6 @@ def async_client(medplum_credentials):
             client_secret=medplum_credentials["client_secret"],
             **kwargs,
         )
-        await client.authenticate()
         return client
 
     return _create
@@ -310,8 +309,10 @@ def test_on_behalf_of_update_resource(medplum_client, create_scoped_client, mso_
     finally:
         scoped_client.close()
 
-    patient["gender"] = "female"
-    medplum_client.update_resource(patient)
+    # The scoped update bumped meta.versionId; carry the fresh version into
+    # the second call so the default If-Match matches.
+    updated["gender"] = "female"
+    medplum_client.update_resource(updated)
 
 
 def test_on_behalf_of_different_members(create_scoped_client, mso_setup):
@@ -484,19 +485,25 @@ def test_multi_org_access_allowed(create_scoped_client, mso_setup):
 
 
 def test_on_behalf_of_header_sent(create_scoped_client, mso_setup):
-    """Verify X-Medplum-On-Behalf-Of header is sent on requests."""
+    """Verify X-Medplum-On-Behalf-Of header is sent on requests.
+
+    ``before_request`` hooks deliberately don't see Authorization / OBO
+    headers, so intercept at the httpx transport layer instead.
+    """
+    import httpx
+
     membership_id = mso_setup["memberships"]["doctor_a"]["id"]
     header_was_set = False
 
-    def check_headers(method, url, headers, kwargs):
+    def log_request(request: httpx.Request) -> None:
         nonlocal header_was_set
-        if "X-Medplum-On-Behalf-Of" in headers:
+        if "X-Medplum-On-Behalf-Of" in request.headers:
             header_was_set = True
             expected = f"ProjectMembership/{membership_id}"
-            assert headers["X-Medplum-On-Behalf-Of"] == expected
+            assert request.headers["X-Medplum-On-Behalf-Of"] == expected
 
     scoped_client = create_scoped_client(membership_id)
-    scoped_client.before_request = check_headers
+    scoped_client._http.event_hooks = {"request": [log_request]}
 
     try:
         scoped_client.search_resources("Patient", {"_count": "1"})

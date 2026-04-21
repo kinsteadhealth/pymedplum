@@ -155,10 +155,11 @@ class ProjectDefaultProfile(MedplumFHIRBase):
     individually specify profiles
     """
 
-    resource_type: Literal["ProjectDefaultProfile"] = Field(
-        default="ProjectDefaultProfile", alias="resourceType"
+    resource_type: ResourceType = Field(
+        default=...,
+        alias="resourceType",
+        description="The resource type onto which to apply the default profiles",
     )
-
     profile: list[str] = Field(
         default=..., description="The profiles to add by default"
     )

@@ -26,6 +26,8 @@ This library allows you to:
 ## Advanced
 
 - [Advanced Usage (overview)](advanced_usage.md)
+- [On-Behalf-Of](advanced/on_behalf_of.md)
+- [Audit Logging](advanced/audit_logging.md)
 - [MCP Server](mcp.md)
 
 ## Reference

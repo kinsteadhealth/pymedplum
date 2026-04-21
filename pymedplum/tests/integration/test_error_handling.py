@@ -4,10 +4,31 @@ These tests verify that the client properly handles various error conditions
 when interacting with a real Medplum server.
 """
 
+from typing import Any
+
 import pytest
 
 from pymedplum import AsyncMedplumClient, MedplumClient
 from pymedplum.exceptions import NotFoundError
+
+
+def _outcome_text(response_data: Any) -> str:
+    """Concatenate diagnostics/details.text from an OperationOutcome payload."""
+    if not isinstance(response_data, dict):
+        return ""
+    parts: list[str] = []
+    for issue in response_data.get("issue") or []:
+        if not isinstance(issue, dict):
+            continue
+        diagnostics = issue.get("diagnostics")
+        if isinstance(diagnostics, str):
+            parts.append(diagnostics)
+        details = issue.get("details")
+        if isinstance(details, dict):
+            text = details.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+    return " ".join(parts).lower()
 
 
 def test_read_nonexistent_resource(medplum_client: MedplumClient):
@@ -39,11 +60,8 @@ def test_invalid_search_parameter(medplum_client: MedplumClient):
             "Patient", {"this_param_definitely_does_not_exist_xyz": "value"}
         )
 
-    # Verify the error message mentions the unknown parameter
-    assert (
-        "unknown" in str(exc_info.value).lower()
-        or "search parameter" in str(exc_info.value).lower()
-    )
+    body = _outcome_text(exc_info.value.response_data)
+    assert "unknown" in body or "search parameter" in body
 
 
 def test_config_validation_empty_membership():
@@ -101,11 +119,9 @@ def test_malformed_resource_creation(medplum_client: MedplumClient):
                 # Missing required 'status' field
             }
         )
-        # If it doesn't raise, that's actually fine - server may have defaults
-        # Just verify we can handle the response
     except Exception as e:
-        # If it does raise, verify it's a sensible error
-        assert "status" in str(e).lower() or "required" in str(e).lower()
+        body = _outcome_text(getattr(e, "response_data", None))
+        assert "status" in body or "required" in body
 
 
 def test_create_resource_with_invalid_reference(medplum_client: MedplumClient):
@@ -122,11 +138,9 @@ def test_create_resource_with_invalid_reference(medplum_client: MedplumClient):
                 "subject": {"reference": "InvalidReferenceFormat"},  # Should be Type/ID
             }
         )
-        # Server may accept this or reject it
     except Exception as e:
-        # If rejected, error message should mention reference or format
-        error_str = str(e).lower()
-        assert "reference" in error_str or "invalid" in error_str
+        body = _outcome_text(getattr(e, "response_data", None))
+        assert "reference" in body or "invalid" in body
 
 
 @pytest.mark.asyncio
@@ -143,4 +157,5 @@ async def test_async_malformed_resource_creation(
             }
         )
     except Exception as e:
-        assert "status" in str(e).lower() or "required" in str(e).lower()
+        body = _outcome_text(getattr(e, "response_data", None))
+        assert "status" in body or "required" in body

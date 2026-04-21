@@ -46,7 +46,6 @@ def medplum_client(medplum_credentials):
         client_secret=medplum_credentials["client_secret"],
         project_id=project_id,
     )
-    client.authenticate()
 
     yield client
 
@@ -65,11 +64,10 @@ async def async_medplum_client(medplum_credentials):
         client_secret=medplum_credentials["client_secret"],
         project_id=project_id,
     )
-    await client.authenticate()
 
     yield client
 
-    await client.close()
+    await client.aclose()
 
 
 @pytest.fixture
@@ -115,7 +113,6 @@ def create_scoped_client(medplum_credentials):
             project_id=project_id,
             default_on_behalf_of=f"ProjectMembership/{membership_id}",
         )
-        client.authenticate()
         return client
 
     return _create

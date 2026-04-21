@@ -39,7 +39,7 @@ class TestCreateResource:
     @pytest.mark.asyncio
     async def test_blocked_in_read_only(self):
         with (
-            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": "false"}),
             pytest.raises(PermissionError, match="read-only mode"),
         ):
             await create_resource({"resourceType": "Patient"})
@@ -104,7 +104,7 @@ class TestUpdateResource:
     @pytest.mark.asyncio
     async def test_blocked_in_read_only(self):
         with (
-            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": "false"}),
             pytest.raises(PermissionError),
         ):
             await update_resource({"resourceType": "Patient", "id": "1"})
@@ -135,7 +135,7 @@ class TestPatchResource:
     @pytest.mark.asyncio
     async def test_blocked_in_read_only(self):
         with (
-            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": "false"}),
             pytest.raises(PermissionError),
         ):
             ops = [PatchOp(op="replace", path="/active", value=True)]
@@ -158,7 +158,7 @@ class TestDeleteResource:
     @pytest.mark.asyncio
     async def test_blocked_in_read_only(self):
         with (
-            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": "false"}),
             pytest.raises(PermissionError),
         ):
             await delete_resource("Patient", "123")

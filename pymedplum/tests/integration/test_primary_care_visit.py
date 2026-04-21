@@ -222,7 +222,6 @@ def test_01_create_primary_care_encounter(
         client_secret=medplum_credentials["client_secret"],
         project_id=project_id,
     )
-    client.authenticate()
 
     try:
         # Create encounter for annual diabetic follow-up visit
@@ -669,7 +668,6 @@ def test_10_perform_diabetic_foot_exam(
         client_secret=medplum_client.client_secret,
         project_id=medplum_client.project_id,
     )
-    client.authenticate()
 
     # Create encounter for this procedure
     encounter = Encounter(
@@ -1037,7 +1035,6 @@ def test_14_create_billing_claim(
         client_secret=medplum_client.client_secret,
         project_id=medplum_client.project_id,
     )
-    client.authenticate()
 
     encounter = Encounter(
         status="finished",

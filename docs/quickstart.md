@@ -4,16 +4,30 @@ This guide will walk you through the basic, recommended workflow for using `pyme
 
 ## Initializing the Client
 First, create an instance of the `MedplumClient` or `AsyncMedplumClient`.
+Constructor arguments (other than `base_url`) are keyword-only; unknown
+kwargs raise `TypeError` at construction time.
 
 ```python
-from pymedplum.client import MedplumClient
+from pymedplum import MedplumClient
 
-# This client will be used for all synchronous examples
 client = MedplumClient(
     base_url="https://api.medplum.com/",
-    access_token="YOUR_ACCESS_TOKEN"
+    client_id="YOUR_CLIENT_ID",
+    client_secret="YOUR_CLIENT_SECRET",
 )
 ```
+
+If you already have a bearer token, pass `access_token=` instead of
+the client-credentials pair.
+
+### HTTPS is required by default
+
+PyMedplum enforces `https://` on the `base_url` unless the host is a
+loopback address (`127.0.0.1`, `::1`, `localhost`). If you're running
+Medplum locally via Docker, `http://localhost:8103/` works with no
+extra flag. Any other `http://` URL raises `InsecureTransportError`
+unless you explicitly pass `allow_insecure_http=True` (not recommended
+in production; logs a WARNING when enabled).
 
 ## Creating a Resource with Pydantic
 The best way to create a resource is to instantiate its Pydantic model. This gives you autocompletion and compile-time validation in your editor.
@@ -21,18 +35,16 @@ The best way to create a resource is to instantiate its Pydantic model. This giv
 ```python
 from pymedplum.fhir import Patient
 
-# Create a Patient model instance
 new_patient = Patient(
     name=[{"given": ["Jane"], "family": "Pydantic"}],
     gender="female",
-    birth_date="1990-05-20"
+    birth_date="1990-05-20",
 )
 
-# Pass the model directly to the client and get a typed response
 created_patient = client.create_resource(new_patient, as_fhir=Patient)
 
 print(f"Created patient {created_patient.id} for {created_patient.name[0].given[0]}")
-assert isinstance(created_patient, Patient)  # as_fhir=Patient ensures static type checkers treat this as a Patient
+assert isinstance(created_patient, Patient)
 ```
 The client accepts the model instance and returns a new instance representing the resource as it was stored on the server, now including its server-assigned `id`.
 
@@ -42,14 +54,36 @@ When you read a resource, you should read it directly into its corresponding Pyd
 ```python
 from pymedplum.fhir import Patient
 
-# Read a resource and get a typed model back
 patient = client.read_resource("Patient", "some-patient-id", as_fhir=Patient)
 
-# Now you can access its attributes with type-safety
 print(f"Patient's Gender: {patient.gender}")
 if patient.birth_date:
     print(f"Birth Date: {patient.birth_date}")
 ```
+
+## Updating a Resource
+
+`update_resource` auto-attaches an `If-Match` header from the
+resource's `meta.versionId` by default, giving you optimistic
+concurrency control out of the box.
+
+```python
+patient = client.read_resource("Patient", "some-patient-id", as_fhir=Patient)
+patient.active = False
+
+# Default: If-Match derived from meta.versionId.
+updated = client.update_resource(patient)
+
+# Opt out for last-write-wins behavior.
+updated = client.update_resource(patient, if_match=False)
+
+# Or pass a custom value verbatim.
+updated = client.update_resource(patient, if_match='W/"5"')
+```
+
+If the server's current version has moved on, the default path raises
+`PreconditionFailedError` rather than silently overwriting a newer
+revision.
 
 ## Searching for Resources
 The recommended way to search is to use the `search_resource_pages` iterator, which handles pagination for you. You can get results as dicts or as typed Pydantic models.
@@ -57,21 +91,17 @@ The recommended way to search is to use the `search_resource_pages` iterator, wh
 ```python
 from pymedplum.fhir import Observation
 
-# Type-safe search with Pydantic models
 for observation in client.search_resource_pages(
     "Observation",
     {"subject": "Patient/some-patient-id", "category": "vital-signs"},
-    as_fhir=Observation
+    as_fhir=Observation,
 ):
-    # Each item is a fully-validated Observation model
     print(f"Found Observation {observation.id} with status: {observation.status}")
 
-# Or iterate over dict resources
 for observation in client.search_resource_pages(
     "Observation",
-    {"subject": "Patient/some-patient-id", "category": "vital-signs"}
+    {"subject": "Patient/some-patient-id", "category": "vital-signs"},
 ):
-    # Each item is a dict
     print(f"Found Observation {observation['id']} with status: {observation['status']}")
 ```
 
@@ -79,4 +109,4 @@ The type-safe approach with Pydantic models provides the best developer experien
 
 ---
 
-For more in-depth examples, see the **Advanced Usage** guide. To learn more about the Pydantic models and client design, see the **Core Concepts** section.
+For more in-depth examples, see the **Advanced Usage** guide. To learn more about the Pydantic models and client design, see the **Core Concepts** section. For PHI-access audit hooks, see [Audit Logging](advanced/audit_logging.md).

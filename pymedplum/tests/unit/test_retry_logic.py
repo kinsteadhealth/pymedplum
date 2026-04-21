@@ -13,13 +13,22 @@ from pymedplum.exceptions import RateLimitError, ServerError
 @pytest.fixture
 def mock_client():
     """Create a mock client with authentication"""
+    from datetime import datetime, timedelta, timezone
+
     client = MedplumClient(
         base_url="https://api.test.medplum.com/",
         client_id="test-client",
         client_secret="test-secret",
+        access_token="test-token",
     )
-    client.access_token = "test-token"
-    return client
+    # Guard the token manager from proactive refresh for the duration of
+    # the test: no expiry is set on the JWT, so without this it would
+    # treat the token as MANAGED with no parsed expiry and skip proactive
+    # refresh anyway — but we bump expiry far into the future to keep
+    # the retry tests free of any token-endpoint mocking.
+    client._tokens.token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    yield client
+    client.close()
 
 
 def test_sync_get_method(mock_client):
@@ -201,13 +210,18 @@ def test_no_retry_on_404(mock_client):
 def test_retry_with_default_on_behalf_of(mock_client):
     """Test that retries work correctly with default_on_behalf_of"""
     # Create client with default_on_behalf_of
+    from datetime import datetime, timedelta, timezone
+
     scoped_client = MedplumClient(
         base_url="https://api.test.medplum.com/",
         client_id="test-client",
         client_secret="test-secret",
+        access_token="test-token",
         default_on_behalf_of="ProjectMembership/456",
     )
-    scoped_client.access_token = "test-token"
+    scoped_client._tokens.token_expires_at = datetime.now(timezone.utc) + timedelta(
+        hours=1
+    )
 
     with respx.mock:
         # First attempt 429, second succeeds

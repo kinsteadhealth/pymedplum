@@ -161,16 +161,16 @@ class TestValidateOnBehalfOf:
 
 
 class TestIsReadOnly:
-    def test_true_values(self):
+    def test_writes_enabled_truthy_values(self):
         for val in ("true", "True", "TRUE", "1", "yes"):
-            with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": val}):
-                assert _is_read_only() is True
-
-    def test_false_values(self):
-        for val in ("false", "0", "no", "anything"):
-            with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": val}):
+            with patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": val}):
                 assert _is_read_only() is False
 
-    def test_unset_is_false(self):
+    def test_writes_enabled_falsy_values(self):
+        for val in ("false", "0", "no", "anything"):
+            with patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": val}):
+                assert _is_read_only() is True
+
+    def test_unset_defaults_to_read_only(self):
         with patch.dict(os.environ, {}, clear=True):
-            assert _is_read_only() is False
+            assert _is_read_only() is True

@@ -34,11 +34,23 @@ class FHIRBundle(Generic[T]):
         self._data = data
         self._resource_class: type[T] | None = None
 
-    def get_resources(self) -> list[dict[str, Any]]:
+    def get_resources(
+        self, *, max_resources: int | None = None
+    ) -> list[dict[str, Any]]:
         """Extract all resources from Bundle entries.
+
+        Args:
+            max_resources: Optional cap on the number of resources returned.
+                When supplied and the bundle contains more entries, raises
+                ``ValueError`` instead of materializing the full list. Use
+                this defensively against pages of unexpected size; leave
+                unset for legitimate bulk-data flows.
 
         Returns:
             List of resource dicts
+
+        Raises:
+            ValueError: If ``max_resources`` is set and the bundle exceeds it.
 
         Example:
             >>> bundle = FHIRBundle(api_response)
@@ -47,7 +59,17 @@ class FHIRBundle(Generic[T]):
             ...     print(patient['name'])
         """
         entries = self._data.get("entry", [])
-        return [entry["resource"] for entry in entries if "resource" in entry]
+        resources: list[dict[str, Any]] = []
+        for entry in entries:
+            if "resource" not in entry:
+                continue
+            if max_resources is not None and len(resources) >= max_resources:
+                raise ValueError(
+                    f"Bundle contains more than {max_resources} resources, "
+                    f"exceeding max_resources={max_resources}"
+                )
+            resources.append(entry["resource"])
+        return resources
 
     def get_resources_typed(self, resource_class: type[T]) -> list[T]:
         """Extract and parse resources to typed Pydantic models.
@@ -78,7 +100,9 @@ class FHIRBundle(Generic[T]):
             Total count of resources
         """
         if "total" in self._data:
-            return self._data["total"]
+            total = self._data["total"]
+            if isinstance(total, int):
+                return total
         return len(self.get_resources())
 
     def is_empty(self) -> bool:
@@ -105,7 +129,8 @@ class FHIRBundle(Generic[T]):
     @property
     def link(self) -> list[dict[str, Any]]:
         """Get Bundle links for pagination."""
-        return self._data.get("link", [])
+        links = self._data.get("link", [])
+        return links if isinstance(links, list) else []
 
     def get_next_link(self) -> str | None:
         """Get next page URL for pagination.
@@ -115,5 +140,6 @@ class FHIRBundle(Generic[T]):
         """
         for link in self.link:
             if link.get("relation") == "next":
-                return link.get("url")
+                url = link.get("url")
+                return url if isinstance(url, str) else None
         return None

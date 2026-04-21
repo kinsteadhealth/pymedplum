@@ -23,6 +23,39 @@ class TestWithOboEmptyString:
             await read_resource("Patient", "123", on_behalf_of="   ")
 
 
+class TestObOOverrideLockdown:
+    """Per-call ``on_behalf_of`` overrides are off by default; the autouse
+    conftest fixture turns them on for the rest of the MCP suite. These
+    tests opt back out to verify the lockdown.
+    """
+
+    @pytest.mark.asyncio
+    async def test_per_call_obo_rejected_by_default(self, monkeypatch):
+        monkeypatch.setenv("MEDPLUM_ALLOW_OBO_OVERRIDE", "false")
+        with pytest.raises(PermissionError, match="MEDPLUM_ALLOW_OBO_OVERRIDE"):
+            await read_resource(
+                "Patient",
+                "123",
+                on_behalf_of="ProjectMembership/11111111-1111-1111-1111-111111111111",
+            )
+
+    @pytest.mark.asyncio
+    async def test_no_obo_passthrough_when_override_disabled(self, monkeypatch):
+        """Without an override, calls without on_behalf_of still flow through.
+
+        The lockdown only blocks caller-supplied overrides; the server's
+        startup OBO (env var) is unaffected.
+        """
+        from pymedplum.tests.unit.mcp.conftest import make_fake_obo
+
+        monkeypatch.setenv("MEDPLUM_ALLOW_OBO_OVERRIDE", "false")
+        mock_client = AsyncMock()
+        mock_client.read_resource.return_value = {"resourceType": "Patient", "id": "1"}
+        with patch("pymedplum.mcp.tools._with_obo", make_fake_obo(mock_client)):
+            result = await read_resource("Patient", "1")
+        assert result["resourceType"] == "Patient"
+
+
 class TestGetCapabilitiesPathNormalization:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

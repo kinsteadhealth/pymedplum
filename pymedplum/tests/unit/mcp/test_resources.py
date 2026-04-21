@@ -10,7 +10,9 @@ from pymedplum.mcp.resources import common_errors, server_info, tool_guide
 
 class TestServerInfo:
     @pytest.mark.asyncio
-    async def test_default_values(self):
+    async def test_writes_enabled_reflected(self):
+        # The MCP test conftest sets MEDPLUM_ENABLE_WRITES=true autouse, so the
+        # default observed state in this suite is read_only=False.
         info = await server_info()
         assert info["base_url"] == "https://api.medplum.com/"
         assert info["read_only"] is False
@@ -18,7 +20,7 @@ class TestServerInfo:
 
     @pytest.mark.asyncio
     async def test_read_only_reflected(self):
-        with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}):
+        with patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": "false"}):
             info = await server_info()
         assert info["read_only"] is True
 
@@ -29,17 +31,21 @@ class TestServerInfo:
         assert info["base_url"] == "https://custom.com/"
 
     @pytest.mark.asyncio
-    async def test_obo_included_when_set(self):
+    async def test_obo_set_flag_true_when_env_set(self):
         with patch.dict(
             os.environ,
             {"MEDPLUM_ON_BEHALF_OF": "ProjectMembership/abc-123"},
         ):
             info = await server_info()
-        assert info["default_on_behalf_of"] == "ProjectMembership/abc-123"
+        # Only a boolean is exposed; the raw OBO UUID is deliberately omitted.
+        assert info["default_on_behalf_of_set"] is True
+        assert "default_on_behalf_of" not in info
 
     @pytest.mark.asyncio
-    async def test_obo_absent_when_unset(self):
+    async def test_obo_set_flag_false_when_unset(self, monkeypatch):
+        monkeypatch.delenv("MEDPLUM_ON_BEHALF_OF", raising=False)
         info = await server_info()
+        assert info["default_on_behalf_of_set"] is False
         assert "default_on_behalf_of" not in info
 
 

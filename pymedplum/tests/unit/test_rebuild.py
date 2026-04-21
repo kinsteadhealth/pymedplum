@@ -166,9 +166,9 @@ def test_multiple_resource_types_coexist():
 
 
 def test_list_resource_does_not_shadow_builtin_list():
-    """Regression: importing `List` (FHIR resource) used to crash the lazy
-    loader because the `pymedplum.fhir.list` submodule shadowed the builtin
-    `list` used inside __getattr__.
+    """Importing `List` (FHIR resource) must not collide with the builtin
+    `list` used inside the lazy loader's ``__getattr__`` — the
+    `pymedplum.fhir.list` submodule must not shadow it.
     """
     from pymedplum.fhir import List
 

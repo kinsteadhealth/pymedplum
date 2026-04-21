@@ -4,10 +4,15 @@ These functions simplify working with FHIR data structures and
 reduce boilerplate in application code.
 """
 
-import base64
-import json
-from datetime import datetime, timezone
 from typing import Any
+
+from pydantic import BaseModel
+
+
+def _to_dict(resource: dict[str, Any] | BaseModel) -> dict[str, Any]:
+    if isinstance(resource, BaseModel):
+        return resource.model_dump(by_alias=True, exclude_none=True)
+    return resource
 
 
 def parse_reference(reference: str) -> tuple[str, str]:
@@ -56,7 +61,7 @@ def build_reference(resource_type: str, resource_id: str) -> str:
     return f"{resource_type}/{resource_id}"
 
 
-def get_patient_display_name(patient: dict[str, Any]) -> str:
+def get_patient_display_name(patient: dict[str, Any] | BaseModel) -> str:
     """Extract a display-friendly name from a Patient resource.
 
     Handles the complexity of FHIR's HumanName structure and returns
@@ -73,10 +78,7 @@ def get_patient_display_name(patient: dict[str, Any]) -> str:
         >>> get_patient_display_name(patient)
         'John Doe'
     """
-    # Convert Pydantic model to dict if needed
-    if hasattr(patient, "model_dump"):
-        patient = patient.model_dump()
-
+    patient = _to_dict(patient)
     name_list = patient.get("name", [])
     if not name_list:
         return "Unknown"
@@ -85,20 +87,23 @@ def get_patient_display_name(patient: dict[str, Any]) -> str:
     name_obj = name_list[0]
 
     # Prefer text representation if available
-    if name_obj.get("text"):
-        return name_obj["text"]
+    text = name_obj.get("text")
+    if isinstance(text, str) and text:
+        return text
 
     # Build from parts
-    parts = []
-    if name_obj.get("given"):
-        parts.extend(name_obj["given"])
-    if name_obj.get("family"):
-        parts.append(name_obj["family"])
+    parts: list[str] = []
+    given = name_obj.get("given")
+    if isinstance(given, list):
+        parts.extend(str(g) for g in given)
+    family = name_obj.get("family")
+    if isinstance(family, str) and family:
+        parts.append(family)
 
     return " ".join(parts) if parts else "Unknown"
 
 
-def extract_identifier(resource: dict[str, Any], system: str) -> str | None:
+def extract_identifier(resource: dict[str, Any] | BaseModel, system: str) -> str | None:
     """Extract an identifier value by system URI.
 
     Args:
@@ -115,18 +120,16 @@ def extract_identifier(resource: dict[str, Any], system: str) -> str | None:
         >>> extract_identifier(patient, "http://hospital.org/mrn")
         '123456'
     """
-    # Convert Pydantic model to dict if needed
-    if hasattr(resource, "model_dump"):
-        resource = resource.model_dump()
-
+    resource = _to_dict(resource)
     for identifier in resource.get("identifier", []):
         if identifier.get("system") == system:
-            return identifier.get("value")
+            value = identifier.get("value")
+            return value if isinstance(value, str) else None
 
     return None
 
 
-def get_code_display(codeable_concept: dict[str, Any]) -> str | None:
+def get_code_display(codeable_concept: dict[str, Any] | BaseModel) -> str | None:
     """Extract display text from a CodeableConcept.
 
     Args:
@@ -140,22 +143,22 @@ def get_code_display(codeable_concept: dict[str, Any]) -> str | None:
         >>> get_code_display(concept)
         'Type 2 Diabetes'
     """
-    if hasattr(codeable_concept, "model_dump"):
-        codeable_concept = codeable_concept.model_dump()
-
-    # Prefer text if available
-    if codeable_concept.get("text"):
-        return codeable_concept["text"]
+    codeable_concept = _to_dict(codeable_concept)
+    text = codeable_concept.get("text")
+    if isinstance(text, str) and text:
+        return text
 
     # Otherwise use first coding's display
     coding_list = codeable_concept.get("coding", [])
-    if coding_list and coding_list[0].get("display"):
-        return coding_list[0]["display"]
+    if coding_list:
+        display = coding_list[0].get("display")
+        if isinstance(display, str) and display:
+            return display
 
     return None
 
 
-def to_fhir_json(resource: dict[str | Any, Any]) -> dict[str, Any]:
+def to_fhir_json(resource: dict[str, Any] | BaseModel) -> dict[str, Any]:
     """Convert a resource to FHIR JSON format.
 
     Handles both dict resources and Pydantic models.
@@ -173,12 +176,10 @@ def to_fhir_json(resource: dict[str | Any, Any]) -> dict[str, Any]:
         >>> data["resourceType"]
         'Patient'
     """
-    if hasattr(resource, "model_dump"):
-        return resource.model_dump(by_alias=True, exclude_none=True)
-    return resource
+    return _to_dict(resource)
 
 
-def get_resource_accounts(resource: dict[str, Any]) -> list[str]:
+def get_resource_accounts(resource: dict[str, Any] | BaseModel) -> list[str]:
     """Return the account references assigned to a resource.
 
     Reads from Medplum's meta.accounts field, which stores account
@@ -203,9 +204,7 @@ def get_resource_accounts(resource: dict[str, Any]) -> list[str]:
         >>> get_resource_accounts(resource)
         ['Organization/org-1', 'Organization/org-2']
     """
-    if hasattr(resource, "model_dump"):
-        resource = resource.model_dump()
-
+    resource = _to_dict(resource)
     return [
         acc["reference"]
         for acc in resource.get("meta", {}).get("accounts", [])
@@ -235,42 +234,3 @@ def resource_has_account(resource: dict[str, Any], account_ref: str) -> bool:
         False
     """
     return account_ref in get_resource_accounts(resource)
-
-
-def decode_jwt_exp(token: str) -> datetime | None:
-    """Decode JWT token and extract expiration time.
-
-    Args:
-        token: JWT token string
-
-    Returns:
-        Expiration datetime or None if not found
-
-    Example:
-        >>> token = "eyJ...header...eyJ...payload...signature"
-        >>> exp = decode_jwt_exp(token)
-        >>> isinstance(exp, datetime) if exp else True
-        True
-    """
-    try:
-        # JWT format: header.payload.signature
-        parts = token.split(".")
-        if len(parts) != 3:
-            return None
-
-        # Decode payload (add padding if needed)
-        payload = parts[1]
-        padding = 4 - (len(payload) % 4)
-        if padding != 4:
-            payload += "=" * padding
-
-        decoded = base64.urlsafe_b64decode(payload)
-        data = json.loads(decoded)
-
-        exp_timestamp = data.get("exp")
-        if exp_timestamp is None:
-            return None
-
-        return datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
-    except Exception:
-        return None

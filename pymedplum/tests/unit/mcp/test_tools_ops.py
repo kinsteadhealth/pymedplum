@@ -25,7 +25,7 @@ class TestExecuteOperation:
     @pytest.mark.asyncio
     async def test_blocks_unknown_ops_in_read_only(self):
         with (
-            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": "false"}),
             pytest.raises(PermissionError, match="read-only allowlist"),
         ):
             await execute_operation("Patient", "some-write-op")
@@ -35,7 +35,7 @@ class TestExecuteOperation:
         mock = AsyncMock()
         mock.execute_operation.return_value = {"resourceType": "Bundle"}
         with (
-            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": "false"}),
             patch("pymedplum.mcp.tools._with_obo", make_fake_obo(mock)),
         ):
             result = await execute_operation(
@@ -45,49 +45,40 @@ class TestExecuteOperation:
 
 
 class TestExecuteGraphQL:
+    """GraphQL is treated as a write-capable tool because query text is
+    unstructured. In read-only mode (the default), the entire tool is
+    blocked rather than relying on a regex/parser to decide intent.
+    """
+
+    @pytest.mark.asyncio
+    async def test_query_blocked_entirely_in_read_only(self):
+        with (
+            patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": "false"}),
+            pytest.raises(PermissionError, match="read-only mode"),
+        ):
+            await execute_graphql('{ Patient(id: "1") { id } }')
+
     @pytest.mark.asyncio
     async def test_mutation_blocked_in_read_only(self):
         with (
-            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
-            pytest.raises(PermissionError, match="mutations are blocked"),
+            patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": "false"}),
+            pytest.raises(PermissionError, match="read-only mode"),
         ):
             await execute_graphql("mutation { PatientCreate(resource: {}) { id } }")
 
     @pytest.mark.asyncio
-    async def test_mutation_case_insensitive(self):
-        with (
-            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
-            pytest.raises(PermissionError),
-        ):
-            await execute_graphql("MUTATION { Foo }")
-
-    @pytest.mark.asyncio
-    async def test_mutation_substring_not_blocked(self):
+    async def test_executes_when_writes_enabled(self):
         mock = AsyncMock()
-        mock.execute_graphql.return_value = {"data": {}}
-        with (
-            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
-            patch("pymedplum.mcp.tools._with_obo", make_fake_obo(mock)),
-        ):
-            result = await execute_graphql("{ Patient { mutationRate } }")
-            assert "data" in result
-
-    @pytest.mark.asyncio
-    async def test_query_allowed_in_read_only(self):
-        mock = AsyncMock()
-        mock.execute_graphql.return_value = {"data": {}}
-        with (
-            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
-            patch("pymedplum.mcp.tools._with_obo", make_fake_obo(mock)),
-        ):
+        mock.execute_graphql.return_value = {"data": {"Patient": {"id": "1"}}}
+        with patch("pymedplum.mcp.tools._with_obo", make_fake_obo(mock)):
             result = await execute_graphql('{ Patient(id: "1") { id } }')
-            assert "data" in result
+            assert result["data"]["Patient"]["id"] == "1"
 
 
 class TestExecuteBatch:
     @pytest.mark.asyncio
     async def test_blocks_writes_in_read_only(self):
-        with patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}):
+        with patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": "false"}):
             bundle = BundleInput(
                 type="batch",
                 entry=[{"request": {"method": "POST", "url": "Patient"}}],
@@ -103,7 +94,7 @@ class TestExecuteBatch:
             "type": "batch-response",
         }
         with (
-            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": "false"}),
             patch("pymedplum.mcp.tools._with_obo", make_fake_obo(mock)),
         ):
             bundle = BundleInput(
@@ -121,7 +112,7 @@ class TestExecuteBatch:
             "type": "transaction-response",
         }
         with (
-            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": "false"}),
             patch("pymedplum.mcp.tools._with_obo", make_fake_obo(mock)),
         ):
             bundle = BundleInput(
@@ -223,10 +214,51 @@ class TestBotTools:
     @pytest.mark.asyncio
     async def test_execute_bot_blocked_read_only(self):
         with (
-            patch.dict(os.environ, {"MEDPLUM_READ_ONLY": "true"}),
+            patch.dict(os.environ, {"MEDPLUM_ENABLE_WRITES": "false"}),
             pytest.raises(PermissionError),
         ):
             await execute_bot("bot-1", {"data": "test"})
+
+    @pytest.mark.asyncio
+    async def test_execute_bot_blocked_when_not_in_allowlist(self):
+        """Even with writes enabled, a bot not in MEDPLUM_ALLOWED_BOT_IDS is rejected."""
+        with (
+            patch.dict(
+                os.environ,
+                {"MEDPLUM_ALLOWED_BOT_IDS": "allowed-bot-1,allowed-bot-2"},
+            ),
+            pytest.raises(PermissionError, match="MEDPLUM_ALLOWED_BOT_IDS"),
+        ):
+            await execute_bot("forbidden-bot", {"data": "test"})
+
+    @pytest.mark.asyncio
+    async def test_execute_bot_allowed_when_in_allowlist(self):
+        mock = AsyncMock()
+        mock.execute_bot.return_value = {"result": "ok"}
+        with (
+            patch.dict(
+                os.environ,
+                {"MEDPLUM_ALLOWED_BOT_IDS": "allowed-bot-1,allowed-bot-2"},
+            ),
+            patch("pymedplum.mcp.tools._with_obo", make_fake_obo(mock)),
+        ):
+            result = await execute_bot("allowed-bot-1", {"data": "test"})
+        assert result["result"] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_execute_bot_unrestricted_when_allowlist_unset(self):
+        """No allowlist means any bot is callable (write-enabled mode)."""
+        mock = AsyncMock()
+        mock.execute_bot.return_value = {"result": "ok"}
+        # The autouse conftest fixture enables writes; ensure the
+        # allowlist env var is truly unset for this test.
+        with (
+            patch.dict(os.environ, {}, clear=False),
+            patch("pymedplum.mcp.tools._with_obo", make_fake_obo(mock)),
+        ):
+            os.environ.pop("MEDPLUM_ALLOWED_BOT_IDS", None)
+            result = await execute_bot("any-bot-id", {"data": "test"})
+        assert result["result"] == "ok"
 
     @pytest.mark.asyncio
     async def test_create_bot_collision(self):

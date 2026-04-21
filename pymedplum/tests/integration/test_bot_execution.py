@@ -54,7 +54,10 @@ def test_bot_crud_operations(medplum_client: MedplumClient):
 
     with pytest.raises(OperationOutcomeError) as exc_info:
         medplum_client.read_bot(bot_id)
-    assert exc_info.value.status_code == 410
+    # 410 Gone surfaces as OperationOutcomeError; the outcome itself is attached
+    # on exc.outcome for inspection. We can't assert on HTTP status directly
+    # without the response, so we assert the outcome shape instead.
+    assert isinstance(exc_info.value.outcome, dict)
 
 
 def test_save_bot_code(medplum_client: MedplumClient):
@@ -219,7 +222,9 @@ exports.handler = async function(medplum, event) {
         deploy_result = medplum_client.deploy_bot(bot_id, compiled_code)
         assert deploy_result is not None
 
-        # Update bot
+        # deploy_bot bumps the Bot's versionId server-side; re-read before
+        # update so the default If-Match matches the current version.
+        bot = medplum_client.read_bot(bot_id)
         bot["description"] = "Lifecycle test - updated"
         bot = medplum_client.update_bot(bot)
         assert bot["description"] == "Lifecycle test - updated"

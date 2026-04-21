@@ -21,8 +21,56 @@ Optional settings:
 export MEDPLUM_BASE_URL="https://api.medplum.com/"
 export MEDPLUM_FHIR_URL_PATH="fhir/R4/"
 export MEDPLUM_ON_BEHALF_OF="ProjectMembership/00000000-0000-0000-0000-000000000000"
-export MEDPLUM_READ_ONLY="true"
 ```
+
+### Opting into mutations
+
+The MCP server is **read-only by default**. Write tools (create,
+update, patch, delete, batch, transaction, bot create/deploy/execute,
+GraphQL) are blocked unless you explicitly enable them:
+
+```bash
+export MEDPLUM_ENABLE_WRITES="true"
+```
+
+When this is set, the server prints a warning to stderr at startup
+so the operator sees that an LLM-facing PHI surface is now write-
+capable. Pair this with a tightly scoped Medplum OAuth client and
+``MEDPLUM_ON_BEHALF_OF`` so the LLM cannot operate outside its
+intended access policy.
+
+Per-call ``on_behalf_of`` overrides from the LLM are also rejected
+by default. The server-startup OBO is authoritative for every call;
+to permit per-call overrides:
+
+```bash
+export MEDPLUM_ALLOW_OBO_OVERRIDE="true"
+```
+
+### Transport security
+
+The MCP server defaults to stdio transport, intended for local
+agent processes (Claude Desktop, Claude Code, Codex). FastMCP can
+also expose the server over network transports (SSE, HTTP). **Do
+not run pymedplum-mcp behind a network transport without an
+authenticating reverse proxy (mTLS, signed JWT, etc.).** A
+network-exposed MCP endpoint with valid Medplum credentials is
+equivalent to handing a Medplum admin shell to anyone who can
+reach the bind address.
+
+If your deployment requires a network transport, terminate TLS and
+require client authentication outside this process; do not bind to
+``0.0.0.0`` without one.
+
+### Prompt injection from FHIR text fields
+
+FHIR resources contain free-text fields — ``Observation.valueString``,
+``Patient.name[].text``, narratives, ``CarePlan.description``,
+``Communication.payload[].contentString``, and many more — which an
+upstream actor can craft to look like instructions to the LLM. Tool
+responses must be treated as untrusted input. The SDK cannot fully
+prevent this; defense lives in the calling agent's system prompt
+and tool-call review policy.
 
 ## Setup
 
@@ -130,3 +178,11 @@ The server also exposes three MCP resources:
 Use `execute_operation` for FHIR `$operations` not covered by a dedicated
 tool, and `raw_request` as the last resort for arbitrary Medplum endpoints
 (admin APIs, `$reindex`, `_history`, etc.).
+
+### `raw_request` accepts only relative paths
+
+`raw_request` is a path-only escape hatch — the first argument must be
+a relative path like `"fhir/R4/Patient/$validate"` or
+`"admin/projects/<id>"`. Absolute URLs are rejected, even same-origin
+ones, to keep the transport-security invariants (HTTPS enforcement,
+same-origin follow-up validation) from being bypassed accidentally.

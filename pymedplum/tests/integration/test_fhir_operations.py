@@ -1616,7 +1616,9 @@ def test_sync_set_access_token(medplum_credentials):
         client_id=medplum_credentials["client_id"],
         client_secret=medplum_credentials["client_secret"],
     )
-    token = auth_client.authenticate()
+    auth_client._tokens.force_refresh(auth_client._http)
+    token = auth_client._tokens.access_token
+    assert token is not None
     auth_client.close()
 
     # Create a new client without credentials and set the token
@@ -1629,8 +1631,9 @@ def test_sync_set_access_token(medplum_credentials):
 
         # Verify the token was set correctly
         assert token_client.access_token == token
-        # token_expires_at should be set from JWT
-        assert token_client.token_expires_at is not None
+        # Without an explicit expires_at, token_expires_at stays None —
+        # the SDK relies on reactive 401 refresh rather than JWT decoding.
+        assert token_client.token_expires_at is None
 
 
 def test_sync_client_with_access_token_in_constructor(medplum_credentials):
@@ -1642,7 +1645,9 @@ def test_sync_client_with_access_token_in_constructor(medplum_credentials):
         client_id=medplum_credentials["client_id"],
         client_secret=medplum_credentials["client_secret"],
     )
-    token = auth_client.authenticate()
+    auth_client._tokens.force_refresh(auth_client._http)
+    token = auth_client._tokens.access_token
+    assert token is not None
     auth_client.close()
 
     # Create a new client directly with the access_token
@@ -1651,9 +1656,9 @@ def test_sync_client_with_access_token_in_constructor(medplum_credentials):
         result = token_client.search_resources("Patient", {"_count": "1"})
         assert result["resourceType"] == "Bundle"
 
-        # Verify the token and expiry were set
+        # Verify the token was set; expiry stays None (reactive refresh).
         assert token_client.access_token == token
-        assert token_client.token_expires_at is not None
+        assert token_client.token_expires_at is None
 
 
 @pytest.mark.asyncio
@@ -1666,7 +1671,9 @@ async def test_async_set_access_token(medplum_credentials):
         client_id=medplum_credentials["client_id"],
         client_secret=medplum_credentials["client_secret"],
     )
-    token = await auth_client.authenticate()
+    await auth_client._tokens.force_refresh(auth_client._http)
+    token = auth_client._tokens.access_token
+    assert token is not None
     await auth_client.close()
 
     # Create a new client without credentials and set the token
@@ -1678,10 +1685,9 @@ async def test_async_set_access_token(medplum_credentials):
         result = await token_client.search_resources("Patient", {"_count": "1"})
         assert result["resourceType"] == "Bundle"
 
-        # Verify the token was set correctly
+        # Verify the token was set; expiry stays None (reactive refresh).
         assert token_client.access_token == token
-        # token_expires_at should be set from JWT
-        assert token_client.token_expires_at is not None
+        assert token_client.token_expires_at is None
     finally:
         await token_client.close()
 
@@ -1696,7 +1702,9 @@ async def test_async_client_with_access_token_in_constructor(medplum_credentials
         client_id=medplum_credentials["client_id"],
         client_secret=medplum_credentials["client_secret"],
     )
-    token = await auth_client.authenticate()
+    await auth_client._tokens.force_refresh(auth_client._http)
+    token = auth_client._tokens.access_token
+    assert token is not None
     await auth_client.close()
 
     # Create a new client directly with the access_token
@@ -1707,9 +1715,9 @@ async def test_async_client_with_access_token_in_constructor(medplum_credentials
         result = await token_client.search_resources("Patient", {"_count": "1"})
         assert result["resourceType"] == "Bundle"
 
-        # Verify the token and expiry were set
+        # Verify the token was set; expiry stays None (reactive refresh).
         assert token_client.access_token == token
-        assert token_client.token_expires_at is not None
+        assert token_client.token_expires_at is None
     finally:
         await token_client.close()
 
@@ -1725,7 +1733,9 @@ def test_sync_set_access_token_with_explicit_expiry(medplum_credentials):
         client_id=medplum_credentials["client_id"],
         client_secret=medplum_credentials["client_secret"],
     )
-    token = auth_client.authenticate()
+    auth_client._tokens.force_refresh(auth_client._http)
+    token = auth_client._tokens.access_token
+    assert token is not None
     auth_client.close()
 
     # Create a new client and set token with explicit expiry

@@ -2,6 +2,12 @@
 
 `pymedplum` is available on PyPI and can be installed with pip. A virtual environment is recommended.
 
+## Requirements
+
+- Python 3.10 or newer.
+- `pip` 21.3 or newer for editable installs — `pymedplum` has no
+  `setup.py` and relies on PEP 660 editable installs.
+
 ## Install with pip
 
 ```bash

@@ -15,14 +15,6 @@ from pymedplum.fhir import Patient
 # ============================================================================
 
 
-def test_sync_authenticate(medplum_client):
-    """Test sync client authentication."""
-    token = medplum_client.authenticate()
-    assert token
-    assert isinstance(token, str)
-    assert len(token) > 0
-
-
 def test_sync_create_resource(medplum_client):
     """Test sync client create_resource method."""
     patient = Patient(
@@ -292,15 +284,11 @@ def test_sync_on_behalf_of_context_manager(medplum_client, medplum_membership):
         )
         created2 = medplum_client.create_resource(patient2)
 
-        # Verify the context is active (check the internal stack)
-        assert len(medplum_client._obo_stack) == 1
-        # The stack stores normalized references with "ProjectMembership/" prefix
         assert (
-            medplum_client._obo_stack[-1] == f"ProjectMembership/{medplum_membership}"
+            medplum_client._obo_var.get() == f"ProjectMembership/{medplum_membership}"
         )
 
-    # Verify the context is cleared after exiting
-    assert len(medplum_client._obo_stack) == 0
+    assert medplum_client._obo_var.get() is None
 
     # Both patients should exist
     assert created1["id"]
@@ -310,15 +298,6 @@ def test_sync_on_behalf_of_context_manager(medplum_client, medplum_membership):
 # ============================================================================
 # ASYNC CLIENT TESTS
 # ============================================================================
-
-
-@pytest.mark.asyncio
-async def test_async_authenticate(async_medplum_client):
-    """Test async client authentication."""
-    token = await async_medplum_client.authenticate()
-    assert token
-    assert isinstance(token, str)
-    assert len(token) > 0
 
 
 @pytest.mark.asyncio

@@ -25,7 +25,7 @@ def test_base_client_initialization():
     assert client.project_id == "test-project"
     # default_on_behalf_of is stored as-is, not normalized
     assert client.default_on_behalf_of == "membership-123"
-    assert len(client._obo_stack) == 0
+    assert client._obo_var.get() is None
 
 
 def test_base_client_custom_fhir_path():
@@ -180,36 +180,40 @@ def test_get_headers_with_default_on_behalf_of():
 
 
 def test_get_headers_obo_stack_overrides_default():
-    """Test OBO stack takes precedence over default."""
+    """Test ambient OBO ContextVar takes precedence over default."""
     client = BaseClient(
         access_token="test-token", default_on_behalf_of="default-membership"
     )
 
-    # Push to OBO stack
-    client._obo_stack.append("ProjectMembership/active-membership")
-
-    headers = client._get_headers()
+    token = client._obo_var.set("ProjectMembership/active-membership")
+    try:
+        headers = client._get_headers()
+    finally:
+        client._obo_var.reset(token)
 
     # Active OBO should override default
     assert headers["X-Medplum-On-Behalf-Of"] == "ProjectMembership/active-membership"
 
 
 def test_obo_current_empty_stack():
-    """Test _obo_current returns None when stack is empty."""
+    """Test _obo_current returns None when ContextVar is unset."""
     client = BaseClient()
 
     assert client._obo_current() is None
 
 
 def test_obo_current_with_values():
-    """Test _obo_current returns top of stack."""
+    """Test _obo_current returns the ambient ContextVar value."""
     client = BaseClient()
 
-    client._obo_stack.append("ProjectMembership/first")
+    t1 = client._obo_var.set("ProjectMembership/first")
     assert client._obo_current() == "ProjectMembership/first"
 
-    client._obo_stack.append("ProjectMembership/second")
+    t2 = client._obo_var.set("ProjectMembership/second")
     assert client._obo_current() == "ProjectMembership/second"
+
+    client._obo_var.reset(t2)
+    client._obo_var.reset(t1)
 
 
 def test_build_query_params_from_dict():
@@ -323,27 +327,104 @@ def test_validate_on_behalf_of_usage_warns_without_secret():
         assert "should only be used with ClientApplication" in str(w[0].message)
 
 
-def test_token_expiration_from_jwt():
-    """Test that token_expires_at is correctly decoded from JWT."""
-    import json
-    import time
-    from base64 import urlsafe_b64encode
+def test_attempt_tracker_record_appends_monotonic():
+    from datetime import datetime, timezone
 
-    client = BaseClient(access_token="test-token")
+    from pymedplum._base import _AttemptTracker
 
-    # Create a mock JWT with an 'exp' claim
-    exp_time = int(time.time()) + 3600
-    payload = {"exp": exp_time}
-    # Properly encode the payload
-    payload_bytes = json.dumps(payload).encode("utf-8")
-    encoded_payload = urlsafe_b64encode(payload_bytes).rstrip(b"=").decode("utf-8")
-    mock_jwt = f"header.{encoded_payload}.signature"
-    client.access_token = mock_jwt
+    tracker = _AttemptTracker(
+        method="GET",
+        url="https://api.example.com/fhir/R4/Patient/123",
+        started_at=datetime.now(timezone.utc),
+    )
+    tracker.record(
+        status_code=200, duration_seconds=0.1, on_behalf_of=None, exception=None
+    )
+    tracker.record(
+        status_code=429,
+        duration_seconds=0.2,
+        on_behalf_of="ProjectMembership/abc",
+        exception=None,
+    )
 
-    # Manually trigger the decoding logic
-    from pymedplum.helpers import decode_jwt_exp
+    assert [a.attempt_number for a in tracker.attempts] == [1, 2]
+    assert tracker.attempts[0].status_code == 200
+    assert tracker.attempts[1].on_behalf_of == "ProjectMembership/abc"
 
-    client.token_expires_at = decode_jwt_exp(client.access_token)
 
-    assert client.token_expires_at is not None
-    assert abs(client.token_expires_at.timestamp() - exp_time) < 1
+@pytest.fixture
+def built_event_with_fhir_url():
+    from datetime import datetime, timezone
+
+    from pymedplum._base import _AttemptTracker
+
+    started = datetime.now(timezone.utc)
+    tracker = _AttemptTracker(
+        method="GET",
+        url="https://api.example.com/fhir/R4/Patient/123?_count=5",
+        started_at=started,
+    )
+    tracker.record(
+        status_code=200, duration_seconds=0.05, on_behalf_of=None, exception=None
+    )
+    tracker.final_status_code = 200
+    ended = datetime.now(timezone.utc)
+    return tracker.build_event(ended), started, ended
+
+
+def test_attempt_tracker_build_event_populates_fhir_identity(
+    built_event_with_fhir_url,
+):
+    event, _, _ = built_event_with_fhir_url
+    assert event.method == "GET"
+    assert event.resource_type == "Patient"
+    assert event.resource_id == "123"
+
+
+def test_attempt_tracker_build_event_populates_path_template_and_query(
+    built_event_with_fhir_url,
+):
+    event, _, _ = built_event_with_fhir_url
+    assert event.path_template == "/fhir/R4/Patient/{id}"
+    assert event.query_params == {"_count": ["5"]}
+
+
+def test_attempt_tracker_build_event_populates_timing_and_status(
+    built_event_with_fhir_url,
+):
+    event, started, ended = built_event_with_fhir_url
+    assert event.started_at is started
+    assert event.ended_at is ended
+    assert event.final_status_code == 200
+    assert len(event.attempts) == 1
+
+
+def test_retry_delay_429_and_5xx_and_terminal():
+    import httpx
+
+    from pymedplum._base import _retry_delay
+
+    req = httpx.Request("GET", "https://example.test/")
+    r429 = httpx.Response(429, request=req)
+    delay = _retry_delay(r429, attempt=0)
+    assert delay is not None
+    assert delay >= 0.0
+
+    r503 = httpx.Response(503, request=req)
+    assert _retry_delay(r503, attempt=0) is not None
+
+    r200 = httpx.Response(200, request=req)
+    assert _retry_delay(r200, attempt=0) is None
+
+
+def test_retry_budget_exceeded_caps_correctly():
+    from pymedplum._base import _retry_budget_exceeded
+
+    # 429 has a budget of 5 retries — so attempt 4 still gets one more,
+    # attempt 5 does not.
+    assert _retry_budget_exceeded(429, 4) is False
+    assert _retry_budget_exceeded(429, 5) is True
+
+    # 5xx has a budget of 2 retries.
+    assert _retry_budget_exceeded(503, 1) is False
+    assert _retry_budget_exceeded(503, 2) is True

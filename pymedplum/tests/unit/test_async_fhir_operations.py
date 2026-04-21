@@ -1375,13 +1375,13 @@ async def test_async_create_resource_if_none_exist_rejects_empty_query(
     async_client: AsyncMedplumClient, respx_mock: MockRouter
 ):
     """Test async that empty query string raises ValueError."""
-    with pytest.raises(ValueError, match="cannot be empty"):
+    with pytest.raises(ValueError, match="non-empty"):
         await async_client.create_resource_if_none_exist(
             {"resourceType": "Patient", "name": [{"family": "Smith"}]},
             if_none_exist="",
         )
 
-    with pytest.raises(ValueError, match="cannot be empty"):
+    with pytest.raises(ValueError, match="non-empty"):
         await async_client.create_resource_if_none_exist(
             {"resourceType": "Patient", "name": [{"family": "Smith"}]},
             if_none_exist="?",

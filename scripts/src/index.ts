@@ -7,7 +7,12 @@
 import * as fs from "fs";
 import * as path from "path";
 import { parseTypeScriptFile } from "./parser";
-import { generatePydanticFile, generateInitFile, generateStubFile } from "./writer";
+import {
+  generatePydanticFile,
+  generateInitFile,
+  generateResourceTypesFile,
+  generateStubFile,
+} from "./writer";
 
 // ============================================================================
 // Version Detection
@@ -150,12 +155,26 @@ function generateModuleInit(
   classesToFiles: Map<string, string>,
   outputDir: string,
   fhirTypesVersion: string,
+  topLevelResourceTypes: Set<string>,
 ): void {
   console.log("\n📦 Generating module exports...");
 
   // Generate __init__.py
-  const initCode = generateInitFile(resourceNames, classesToFiles, fhirTypesVersion);
+  const initCode = generateInitFile(
+    resourceNames,
+    classesToFiles,
+    fhirTypesVersion,
+  );
   fs.writeFileSync(path.join(outputDir, "__init__.py"), initCode, "utf-8");
+
+  // Generate standalone resource-type allowlist (used by client path validation)
+  console.log("🔒 Generating resource-type allowlist (_resource_types.py)...");
+  const resourceTypesCode = generateResourceTypesFile(topLevelResourceTypes);
+  fs.writeFileSync(
+    path.join(outputDir, "_resource_types.py"),
+    resourceTypesCode,
+    "utf-8",
+  );
 
   // Generate __init__.pyi stub file for IDE/type checker support
   console.log("📝 Generating type stub file (__init__.pyi)...");
@@ -209,12 +228,19 @@ function main(): void {
   ensureOutputDirectory(OUTPUT_DIR);
 
   // Track which .py files we generate so we can remove stale ones
-  const generatedFiles = new Set<string>(["__init__.py", "__init__.pyi", "base.py", "py.typed"]);
+  const generatedFiles = new Set<string>([
+    "__init__.py",
+    "__init__.pyi",
+    "_resource_types.py",
+    "base.py",
+    "py.typed",
+  ]);
 
   const files = getDefinitionFiles(typesDir);
   console.log(`📋 Found ${files.length} type definition files\n`);
 
   const resourceNames: string[] = [];
+  const topLevelResourceTypes = new Set<string>();
   const stats = {
     generated: 0,
     skipped: 0,
@@ -241,6 +267,9 @@ function main(): void {
         result.parsedFile.interfaces.forEach((iface) => {
           resourceNames.push(iface.name);
           classesToFiles.set(iface.name, pythonFileName);
+          if (iface.isResource) {
+            topLevelResourceTypes.add(iface.name);
+          }
         });
         break;
       }
@@ -277,7 +306,13 @@ function main(): void {
   }
 
   const fhirTypesVersion = getInstalledFhirTypesVersion(typesDir);
-  generateModuleInit(resourceNames, classesToFiles, OUTPUT_DIR, fhirTypesVersion);
+  generateModuleInit(
+    resourceNames,
+    classesToFiles,
+    OUTPUT_DIR,
+    fhirTypesVersion,
+    topLevelResourceTypes,
+  );
   printSummary(stats);
 
   if (stats.errors > 0) {

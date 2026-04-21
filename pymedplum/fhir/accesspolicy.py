@@ -105,10 +105,9 @@ class AccessPolicyIpAccessRule(MedplumFHIRBase):
 class AccessPolicyResource(MedplumFHIRBase):
     """Access details for a resource type."""
 
-    resource_type: Literal["AccessPolicyResource"] = Field(
-        default="AccessPolicyResource", alias="resourceType"
+    resource_type: str = Field(
+        default=..., alias="resourceType", description="The resource type."
     )
-
     compartment: Reference | None = Field(default=None)
     criteria: str | None = Field(
         default=None,

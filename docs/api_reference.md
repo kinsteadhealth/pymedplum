@@ -4,32 +4,84 @@ This page provides a comprehensive reference for all methods available on the `M
 
 ## Synchronous Client (`MedplumClient`)
 
+### Constructor
+
+```python
+MedplumClient(
+    base_url: str = "https://api.medplum.com/",
+    *,
+    client_id: str | None = None,
+    client_secret: str | None = None,
+    access_token: str | None = None,
+    project_id: str | None = None,
+    fhir_url_path: str = "fhir/R4/",
+    timeout: float = 30.0,
+    http_client: httpx.Client | None = None,
+    before_request: BeforeRequestHook | None = None,
+    on_request_complete: OnRequestCompleteHook | None = None,
+    allow_insecure_http: bool = False,
+    failed_refresh_cooldown: float = 1.0,
+    default_on_behalf_of: str | None = None,
+)
+```
+
+All arguments except `base_url` are keyword-only. Unknown kwargs raise
+`TypeError` at construction time.
+
+**Parameters**:
+
+- `base_url` (str): Medplum base URL. Defaults to
+  `https://api.medplum.com/`. Must be `https://` unless it points at
+  a loopback address or `allow_insecure_http=True` is passed.
+- `client_id`, `client_secret` (str | None): OAuth client credentials.
+  When both are set, the client uses the client-credentials flow with
+  automatic refresh.
+- `access_token` (str | None): Pre-obtained bearer token. Use instead
+  of `client_id`/`client_secret` for externally-managed tokens.
+- `project_id` (str | None): Optional Medplum project scope.
+- `fhir_url_path` (str): FHIR path prefix under `base_url`. Default
+  `fhir/R4/`.
+- `timeout` (float): Per-request httpx timeout in seconds.
+- `http_client` (httpx.Client | None): Caller-supplied httpx client.
+  Must be constructed with `follow_redirects=False` — the SDK rejects
+  clients that auto-follow redirects to prevent auth-header leaks to
+  unexpected origins.
+- `before_request` (`BeforeRequestHook | None`): Hook that receives a
+  sanitized `PreparedRequest` and may return a modified copy. See
+  the [Hooks](#hooks) section for the contract.
+- `on_request_complete` (`OnRequestCompleteHook | None`): Hook that
+  receives a `RequestEvent` once per logical SDK call. Typically
+  wired to a PHI-access audit log — see
+  [Audit Logging](advanced/audit_logging.md).
+- `allow_insecure_http` (bool): Opt-in to plain `http://` base URLs
+  for non-loopback hosts. Defaults to `False`. Logs a WARNING when
+  enabled.
+- `failed_refresh_cooldown` (float): Seconds to cool down after a
+  token-refresh failure. Additional refreshes during the cooldown
+  window raise `TokenRefreshCooldownError` instead of hammering the
+  OAuth endpoint. Default `1.0`.
+- `default_on_behalf_of` (str | None): Baseline OBO membership for
+  every request made by this client. Overridden by the
+  `client.on_behalf_of(...)` context manager and by per-call
+  `on_behalf_of=` kwargs. See [On-Behalf-Of](advanced/on_behalf_of.md)
+  for precedence rules.
+
 ### Authentication
 
-#### `authenticate() -> str`
+The client authenticates lazily on the first request using the
+client-credentials flow and refreshes proactively before expiration.
+There is no public `authenticate()` method — construct the client
+with `client_id` / `client_secret` and make a request; the SDK
+handles token acquisition and refresh internally.
 
-Authenticate using client credentials flow.
-
-**Returns**: Access token string
-
-**Raises**:
-- `ValueError`: If client_id or client_secret are missing
-- `OperationOutcomeError`: On authentication failure
-
-**Example**:
-```python
-client = MedplumClient(
-    base_url="https://api.medplum.com/",
-    client_id="YOUR_CLIENT_ID",
-    client_secret="YOUR_CLIENT_SECRET"
-)
-token = client.authenticate()
-print(f"Authenticated with token: {token[:20]}...")
-```
+On a `401` response the client force-refreshes the token and replays
+the request once. After a refresh failure the client enters a short
+cooldown window (see `failed_refresh_cooldown`); further refreshes
+during that window raise `TokenRefreshCooldownError`.
 
 ### Resource Operations
 
-#### `create_resource(resource, headers=None, *, accounts=None, as_fhir=None) -> dict | Model`
+#### `create_resource(resource, *, headers=None, accounts=None, as_fhir=None, on_behalf_of=None) -> dict | Model`
 
 Create a new FHIR resource.
 
@@ -38,6 +90,7 @@ Create a new FHIR resource.
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request
 - `accounts` (str | list[str], optional): Account references to set on `meta.accounts` at creation time for multi-tenant compartment assignment
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
+- `on_behalf_of` (str | None, keyword-only): Per-call OBO override. `None` (default) uses ambient OBO (context manager or client default); empty string clears it for this call. See [On-Behalf-Of](advanced/on_behalf_of.md) for precedence rules.
 
 **Returns**: dict or Pydantic model instance - The created resource with server-assigned ID
 
@@ -66,7 +119,7 @@ created_patient = client.create_resource(patient_dict, as_fhir=Patient)
 print(created_patient.name[0].family)  # Full IDE autocomplete!
 ```
 
-#### `create_resource_if_none_exist(resource, if_none_exist, headers=None, *, accounts=None, as_fhir=None) -> dict | Model`
+#### `create_resource_if_none_exist(resource, if_none_exist, *, headers=None, accounts=None, as_fhir=None, on_behalf_of=None) -> dict | Model`
 
 Conditionally create a FHIR resource only if no matching resource exists (If-None-Exist).
 
@@ -74,10 +127,11 @@ This method uses FHIR's conditional create mechanism via the `If-None-Exist` hea
 
 **Parameters**:
 - `resource` (dict | Pydantic model): The resource to create
-- `if_none_exist` (str): FHIR search query string (e.g., "identifier=MRN|12345"). Accepts plain query strings or strings with a leading `?` (which is automatically stripped). Full URLs are also accepted and the query portion is extracted.
+- `if_none_exist` (str): FHIR search query string (e.g., "identifier=MRN|12345"). Accepts plain query strings or strings with a leading `?` (which is automatically stripped). Same-origin absolute URLs are accepted and the query portion is extracted (with a warning); cross-origin URLs are rejected as `UnsafeRedirectError`.
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request
 - `accounts` (str | list[str], optional): Account references to set on `meta.accounts` at creation time
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
+- `on_behalf_of` (str | None, keyword-only): Per-call OBO override. See `create_resource` above.
 
 **Returns**: dict or Pydantic model instance - The created or existing resource
 
@@ -117,7 +171,7 @@ resource = client.create_resource_if_none_exist(
 )
 ```
 
-#### `read_resource(resource_type, resource_id, as_fhir=None, headers=None) -> dict | Model`
+#### `read_resource(resource_type, resource_id, as_fhir=None, *, headers=None, on_behalf_of=None) -> dict | Model`
 
 Read a FHIR resource by type and ID.
 
@@ -126,6 +180,7 @@ Read a FHIR resource by type and ID.
 - `resource_id` (str): Resource ID
 - `as_fhir` (Type[Model], optional): Pydantic model class to return
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request
+- `on_behalf_of` (str | None, keyword-only): Per-call OBO override. See [On-Behalf-Of](advanced/on_behalf_of.md).
 
 **Returns**: dict or Pydantic model instance
 
@@ -144,53 +199,77 @@ patient = client.read_resource("Patient", "123", as_fhir=Patient)
 print(patient.name[0].family)  # Type-safe access
 ```
 
-#### `update_resource(resource, headers=None, *, accounts=None, as_fhir=None) -> dict | Model`
+#### `vread_resource(resource_type, resource_id, version_id, as_fhir=None, *, headers=None, on_behalf_of=None) -> dict | Model`
 
-Update an existing FHIR resource (requires id).
+Read a specific historical version of a FHIR resource (`vread`).
 
 **Parameters**:
-- `resource` (dict | Pydantic model): Resource with id field
-- `headers` (dict[str, str], optional): Additional HTTP headers for the request (e.g., `If-Match` for optimistic locking)
-- `accounts` (str | list[str], optional): Account references to set on `meta.accounts`
+- `resource_type` (str): FHIR resource type (e.g., "Patient")
+- `resource_id` (str): Resource ID
+- `version_id` (str): Version ID (found in `meta.versionId`)
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
+- `headers` (dict[str, str], optional): Additional HTTP headers for the request
+- `on_behalf_of` (str, optional): ProjectMembership reference to act on behalf of for this call. See [On-Behalf-Of](advanced/on_behalf_of.md).
 
-**Returns**: dict or Pydantic model instance - The updated resource
-
-**Raises**:
-- `ValueError`: If resource lacks resourceType or id
-- `PreconditionFailedError`: If `If-Match` header version doesn't match current resource version
+**Returns**: dict or Pydantic model instance - The resource at the given version
 
 **Example**:
 ```python
 from pymedplum.fhir import Patient
 
-# Read, modify, update pattern
+# Read a specific version
+patient_v1 = client.vread_resource("Patient", "123", "1")
+
+# Type-safe versioned read
+patient_v1 = client.vread_resource("Patient", "123", "1", as_fhir=Patient)
+```
+
+#### `update_resource(resource, *, headers=None, accounts=None, as_fhir=None, on_behalf_of=None, if_match=True) -> dict | Model`
+
+Update an existing FHIR resource (requires id).
+
+**Parameters**:
+- `resource` (dict | Pydantic model): Resource with id field
+- `headers` (dict[str, str], optional): Additional HTTP headers for the request. An explicit `If-Match` in `headers` always wins over the `if_match` keyword.
+- `accounts` (str | list[str], optional): Account references to set on `meta.accounts`
+- `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
+- `on_behalf_of` (str | None, keyword-only): Per-call OBO override. See [On-Behalf-Of](advanced/on_behalf_of.md).
+- `if_match` (bool | str, keyword-only, default `True`): Optimistic-concurrency control.
+  - `True` (default): auto-attach `If-Match: W/"<versionId>"` from `resource.meta.versionId` if present. If the resource has no versionId, no header is attached.
+  - `False`: opt out of If-Match entirely (last-write-wins behavior).
+  - `str`: sent verbatim as the `If-Match` header value.
+
+**Returns**: dict or Pydantic model instance - The updated resource
+
+**Raises**:
+- `ValueError`: If resource lacks resourceType or id
+- `TypeError`: If `if_match` is neither `bool` nor `str`
+- `PreconditionFailedError`: If the attached `If-Match` version doesn't match the server's current resource version
+
+**Example**:
+```python
+from pymedplum.fhir import Patient
+
+# Default behavior: If-Match auto-attaches from meta.versionId.
 patient = client.read_resource("Patient", "123", as_fhir=Patient)
 patient.active = False
 updated = client.update_resource(patient)
 
-# With type-safe response
-patient = client.read_resource("Patient", "123")
-patient["active"] = False
-updated_patient = client.update_resource(patient, as_fhir=Patient)
-print(updated_patient.active)  # Full IDE autocomplete!
+# Opt out for last-write-wins semantics.
+updated = client.update_resource(patient, if_match=False)
 
-# With optimistic locking to prevent concurrent modifications
-patient = client.read_resource("Patient", "123")
-version = patient["meta"]["versionId"]
-patient["active"] = False
+# Or pass a custom If-Match value.
+updated = client.update_resource(patient, if_match='W/"5"')
+
+# Handle version conflicts from concurrent updates.
 try:
-    updated = client.update_resource(
-        patient,
-        headers={"If-Match": f'W/"{version}"'},
-        as_fhir=Patient
-    )
+    updated = client.update_resource(patient)
 except PreconditionFailedError:
-    # Resource was modified by another process - refetch and retry
-    patient = client.read_resource("Patient", "123")
+    patient = client.read_resource("Patient", "123", as_fhir=Patient)
+    # re-apply changes, then retry
 ```
 
-#### `patch_resource(resource_type, resource_id, operations, headers=None, *, as_fhir=None) -> dict | Model`
+#### `patch_resource(resource_type, resource_id, operations, *, headers=None, as_fhir=None, on_behalf_of=None) -> dict | Model`
 
 Apply JSON Patch operations to a resource.
 
@@ -200,6 +279,7 @@ Apply JSON Patch operations to a resource.
 - `operations` (list[PatchOperation]): JSON Patch operations
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request (e.g., `If-Match` for optimistic locking)
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
+- `on_behalf_of` (str | None, keyword-only): Per-call OBO override. See [On-Behalf-Of](advanced/on_behalf_of.md).
 
 **Returns**: dict or Pydantic model instance - The patched resource
 
@@ -232,7 +312,7 @@ patched = client.patch_resource(
 )
 ```
 
-#### `delete_resource(resource_type, resource_id, headers=None) -> None`
+#### `delete_resource(resource_type, resource_id, *, headers=None, on_behalf_of=None) -> None`
 
 Delete a FHIR resource. Per the FHIR specification, successful deletion returns HTTP 204 No Content with no response body.
 
@@ -240,6 +320,7 @@ Delete a FHIR resource. Per the FHIR specification, successful deletion returns 
 - `resource_type` (str): FHIR resource type
 - `resource_id` (str): Resource ID
 - `headers` (dict[str, str], optional): Additional HTTP headers for the request (e.g., `If-Match` for optimistic locking)
+- `on_behalf_of` (str | None, keyword-only): Per-call OBO override. See [On-Behalf-Of](advanced/on_behalf_of.md).
 
 **Returns**: None (FHIR delete operations return HTTP 204 with no content)
 
@@ -260,7 +341,7 @@ client.delete_resource("Patient", "123", headers={"If-Match": f'W/"{version}"'})
 
 ### Search Operations
 
-#### `search_resources(resource_type, query=None, return_bundle=False, as_fhir=None) -> dict | FHIRBundle`
+#### `search_resources(resource_type, query=None, return_bundle=False, as_fhir=None, *, on_behalf_of=None) -> dict | FHIRBundle`
 
 Search for FHIR resources.
 
@@ -269,6 +350,7 @@ Search for FHIR resources.
 - `query` (dict | list[tuple], optional): Search parameters
 - `return_bundle` (bool): Return FHIRBundle wrapper if True
 - `as_fhir` (Type[Model], optional): Pydantic model class for typed resources (only applies when return_bundle=True)
+- `on_behalf_of` (str | None, keyword-only): Per-call OBO override. See [On-Behalf-Of](advanced/on_behalf_of.md).
 
 **Returns**: dict or FHIRBundle
 
@@ -290,13 +372,14 @@ bundle = client.search_resources("Patient", {"family": "Smith"}, return_bundle=T
 patients = bundle.get_resources_typed(Patient)
 ```
 
-#### `search_one(resource_type, query=None) -> dict | None`
+#### `search_one(resource_type, query=None, *, on_behalf_of=None) -> dict | None`
 
 Search for a single resource (limit 1).
 
 **Parameters**:
 - `resource_type` (str): Type of resource to search
 - `query` (dict | list[tuple], optional): Search parameters
+- `on_behalf_of` (str, optional): ProjectMembership reference to act on behalf of for this call. See [On-Behalf-Of](advanced/on_behalf_of.md).
 
 **Returns**: First matching resource or None
 
@@ -307,7 +390,7 @@ if patient:
     print(f"Found: {patient['id']}")
 ```
 
-#### `search_resource_pages(resource_type, query=None, as_fhir=None) -> Iterator[dict | Model]`
+#### `search_resource_pages(resource_type, query=None, as_fhir=None, *, on_behalf_of=None) -> Iterator[dict | Model]`
 
 Search resources with automatic pagination.
 
@@ -315,6 +398,7 @@ Search resources with automatic pagination.
 - `resource_type` (str): FHIR resource type
 - `query` (dict | list[tuple], optional): Search parameters
 - `as_fhir` (Type[Model], optional): Pydantic model class for typed resources
+- `on_behalf_of` (str, optional): ProjectMembership reference to act on behalf of for this call. See [On-Behalf-Of](advanced/on_behalf_of.md).
 
 **Yields**: Individual resources from paginated results
 
@@ -331,7 +415,7 @@ for obs in client.search_resource_pages("Observation", {"patient": "Patient/123"
     print(f"Observation {obs.id}: {obs.status}")  # Full IDE autocomplete!
 ```
 
-#### `search_with_options(resource_type, query=None, *, summary=None, elements=None, total=None, at=None, count=None, offset=None, sort=None, include=None, include_iterate=None, revinclude=None, revinclude_iterate=None, return_bundle=False, as_fhir=None) -> dict | FHIRBundle`
+#### `search_with_options(resource_type, query=None, *, summary=None, elements=None, total=None, at=None, count=None, offset=None, sort=None, include=None, include_iterate=None, revinclude=None, revinclude_iterate=None, return_bundle=False, as_fhir=None, on_behalf_of=None) -> dict | FHIRBundle`
 
 Search for FHIR resources with named parameters for common FHIR search modifiers.
 
@@ -361,6 +445,7 @@ This method provides an ergonomic interface for FHIR search parameters like `_su
 - `revinclude_iterate` (str | list[str], optional): Recursive reverse includes (_revinclude:iterate)
 - `return_bundle` (bool): Return FHIRBundle wrapper if True
 - `as_fhir` (Type[Model], optional): Pydantic model class for typed resources
+- `on_behalf_of` (str, optional): ProjectMembership reference to act on behalf of for this call. See [On-Behalf-Of](advanced/on_behalf_of.md).
 
 **Alias**: `searchWithOptions` - identical method with camelCase naming
 
@@ -410,16 +495,39 @@ bundle = client.search_with_options(
 )
 ```
 
+### Bundle Operations
+
+#### `execute_batch(bundle, *, accounts=None, on_behalf_of=None) -> dict`
+
+Execute a FHIR batch bundle. Each entry is executed independently; failures in one entry do not roll back the rest.
+
+**Parameters**:
+- `bundle` (dict | Pydantic model): FHIR Bundle resource
+- `accounts` (str | list[str], optional): Account references to set on each bundle entry's `meta.accounts`
+- `on_behalf_of` (str, optional): ProjectMembership reference to act on behalf of for this call. See [On-Behalf-Of](advanced/on_behalf_of.md).
+
+**Returns**: dict - Bundle of type `batch-response`
+
+#### `execute_transaction(bundle, *, on_behalf_of=None) -> dict`
+
+Execute a FHIR transaction bundle atomically. All operations succeed or fail together. Use `urn:uuid:` placeholders to reference resources created within the bundle.
+
+**Parameters**:
+- `bundle` (dict | Pydantic model): Bundle with `type="transaction"` (coerced if missing)
+- `on_behalf_of` (str, optional): ProjectMembership reference to act on behalf of for this call. See [On-Behalf-Of](advanced/on_behalf_of.md).
+
+**Returns**: dict - Bundle of type `transaction-response`
+
 ### GraphQL
 
-#### `execute_graphql(query, variables=None, operation_name=None) -> dict`
+#### `execute_graphql(query, variables=None, *, on_behalf_of=None) -> dict`
 
 Execute a GraphQL query.
 
 **Parameters**:
 - `query` (str): GraphQL query string
 - `variables` (dict, optional): Query variables
-- `operation_name` (str, optional): Operation name for multi-operation queries
+- `on_behalf_of` (str | None, keyword-only): Per-call OBO override. `None` (default) uses ambient OBO (context manager or client default); empty string clears it for this call. See [On-Behalf-Of](advanced/on_behalf_of.md) for precedence rules.
 
 **Returns**: dict - GraphQL response with data/errors
 
@@ -472,19 +580,26 @@ Make a DELETE request (similar parameters to get).
 
 #### `on_behalf_of(membership) -> OnBehalfOfContext`
 
-Create context manager for on-behalf-of operations.
+Create a context manager that sets the ambient OBO membership for
+the client. Exiting the block restores the prior ambient value.
 
 **Parameters**:
 - `membership` (str | ProjectMembership): ProjectMembership resource or ID
 
-**Returns**: Context manager that sets X-Medplum-On-Behalf-Of header
+**Returns**: Context manager that sets `X-Medplum-On-Behalf-Of` on every
+request within its scope
 
 **Example**:
 ```python
-with client.on_behalf_of("ProjectMembership/123") as obo_client:
-    # Operations here execute with the permissions of membership 123
-    patient = obo_client.read_resource("Patient", "456")
+with client.on_behalf_of("ProjectMembership/123"):
+    patient = client.read_resource("Patient", "456")
 ```
+
+OBO has a defined precedence order across per-call kwargs, the
+context manager, and the client default. See
+[On-Behalf-Of](advanced/on_behalf_of.md) for the full precedence
+rules, per-client isolation guarantees, and the
+`ThreadPoolExecutor` propagation caveat.
 
 ### Multi-Tenant Accounts
 
@@ -576,6 +691,55 @@ result = client.set_accounts(
 job = client.wait_for_async_job(result, timeout=60)
 print(job["status"])  # "completed"
 print(job["output"])  # Parameters with resourcesUpdated
+```
+
+### Binary & Document Export
+
+#### `upload_binary(content, content_type, *, on_behalf_of=None) -> dict`
+
+Upload raw binary content (PDF, image, XML, etc.) as a FHIR `Binary` resource.
+
+**Parameters**:
+- `content` (bytes): Binary content
+- `content_type` (str): MIME type (e.g., `"application/pdf"`)
+- `on_behalf_of` (str, optional): ProjectMembership reference to act on behalf of for this call. See [On-Behalf-Of](advanced/on_behalf_of.md).
+
+**Returns**: dict - The created `Binary` resource
+
+**Example**:
+```python
+with open("document.pdf", "rb") as f:
+    binary = client.upload_binary(f.read(), "application/pdf")
+```
+
+#### `download_binary(binary_id, *, on_behalf_of=None) -> bytes`
+
+Download raw bytes for a `Binary` resource.
+
+**Parameters**:
+- `binary_id` (str): ID of the `Binary` resource
+- `on_behalf_of` (str, optional): ProjectMembership reference to act on behalf of for this call. See [On-Behalf-Of](advanced/on_behalf_of.md).
+
+**Returns**: bytes - Raw content
+
+**Example**:
+```python
+content = client.download_binary("binary-123")
+```
+
+#### `export_ccda(patient_id, *, on_behalf_of=None) -> str`
+
+Export a patient's complete record as a C-CDA XML document via `Patient/{id}/$ccda-export`.
+
+**Parameters**:
+- `patient_id` (str): ID of the patient to export
+- `on_behalf_of` (str, optional): ProjectMembership reference to act on behalf of for this call. See [On-Behalf-Of](advanced/on_behalf_of.md).
+
+**Returns**: str - C-CDA XML document
+
+**Example**:
+```python
+ccda_xml = client.export_ccda("patient-123")
 ```
 
 ### Terminology Operations
@@ -735,30 +899,168 @@ async def main():
 - Use `async with` for the `on_behalf_of` context manager
 - The client itself supports `async with` for automatic cleanup
 
-## Error Handling
+## Hooks
 
-All client methods may raise these exceptions:
+PyMedplum exposes two public extension points on the constructor:
+`before_request` (request mutation) and `on_request_complete`
+(completion dispatch, typically wired to a PHI audit log).
 
-- `AuthenticationError` (401): Invalid or expired credentials
-- `AuthorizationError` (403): Insufficient permissions
-- `NotFoundError` (404): Resource not found
-- `BadRequestError` (400): Invalid request data
-- `PreconditionFailedError` (412): Precondition failed (e.g., `If-Match` version conflict during optimistic locking)
-- `RateLimitError` (429): Too many requests
-- `ServerError` (500+): Server-side issues
-- `OperationOutcomeError`: FHIR operation outcome errors
-- `NetworkError`: Connection/network issues
+### Type aliases
 
-**Example**:
 ```python
-from pymedplum.exceptions import NotFoundError, AuthorizationError
+from pymedplum.hooks import (
+    BeforeRequestHook,
+    OnRequestCompleteHook,
+    PreparedRequest,
+    RequestAttempt,
+    RequestEvent,
+)
+
+BeforeRequestHook = Callable[[PreparedRequest], PreparedRequest | None]
+OnRequestCompleteHook = Callable[[RequestEvent], None]
+```
+
+`AsyncMedplumClient` additionally accepts an async-callable
+`on_request_complete`:
+
+```python
+from collections.abc import Awaitable, Callable
+
+AsyncOnRequestCompleteHook = Callable[[RequestEvent], Awaitable[None]]
+```
+
+Passing an async hook to the synchronous `MedplumClient` raises
+`TypeError` at construction.
+
+### `PreparedRequest`
+
+Frozen dataclass presented to a `before_request` hook. Hooks may
+return `None` (no mutation) or a new `PreparedRequest` with
+adjusted fields. The SDK sanitizes the return value — it strips
+`Authorization` headers and enforces same-origin URL mutations.
+
+| Field | Type | Notes |
+|---|---|---|
+| `method` | `str` | HTTP verb. May be changed only to a safe alternative. |
+| `url` | `str` | Full wire URL. Hook mutations must stay same-origin. |
+| `headers` | `dict[str, str]` | Pre-redacted: bearer token and OBO header are not present. |
+| `json_body` | `Any \| None` | Parsed JSON body, if any. |
+
+### `RequestAttempt`
+
+Per-wire attempt record.
+
+| Field | Type | Notes |
+|---|---|---|
+| `attempt_number` | `int` | 1-based. |
+| `status_code` | `int \| None` | `None` on network exceptions. |
+| `duration_seconds` | `float` | Wall-clock for this attempt. |
+| `on_behalf_of` | `str \| None` | Membership sent on this attempt. Always `None` for `/oauth2/token` attempts. |
+| `exception` | `BaseException \| None` | Raised exception, if any. |
+
+### `RequestEvent`
+
+Fires once per logical SDK call. See
+[Audit Logging](advanced/audit_logging.md) for the full field
+reference, PHI notes, and worked examples.
+
+Key methods:
+
+```python
+event.to_phi_audit_dict()                              # PHI-bearing; for HIPAA-approved audit sinks
+event.to_phi_audit_dict(include_query_params=True)     # also includes parsed search params
+event.to_non_phi_dict()                                # shape-only; for metrics / general observability
+```
+
+### Hook failure semantics
+
+- `on_request_complete` exceptions are caught and logged at
+  WARNING under `pymedplum.hooks`. They never propagate to the
+  caller.
+- `before_request` return values that violate the sanitization
+  rules (cross-origin URL, injected auth headers) are logged at
+  WARNING and discarded; the original request proceeds.
+
+## Exceptions
+
+The full public exception tree, all re-exported at
+`pymedplum.*` and available under `pymedplum.exceptions.*`.
+
+| Exception | Raised when |
+|---|---|
+| `MedplumError` | Base class for every SDK exception. |
+| `AuthenticationError` | 401 Unauthorized, or credentials-flow failure. |
+| `AuthorizationError` | 403 Forbidden. |
+| `NotFoundError` | 404 Not Found. |
+| `BadRequestError` | 400 Bad Request. |
+| `PreconditionFailedError` | 412 Precondition Failed (If-Match / If-None-Exist mismatch). |
+| `RateLimitError` | 429 Too Many Requests. |
+| `ServerError` | 5xx. String form omits the response body; access `exc.response` for the raw body, or `exc.sanitize_for_logging()` for a safe dict. |
+| `OperationOutcomeError` | FHIR OperationOutcome returned with non-success issues. String form omits `diagnostics` / `details.text`; access `exc.outcome` or `exc.sanitize_for_logging()`. |
+| `ValidationError` | Resource validation failure (surfaced from 400s that carry OperationOutcome). |
+| `NetworkError` | Connection/timeout/DNS failure. |
+| `InsecureTransportError` | Constructor received a non-`https://` URL without `allow_insecure_http=True` and without a loopback host. |
+| `UnsafeRedirectError` | Follow-up URL (pagination, async job polling, `if_none_exist` absolute URL) is outside the configured origin. |
+| `TokenRefreshCooldownError` | Token refresh attempted during the cooldown window after a prior refresh failure. Has `retry_after: float` (seconds). |
+
+### Safe logging pattern
+
+`ServerError` and `OperationOutcomeError` both provide
+`sanitize_for_logging()`, which returns a PHI-safe dict (no
+response body, no `diagnostics`, no `details.text`). Prefer this
+over `str(exc)` or `repr(exc)` in logs:
+
+```python
+import logging
+
+from pymedplum import OperationOutcomeError, ServerError
+
+log = logging.getLogger(__name__)
+
+try:
+    patient = client.read_resource("Patient", "123")
+except (OperationOutcomeError, ServerError) as exc:
+    log.warning("medplum_call_failed", extra=exc.sanitize_for_logging())
+    raise
+```
+
+### Handling `TokenRefreshCooldownError`
+
+The cooldown exists to prevent hammering an OAuth endpoint that
+has already failed. **Do not catch and retry in a tight loop.**
+Surface the error to your caller and respect `retry_after`:
+
+```python
+from pymedplum import TokenRefreshCooldownError
+
+try:
+    patient = client.read_resource("Patient", "123")
+except TokenRefreshCooldownError as exc:
+    # Transient auth failure — push back and let a higher layer
+    # decide when to retry.
+    raise TransientAuthError(retry_after=exc.retry_after) from exc
+```
+
+## Error-handling example
+
+```python
+from pymedplum import (
+    AuthorizationError,
+    NotFoundError,
+    RateLimitError,
+    ValidationError,
+)
 
 try:
     patient = client.read_resource("Patient", "nonexistent-id")
 except NotFoundError:
-    print("Patient not found")
+    ...
 except AuthorizationError:
-    print("Access denied")
+    ...
+except ValidationError:
+    ...
+except RateLimitError:
+    ...
 ```
 
 ## Next Steps
@@ -766,3 +1068,4 @@ except AuthorizationError:
 - See [Advanced Usage](advanced_usage.md) for GraphQL, patching, and administrative features
 - Review [Utility Functions](utils.md) for helper methods
 - Check [FHIR Models](fhir_models.md) for working with Pydantic models
+- Read [Audit Logging](advanced/audit_logging.md) for the `on_request_complete` hook contract

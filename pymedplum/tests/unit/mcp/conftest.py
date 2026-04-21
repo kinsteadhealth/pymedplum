@@ -6,6 +6,18 @@ from unittest.mock import AsyncMock
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def enable_writes_and_obo_override(monkeypatch):
+    """Enable write tools and per-call OBO overrides for MCP tests by default.
+
+    The MCP server now defaults to read-only and rejects per-call ``on_behalf_of``;
+    tests that want to exercise the gating opt back in by ``monkeypatch.delenv``
+    or by setting their own values via ``patch.dict(os.environ, ...)``.
+    """
+    monkeypatch.setenv("MEDPLUM_ENABLE_WRITES", "true")
+    monkeypatch.setenv("MEDPLUM_ALLOW_OBO_OVERRIDE", "true")
+
+
 @pytest.fixture
 def mock_client():
     """A mock AsyncMedplumClient with common return values."""
