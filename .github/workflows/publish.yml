@@ -1,4 +1,4 @@
-name: Publish to CodeArtifact
+name: Publish to PyPI
 
 on:
   push:
@@ -7,14 +7,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
-  publish:
-    name: Publish to AWS CodeArtifact
+  build:
+    name: Build distribution
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,42 +28,35 @@ jobs:
       - name: Install build tools
         run: |
           python -m pip install --upgrade pip
-          pip install build twine
+          pip install build
 
       - name: Build package
         run: python -m build
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsPyMedplumRole
-          aws-region: us-east-1
+          name: dist
+          path: dist/
 
-      - name: Get CodeArtifact token
-        id: codeartifact
-        run: |
-          export CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token \
-            --domain pymedplum \
-            --query authorizationToken \
-            --output text)
-          echo "::add-mask::$CODEARTIFACT_AUTH_TOKEN"
-          echo "token=$CODEARTIFACT_AUTH_TOKEN" >> $GITHUB_OUTPUT
+  publish:
+    name: Publish to PyPI
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pymedplum
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
 
-      - name: Get CodeArtifact repository endpoint
-        id: repository
-        run: |
-          REPO_ENDPOINT=$(aws codeartifact get-repository-endpoint \
-            --domain pymedplum \
-            --repository pymedplum \
-            --format pypi \
-            --query repositoryEndpoint \
-            --output text)
-          echo "endpoint=$REPO_ENDPOINT" >> $GITHUB_OUTPUT
-
-      - name: Publish to CodeArtifact
-        env:
-          TWINE_USERNAME: aws
-          TWINE_PASSWORD: ${{ steps.codeartifact.outputs.token }}
-          TWINE_REPOSITORY_URL: ${{ steps.repository.outputs.endpoint }}
-        run: |
-          python -m twine upload dist/*
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
