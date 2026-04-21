@@ -1,8 +1,8 @@
 # PyMedplum: Unofficial Python SDK for Medplum
 
-PyMedplum is a Python client for the Medplum headless EHR / FHIR platform. It focuses on a Pythonic API with strong typing (Pydantic models) while keeping full access to the underlying FHIR REST surface.
+PyMedplum is a Python client for the [Medplum](https://www.medplum.com) headless EHR / FHIR platform. It focuses on a Pythonic API with strong typing (Pydantic models) while keeping full access to the underlying FHIR REST surface.
 
-If you like the official Medplum TypeScript SDK experience, this aims to feel familiar in Python.
+If you like the experience of the official [Medplum TypeScript SDK](https://github.com/medplum/medplum), this aims to feel familiar in Python.
 
 Built and maintained by [Kinstead Health](https://www.kinsteadhealth.com).
 
@@ -543,11 +543,12 @@ Agreement with normative content additionally under CC0 1.0). See
 
 ### Trademarks
 
-"Medplum" is a product and trademark of Orangebot, Inc. PyMedplum is
-an independent Python client and is **not affiliated with, endorsed by,
-or sponsored by Orangebot, Inc.** "FHIR" and "HL7" are registered
-trademarks of Health Level Seven International. Use of these names here
-is purely descriptive and does not imply endorsement by HL7.
+"[Medplum](https://www.medplum.com)" is a product and trademark of
+Orangebot, Inc. ([upstream repo](https://github.com/medplum/medplum)).
+PyMedplum is an independent Python client and is **not affiliated with,
+endorsed by, or sponsored by Orangebot, Inc.** "FHIR" and "HL7" are
+registered trademarks of Health Level Seven International. Use of these
+names here is purely descriptive and does not imply endorsement by HL7.
 
 ## Acknowledgments
 
