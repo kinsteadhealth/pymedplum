@@ -230,3 +230,16 @@ check_untyped_defs = false
 disallow_untyped_defs = false
 warn_return_any = false
 disallow_any_generics = false
+
+# The ``mcp`` extra is optional; the base install has no stubs for it.
+[[tool.mypy.overrides]]
+module = "mcp.*"
+ignore_missing_imports = true
+
+# When the ``mcp`` extra isn't installed, FastMCP/ToolAnnotations resolve
+# to Any and every ``@mcp.tool(...)`` decorator trips untyped-decorator.
+# The stub in server.py/tools.py keeps behavior correct; skip the strict
+# decorator check so CI without the extra still passes.
+[[tool.mypy.overrides]]
+module = ["pymedplum.mcp.tools", "pymedplum.mcp.resources"]
+disallow_untyped_decorators = false

@@ -39,9 +39,7 @@ from pymedplum.fhir import FHIR_TYPES
 _MCP_IMPORT_ERROR: ImportError | None = None
 
 try:
-    from mcp.server.fastmcp import (
-        FastMCP,  # type: ignore[import-not-found,unused-ignore]
-    )
+    from mcp.server.fastmcp import FastMCP
 except ImportError as exc:
     _MCP_IMPORT_ERROR = exc
 
