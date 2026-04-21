@@ -11,8 +11,6 @@ This library allows you to:
 - Work with fully-typed Pydantic models for all FHIR resources, providing excellent editor support and data validation.
 - Run an optional MCP server for agent-based workflows.
 
-Built and maintained by [Kinstead Health](https://www.kinsteadhealth.com).
-
 ---
 
 ## Start here
@@ -45,3 +43,5 @@ Built and maintained by [Kinstead Health](https://www.kinsteadhealth.com).
 ---
 
 _PyMedplum is an independent Python client and is **not affiliated with, endorsed by, or sponsored by Orangebot, Inc.**, the makers of [Medplum](https://www.medplum.com) ([upstream repo](https://github.com/medplum/medplum)). "Medplum" is a product and trademark of Orangebot, Inc. "FHIR" is a registered trademark of Health Level Seven International. Use of these names here is purely descriptive._
+
+Built and maintained by [Kinstead Health](https://www.kinsteadhealth.com).

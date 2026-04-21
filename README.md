@@ -4,8 +4,6 @@ PyMedplum is a Python client for the [Medplum](https://www.medplum.com) headless
 
 If you like the experience of the official [Medplum TypeScript SDK](https://github.com/medplum/medplum), this aims to feel familiar in Python.
 
-Built and maintained by [Kinstead Health](https://www.kinsteadhealth.com).
-
 ## The heavy hitters
 
 - **Auth + refresh**: Client-credentials flow with first-request auth,
@@ -557,3 +555,7 @@ definitions (`@medplum/fhirtypes`)](https://github.com/medplum/medplum/tree/main
 and is inspired by the [Medplum TypeScript SDK](https://github.com/medplum/medplum).
 PyMedplum aims to provide a similar developer experience for Python
 developers.
+
+---
+
+Built and maintained by [Kinstead Health](https://www.kinsteadhealth.com).
