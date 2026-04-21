@@ -5,6 +5,7 @@
 Built and maintained by [Kinstead Health](https://www.kinsteadhealth.com).
 
 This library allows you to:
+
 - Authenticate with a Medplum server.
 - Perform CRUD (Create, Read, Update, Delete) operations on FHIR resources.
 - Search for FHIR resources using powerful query parameters.
