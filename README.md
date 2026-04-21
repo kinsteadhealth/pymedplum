@@ -4,6 +4,8 @@ PyMedplum is a Python client for the Medplum headless EHR / FHIR platform. It fo
 
 If you like the official Medplum TypeScript SDK experience, this aims to feel familiar in Python.
 
+Built and maintained by [Kinstead Health](https://www.kinsteadhealth.com).
+
 ## The heavy hitters
 
 - **Auth + refresh**: Client-credentials flow with first-request auth,
@@ -519,7 +521,7 @@ full reporting guidance.
 
 ## License
 
-Copyright 2025-2026 Kinstead Health
+Copyright 2025-2026 [Kinstead Health](https://www.kinsteadhealth.com)
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may
 not use this project except in compliance with the License. You may

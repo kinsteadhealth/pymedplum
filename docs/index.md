@@ -2,6 +2,8 @@
 
 `pymedplum` is an unofficial Python SDK for Medplum, providing a convenient interface for interacting with a Medplum server's FHIR API. It is designed to be intuitive, robust, and fully typed.
 
+Built and maintained by [Kinstead Health](https://www.kinsteadhealth.com).
+
 This library allows you to:
 - Authenticate with a Medplum server.
 - Perform CRUD (Create, Read, Update, Delete) operations on FHIR resources.

@@ -183,4 +183,5 @@ This runs the full pipeline: npm update, TypeScript codegen, ruff formatting, an
 
 The generated `__init__.py` records which `@medplum/fhirtypes` version produced it, so you can always tell what's deployed.
 
-For more details on the generator architecture, see [scripts/README.md](../scripts/README.md).
+For more details on the generator architecture, see
+[scripts/README.md](https://github.com/kinsteadhealth/pymedplum/blob/main/scripts/README.md).
