@@ -1,8 +1,9 @@
 # Welcome to pymedplum!
 
-`pymedplum` is an unofficial Python SDK for Medplum, providing a convenient interface for interacting with a Medplum server's FHIR API. It is designed to be intuitive, robust, and fully typed.
+`pymedplum` is an unofficial Python SDK for [Medplum](https://www.medplum.com), providing a convenient interface for interacting with a Medplum server's FHIR API. It is designed to be intuitive, robust, and fully typed.
 
 This library allows you to:
+
 - Authenticate with a Medplum server.
 - Perform CRUD (Create, Read, Update, Delete) operations on FHIR resources.
 - Search for FHIR resources using powerful query parameters.
@@ -38,3 +39,9 @@ This library allows you to:
 ## Help
 
 - [FAQ & Troubleshooting](faq.md)
+
+---
+
+_PyMedplum is an independent Python client and is **not affiliated with, endorsed by, or sponsored by Orangebot, Inc.**, the makers of [Medplum](https://www.medplum.com) ([upstream repo](https://github.com/medplum/medplum)). "Medplum" is a product and trademark of Orangebot, Inc. "FHIR" is a registered trademark of Health Level Seven International. Use of these names here is purely descriptive._
+
+Built and maintained by [Kinstead Health](https://www.kinsteadhealth.com).

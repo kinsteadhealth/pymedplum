@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pymedplum"
 dynamic = ["version", "readme"]
-description = "Python SDK for Medplum with typed FHIR models and an optional MCP server."
+description = "Unofficial Python SDK for Medplum with typed FHIR models and an optional MCP server."
 authors = [{ name = "Kinstead Health" }]
 license = "Apache-2.0"
 requires-python = ">=3.10"
