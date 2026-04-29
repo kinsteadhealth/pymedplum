@@ -908,6 +908,9 @@ PyMedplum exposes two public extension points on the constructor:
 ### Type aliases
 
 ```python
+from collections.abc import Callable
+from typing import Literal
+
 from pymedplum.hooks import (
     BeforeRequestHook,
     OnRequestCompleteHook,
@@ -930,9 +933,12 @@ RequestOutcome = Literal["success", "error"]
 ```
 
 `serialize_exception(exc)` is the SDK helper used internally to
-reduce a `BaseException` to a JSON-serializable dict. It honors
+reduce a `BaseException` to a dict suitable for logging. It honors
 `exc.sanitize_for_logging()` if present — useful when building
-custom audit payloads.
+custom audit payloads. The result is JSON-serializable as long as
+`sanitize_for_logging()` returns JSON-serializable primitives (the
+SDK's own exceptions do; third-party exceptions are the caller's
+responsibility).
 
 `AsyncMedplumClient` additionally accepts an async-callable
 `on_request_complete`:

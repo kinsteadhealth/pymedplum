@@ -37,7 +37,7 @@ Every hook invocation receives a single `RequestEvent` dataclass.
 | `attempts` | `list[RequestAttempt]` | Mixed | Per-wire detail. See below. |
 | `final_status_code` | `int \| None` | No | Status from the final attempt (or `None` on network exception). |
 | `final_exception` | `BaseException \| None` | Mixed | The exception surfaced to the caller, if any. |
-| `action` | `RequestAction \| None` | No | FHIR action category: `read`, `search`, `create`, `update`, `patch`, `delete`, `operation`, `batch_or_transaction`, or `None` for non-FHIR calls (auth, system endpoints). Use this to skip non-PHI events without parsing the URL yourself. |
+| `action` | `RequestAction \| None` | No | FHIR action category: `read`, `search`, `create`, `update`, `patch`, `delete`, `operation`, `batch_or_transaction`, or `None` for non-FHIR calls (auth, system endpoints). Use this to skip non-FHIR calls (auth/system endpoints) without parsing the URL yourself. |
 | `outcome` | `RequestOutcome` | No | `"success"` if the request finished with a 2xx/3xx and no exception; `"error"` otherwise (including network failures). |
 
 The event as a whole is **PHI-bearing by design**. Route it to a
