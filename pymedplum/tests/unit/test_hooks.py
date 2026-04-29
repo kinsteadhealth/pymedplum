@@ -1440,6 +1440,14 @@ def test_hook_fires_for_sync_download_binary() -> None:
         ("POST", "/fhir/R4/Binary", "Binary", None, None, "create"),
         ("GET", "/fhir/R4/Binary/bin-1", "Binary", "bin-1", None, "read"),
         ("POST", "/fhir/R4/", None, None, None, "batch_or_transaction"),
+        (
+            "POST",
+            "/fhir/R4/$graphql",
+            None,
+            None,
+            "$graphql",
+            "operation",
+        ),
         ("POST", "/oauth2/token", None, None, None, None),
         ("GET", "/healthcheck", None, None, None, None),
         ("HEAD", "/fhir/R4/Patient/p-1", "Patient", "p-1", None, None),
@@ -1707,6 +1715,20 @@ def test_sync_client_populates_action_for_binary_download() -> None:
     fhir_events = [e for e in events if e.resource_type == "Binary"]
     assert len(fhir_events) == 1
     assert fhir_events[0].action == "read"
+
+
+def test_sync_client_populates_action_for_graphql() -> None:
+    with respx.mock(base_url="https://api.medplum.com") as mock:
+        mock.post("/oauth2/token").respond(json=TOKEN_RESPONSE)
+        mock.post("/fhir/R4/$graphql").respond(200, json={"data": {}})
+        with sync_hook_client() as (client, events):
+            client.execute_graphql("query { Patient { id } }")
+
+    graphql_events = [e for e in events if e.path == "/fhir/R4/$graphql"]
+    assert len(graphql_events) == 1
+    assert graphql_events[0].action == "operation"
+    assert graphql_events[0].operation == "$graphql"
+    assert graphql_events[0].resource_type is None
 
 
 def test_sync_client_populates_outcome_error_for_5xx() -> None:

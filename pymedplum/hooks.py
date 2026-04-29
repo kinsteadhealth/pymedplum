@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
 
+# FHIR action category. `None` for non-FHIR calls.
 RequestAction = Literal[
     "read",
     "search",
@@ -26,28 +27,10 @@ RequestAction = Literal[
     "operation",
     "batch_or_transaction",
 ]
-"""FHIR action category derived from method + URL shape.
-
-Values follow the FHIR REST API verbs (read, search, create, update,
-patch, delete) plus two compound categories:
-
-- ``operation``: an extended ``$operation`` invocation, regardless of
-  whether it targets a specific resource instance.
-- ``batch_or_transaction``: a POST to the FHIR root (e.g. ``/fhir/R4/``)
-  carrying a Bundle. Discriminating batch vs. transaction requires the
-  request body's ``Bundle.type``, which the SDK does not retain.
-
-Non-FHIR calls (auth/system endpoints) yield ``None``.
-"""
 
 
+# 2xx/3xx with no exception → `"success"`; everything else → `"error"`.
 RequestOutcome = Literal["success", "error"]
-"""High-level status of the logical request.
-
-``success`` if the SDK observed a 2xx/3xx final status and no exception
-was raised; ``error`` otherwise (including network failures, where
-``final_status_code`` is ``None``).
-"""
 
 
 _METHOD_TO_ACTION: dict[str, RequestAction] = {
@@ -95,20 +78,9 @@ class RequestEvent:
     attempts: list[RequestAttempt]
     final_status_code: int | None
     final_exception: BaseException | None
-    # ``action`` and ``outcome`` carry defaults so external/test code that
-    # hand-constructs a RequestEvent doesn't break. The SDK always computes
-    # and populates them at the dispatch site.
+    # Defaults let hand-constructed events skip these; SDK always sets them.
     action: RequestAction | None = None
-    """FHIR action category. ``None`` for non-FHIR requests (e.g.
-    ``/oauth2/token``) or when the request shape can't be classified.
-    Populated automatically by the SDK; defaults to ``None`` for
-    hand-constructed events."""
-
     outcome: RequestOutcome = "error"
-    """``"success"`` if the request finished with a 2xx/3xx and no
-    exception; ``"error"`` otherwise. Populated automatically by the
-    SDK; defaults to ``"error"`` for hand-constructed events so a
-    forgotten field can't hide a failure."""
 
     def to_phi_audit_dict(
         self, *, include_query_params: bool = False
@@ -226,11 +198,6 @@ def _compute_action(
     operation: str | None,
     fhir_url_path: str | None,
 ) -> RequestAction | None:
-    """Internal: classify a request into a FHIR action category.
-
-    Used at `RequestEvent` construction time. Not part of the public
-    API; consumers should read :attr:`RequestEvent.action` instead.
-    """
     if operation:
         return "operation"
     upper = method.upper()
@@ -248,7 +215,6 @@ def _compute_outcome(
     final_status_code: int | None,
     final_exception: BaseException | None,
 ) -> RequestOutcome:
-    """Internal: classify the final disposition of a logical request."""
     if final_exception is not None:
         return "error"
     if final_status_code is not None and 200 <= final_status_code < 400:
@@ -257,7 +223,6 @@ def _compute_outcome(
 
 
 def _is_fhir_rooted(path: str, fhir_url_path: str | None) -> bool:
-    """Return True when ``path`` falls under the configured FHIR prefix."""
     if fhir_url_path is not None:
         configured = "/" + fhir_url_path.lstrip("/")
         if not configured.endswith("/"):
@@ -288,6 +253,7 @@ def _parse_fhir_url(
         {prefix}{ResourceType}/{id}/_history/{vid}
         {prefix}{ResourceType}/{id}/$operation
         {prefix}{ResourceType}/$operation
+        {prefix}$operation                          (system-level, e.g. $graphql)
 
     path_template substitutes "{id}" for resource and version IDs so it is
     safe to use as a metric tag or non-PHI log field. Non-FHIR paths
@@ -310,7 +276,11 @@ def _parse_fhir_url(
             return None, None, None, path
         prefix = prefix_match.group(0)
     segments = [s for s in path[len(prefix) :].split("/") if s]
-    if not segments or not _RESOURCE_TYPE_RE.match(segments[0]):
+    if not segments:
+        return None, None, None, path
+    if segments[0].startswith("$") and len(segments) == 1:
+        return None, None, segments[0], prefix + segments[0]
+    if not _RESOURCE_TYPE_RE.match(segments[0]):
         return None, None, None, path
 
     resource_type = segments[0]
