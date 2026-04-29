@@ -37,6 +37,8 @@ Every hook invocation receives a single `RequestEvent` dataclass.
 | `attempts` | `list[RequestAttempt]` | Mixed | Per-wire detail. See below. |
 | `final_status_code` | `int \| None` | No | Status from the final attempt (or `None` on network exception). |
 | `final_exception` | `BaseException \| None` | Mixed | The exception surfaced to the caller, if any. |
+| `action` | `RequestAction \| None` | No | FHIR action category: `read`, `search`, `create`, `update`, `patch`, `delete`, `operation`, `batch_or_transaction`, or `None` for non-FHIR calls (auth, system endpoints). Use this to skip non-PHI events without parsing the URL yourself. |
+| `outcome` | `RequestOutcome` | No | `"success"` if the request finished with a 2xx/3xx and no exception; `"error"` otherwise (including network failures). |
 
 The event as a whole is **PHI-bearing by design**. Route it to a
 destination that is cleared to store PHI (a compliance audit log,
@@ -112,13 +114,16 @@ from pymedplum.hooks import RequestEvent
 PHI_RESOURCE_TYPES = {"Patient", "Observation", "Encounter", "Condition"}
 
 def audit_phi_access(event: RequestEvent) -> None:
+    if event.action is None:
+        return  # non-FHIR call (auth, system endpoint) — not PHI access
     include_qp = event.resource_type in PHI_RESOURCE_TYPES
     payload = event.to_phi_audit_dict(include_query_params=include_qp)
     phi_audit_log.info("medplum_request_complete", extra={"event": payload})
 ```
 
-This keeps search-param auditing opt-in per resource type and avoids
-relying on the SDK to guess intent.
+The `action is None` early-return is the canonical way to skip
+non-FHIR calls (e.g. `/oauth2/token`) without parsing the URL
+yourself.
 
 ## Routing two destinations from one hook
 
