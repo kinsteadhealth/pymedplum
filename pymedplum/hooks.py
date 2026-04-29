@@ -206,8 +206,6 @@ def serialize_exception(
     everything else, pass through ``str(exc)`` verbatim. The hook consumer
     owns their sink's PHI contract; the SDK should not silently redact
     information a developer needs to triage failures.
-
-    Public API since 0.2.0.
     """
     if exc is None:
         return None
@@ -217,11 +215,6 @@ def serialize_exception(
         if isinstance(result, dict):
             return result
     return {"type": type(exc).__name__, "message": str(exc)}
-
-
-# Backwards-compatible alias for the underscore-prefixed name used
-# internally before 0.2.0. New code should import `serialize_exception`.
-_serialize_exception = serialize_exception
 
 
 def _compute_action(

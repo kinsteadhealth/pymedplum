@@ -199,30 +199,27 @@ def test_to_non_phi_dict_strips_phi_fields() -> None:
 
 def test_serialize_exception_passes_through_non_pymedplum_messages() -> None:
     """Non-pymedplum exceptions pass str(exc) through; consumer scrubs if needed."""
-    from pymedplum.hooks import _serialize_exception
-
-    payload = _serialize_exception(ValueError("connection refused"))
+    payload = serialize_exception(ValueError("connection refused"))
     assert payload == {"type": "ValueError", "message": "connection refused"}
 
-    payload = _serialize_exception(httpx.ConnectError("Connection refused"))
+    payload = serialize_exception(httpx.ConnectError("Connection refused"))
     assert payload == {"type": "ConnectError", "message": "Connection refused"}
 
     request = httpx.Request("GET", "https://api.medplum.com/fhir/R4/Patient/abc")
     response = httpx.Response(404, request=request)
     exc = httpx.HTTPStatusError("404 Not Found", request=request, response=response)
-    payload = _serialize_exception(exc)
+    payload = serialize_exception(exc)
     assert payload == {"type": "HTTPStatusError", "message": "404 Not Found"}
 
 
 def test_serialize_exception_trusts_sanitize_for_logging() -> None:
     """Any object declaring sanitize_for_logging gets to control its payload."""
-    from pymedplum.hooks import _serialize_exception
 
     class CustomError(Exception):
         def sanitize_for_logging(self) -> dict[str, object]:
             return {"type": "CustomError", "safe": True}
 
-    payload = _serialize_exception(CustomError("raw PHI-ish"))
+    payload = serialize_exception(CustomError("raw PHI-ish"))
     assert payload == {"type": "CustomError", "safe": True}
 
 
@@ -1625,12 +1622,6 @@ def test_serialize_exception_falls_back_to_str_when_sanitizer_returns_non_dict()
 
     payload = serialize_exception(_BadSanitizerError("msg"))
     assert payload == {"type": "_BadSanitizerError", "message": "msg"}
-
-
-def test_underscored_alias_remains_for_backwards_compatibility() -> None:
-    from pymedplum.hooks import _serialize_exception, serialize_exception
-
-    assert _serialize_exception is serialize_exception
 
 
 def test_sync_client_populates_action_for_read() -> None:
