@@ -9,11 +9,53 @@ from __future__ import annotations
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import parse_qs
 
 if TYPE_CHECKING:
     from datetime import datetime
+
+
+RequestAction = Literal[
+    "read",
+    "search",
+    "create",
+    "update",
+    "patch",
+    "delete",
+    "operation",
+    "batch_or_transaction",
+]
+"""FHIR action category derived from method + URL shape.
+
+Values follow the FHIR REST API verbs (read, search, create, update,
+patch, delete) plus two compound categories:
+
+- ``operation``: an extended ``$operation`` invocation, regardless of
+  whether it targets a specific resource instance.
+- ``batch_or_transaction``: a POST to the FHIR root (e.g. ``/fhir/R4/``)
+  carrying a Bundle. Discriminating batch vs. transaction requires the
+  request body's ``Bundle.type``, which the SDK does not retain.
+
+Non-FHIR calls (auth/system endpoints) yield ``None``.
+"""
+
+
+RequestOutcome = Literal["success", "error"]
+"""High-level status of the logical request.
+
+``success`` if the SDK observed a 2xx/3xx final status and no exception
+was raised; ``error`` otherwise (including network failures, where
+``final_status_code`` is ``None``).
+"""
+
+
+_METHOD_TO_ACTION: dict[str, RequestAction] = {
+    "POST": "create",
+    "PUT": "update",
+    "PATCH": "patch",
+    "DELETE": "delete",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +95,20 @@ class RequestEvent:
     attempts: list[RequestAttempt]
     final_status_code: int | None
     final_exception: BaseException | None
+    # ``action`` and ``outcome`` carry defaults so external/test code that
+    # hand-constructs a RequestEvent doesn't break. The SDK always computes
+    # and populates them at the dispatch site.
+    action: RequestAction | None = None
+    """FHIR action category. ``None`` for non-FHIR requests (e.g.
+    ``/oauth2/token``) or when the request shape can't be classified.
+    Populated automatically by the SDK; defaults to ``None`` for
+    hand-constructed events."""
+
+    outcome: RequestOutcome = "error"
+    """``"success"`` if the request finished with a 2xx/3xx and no
+    exception; ``"error"`` otherwise. Populated automatically by the
+    SDK; defaults to ``"error"`` for hand-constructed events so a
+    forgotten field can't hide a failure."""
 
     def to_phi_audit_dict(
         self, *, include_query_params: bool = False
@@ -77,6 +133,8 @@ class RequestEvent:
             "resource_type": self.resource_type,
             "resource_id": self.resource_id,
             "operation": self.operation,
+            "action": self.action,
+            "outcome": self.outcome,
             "started_at": self.started_at.isoformat(),
             "ended_at": self.ended_at.isoformat(),
             "attempts": [
@@ -85,12 +143,12 @@ class RequestEvent:
                     "status_code": a.status_code,
                     "duration_seconds": a.duration_seconds,
                     "on_behalf_of": a.on_behalf_of,
-                    "exception": _serialize_exception(a.exception),
+                    "exception": serialize_exception(a.exception),
                 }
                 for a in self.attempts
             ],
             "final_status_code": self.final_status_code,
-            "final_exception": _serialize_exception(self.final_exception),
+            "final_exception": serialize_exception(self.final_exception),
         }
         if include_query_params:
             data["query_params"] = self.query_params
@@ -102,10 +160,10 @@ class RequestEvent:
         Strips PHI-bearing fields: no resolved ``path``, no ``resource_id``,
         no per-attempt ``on_behalf_of``, no query params. Retains shape and
         timing data — ``method``, ``path_template`` (e.g. ``/Patient/{id}``),
-        ``resource_type``, ``operation``, attempt counts, status codes,
-        durations, and exception type names — which is enough to drive most
-        SLO / latency / error-rate dashboards without exporting protected
-        information.
+        ``resource_type``, ``operation``, ``action``, ``outcome``, attempt
+        counts, status codes, durations, and exception type names — which
+        is enough to drive most SLO / latency / error-rate dashboards
+        without exporting protected information.
 
         Use this for metrics pipelines, generic log aggregators, error
         trackers, or any destination not contractually approved for PHI.
@@ -115,6 +173,8 @@ class RequestEvent:
             "path_template": self.path_template,
             "resource_type": self.resource_type,
             "operation": self.operation,
+            "action": self.action,
+            "outcome": self.outcome,
             "started_at": self.started_at.isoformat(),
             "ended_at": self.ended_at.isoformat(),
             "attempt_count": len(self.attempts),
@@ -136,7 +196,7 @@ class RequestEvent:
         }
 
 
-def _serialize_exception(
+def serialize_exception(
     exc: BaseException | None,
 ) -> dict[str, Any] | None:
     """Reduce an exception to a dict for hook delivery.
@@ -146,6 +206,8 @@ def _serialize_exception(
     everything else, pass through ``str(exc)`` verbatim. The hook consumer
     owns their sink's PHI contract; the SDK should not silently redact
     information a developer needs to triage failures.
+
+    Public API since 0.2.0.
     """
     if exc is None:
         return None
@@ -155,6 +217,60 @@ def _serialize_exception(
         if isinstance(result, dict):
             return result
     return {"type": type(exc).__name__, "message": str(exc)}
+
+
+# Backwards-compatible alias for the underscore-prefixed name used
+# internally before 0.2.0. New code should import `serialize_exception`.
+_serialize_exception = serialize_exception
+
+
+def _compute_action(
+    *,
+    method: str,
+    path: str,
+    resource_type: str | None,
+    resource_id: str | None,
+    operation: str | None,
+    fhir_url_path: str | None,
+) -> RequestAction | None:
+    """Internal: classify a request into a FHIR action category.
+
+    Used at `RequestEvent` construction time. Not part of the public
+    API; consumers should read :attr:`RequestEvent.action` instead.
+    """
+    if operation:
+        return "operation"
+    upper = method.upper()
+    if resource_type:
+        if upper == "GET":
+            return "read" if resource_id else "search"
+        return _METHOD_TO_ACTION.get(upper)
+    if upper == "POST" and _is_fhir_rooted(path, fhir_url_path):
+        return "batch_or_transaction"
+    return None
+
+
+def _compute_outcome(
+    *,
+    final_status_code: int | None,
+    final_exception: BaseException | None,
+) -> RequestOutcome:
+    """Internal: classify the final disposition of a logical request."""
+    if final_exception is not None:
+        return "error"
+    if final_status_code is not None and 200 <= final_status_code < 400:
+        return "success"
+    return "error"
+
+
+def _is_fhir_rooted(path: str, fhir_url_path: str | None) -> bool:
+    """Return True when ``path`` falls under the configured FHIR prefix."""
+    if fhir_url_path is not None:
+        configured = "/" + fhir_url_path.lstrip("/")
+        if not configured.endswith("/"):
+            configured = configured + "/"
+        return path.startswith(configured)
+    return _FHIR_PREFIX_RE.match(path) is not None
 
 
 BeforeRequestHook = Callable[[PreparedRequest], "PreparedRequest | None"]

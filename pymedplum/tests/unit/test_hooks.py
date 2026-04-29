@@ -15,8 +15,11 @@ from pymedplum.hooks import (
     PreparedRequest,
     RequestAttempt,
     RequestEvent,
+    _compute_action,
+    _compute_outcome,
     _parse_fhir_url,
     _parse_query_params,
+    serialize_exception,
 )
 
 TOKEN_RESPONSE = {"access_token": "t", "expires_in": 3600}
@@ -1387,3 +1390,358 @@ def test_hook_fires_for_sync_download_binary() -> None:
     wire_events = [e for e in events if e.resource_type == "Binary"]
     assert len(wire_events) == 1
     assert wire_events[0].resource_id == "bin-123"
+
+
+@pytest.mark.parametrize(
+    (
+        "method",
+        "path",
+        "resource_type",
+        "resource_id",
+        "operation",
+        "expected_action",
+    ),
+    [
+        ("GET", "/fhir/R4/Patient/p-1", "Patient", "p-1", None, "read"),
+        ("GET", "/fhir/R4/Patient", "Patient", None, None, "search"),
+        ("POST", "/fhir/R4/Patient", "Patient", None, None, "create"),
+        ("PUT", "/fhir/R4/Patient/p-1", "Patient", "p-1", None, "update"),
+        ("PATCH", "/fhir/R4/Patient/p-1", "Patient", "p-1", None, "patch"),
+        ("DELETE", "/fhir/R4/Patient/p-1", "Patient", "p-1", None, "delete"),
+        (
+            "POST",
+            "/fhir/R4/Patient/p-1/$everything",
+            "Patient",
+            "p-1",
+            "$everything",
+            "operation",
+        ),
+        (
+            "POST",
+            "/fhir/R4/Patient/$match",
+            "Patient",
+            None,
+            "$match",
+            "operation",
+        ),
+        (
+            "POST",
+            "/fhir/R4/Bot/bot-1/$execute",
+            "Bot",
+            "bot-1",
+            "$execute",
+            "operation",
+        ),
+        (
+            "GET",
+            "/fhir/R4/Patient/p-1/$ccda-export",
+            "Patient",
+            "p-1",
+            "$ccda-export",
+            "operation",
+        ),
+        ("POST", "/fhir/R4/Binary", "Binary", None, None, "create"),
+        ("GET", "/fhir/R4/Binary/bin-1", "Binary", "bin-1", None, "read"),
+        ("POST", "/fhir/R4/", None, None, None, "batch_or_transaction"),
+        ("POST", "/oauth2/token", None, None, None, None),
+        ("GET", "/healthcheck", None, None, None, None),
+        ("HEAD", "/fhir/R4/Patient/p-1", "Patient", "p-1", None, None),
+        ("OPTIONS", "/fhir/R4/Patient", "Patient", None, None, None),
+    ],
+)
+def test_compute_action_covers_all_supported_request_shapes(
+    method, path, resource_type, resource_id, operation, expected_action
+) -> None:
+    assert (
+        _compute_action(
+            method=method,
+            path=path,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            operation=operation,
+            fhir_url_path="fhir/R4/",
+        )
+        == expected_action
+    )
+
+
+def test_compute_action_classifies_bundle_post_under_configured_prefix() -> None:
+    assert (
+        _compute_action(
+            method="POST",
+            path="/fhir/R4B/",
+            resource_type=None,
+            resource_id=None,
+            operation=None,
+            fhir_url_path="fhir/R4B/",
+        )
+        == "batch_or_transaction"
+    )
+
+
+def test_compute_action_returns_none_when_path_is_outside_configured_prefix() -> None:
+    assert (
+        _compute_action(
+            method="POST",
+            path="/fhir/R4B/",
+            resource_type=None,
+            resource_id=None,
+            operation=None,
+            fhir_url_path="fhir/R4/",
+        )
+        is None
+    )
+
+
+def test_compute_action_falls_back_to_default_fhir_prefix_when_unset() -> None:
+    assert (
+        _compute_action(
+            method="POST",
+            path="/fhir/R5/",
+            resource_type=None,
+            resource_id=None,
+            operation=None,
+            fhir_url_path=None,
+        )
+        == "batch_or_transaction"
+    )
+
+
+@pytest.mark.parametrize(
+    ("status", "exception", "expected_outcome"),
+    [
+        (200, None, "success"),
+        (201, None, "success"),
+        (204, None, "success"),
+        (304, None, "success"),
+        (400, None, "error"),
+        (404, None, "error"),
+        (500, None, "error"),
+        (None, None, "error"),
+        (200, RuntimeError("boom"), "error"),
+        (None, RuntimeError("boom"), "error"),
+    ],
+)
+def test_compute_outcome_classifies_success_vs_error(
+    status, exception, expected_outcome
+) -> None:
+    assert (
+        _compute_outcome(final_status_code=status, final_exception=exception)
+        == expected_outcome
+    )
+
+
+def test_request_event_defaults_action_and_outcome_for_hand_constructed_events() -> (
+    None
+):
+    ev = RequestEvent(
+        method="GET",
+        path="/p",
+        path_template="/p",
+        query_params=None,
+        resource_type=None,
+        resource_id=None,
+        operation=None,
+        started_at=datetime.now(timezone.utc),
+        ended_at=datetime.now(timezone.utc),
+        attempts=[],
+        final_status_code=200,
+        final_exception=None,
+    )
+    assert ev.action is None
+    assert ev.outcome == "error"
+
+
+def test_to_phi_audit_dict_includes_action_and_outcome() -> None:
+    ev = RequestEvent(
+        method="GET",
+        path="/fhir/R4/Patient/p-1",
+        path_template="/fhir/R4/Patient/{id}",
+        query_params=None,
+        resource_type="Patient",
+        resource_id="p-1",
+        operation=None,
+        started_at=datetime.now(timezone.utc),
+        ended_at=datetime.now(timezone.utc),
+        attempts=[],
+        final_status_code=200,
+        final_exception=None,
+        action="read",
+        outcome="success",
+    )
+    payload = ev.to_phi_audit_dict()
+    assert payload["action"] == "read"
+    assert payload["outcome"] == "success"
+
+
+def test_to_non_phi_dict_includes_action_and_outcome() -> None:
+    ev = RequestEvent(
+        method="POST",
+        path="/fhir/R4/Patient/p-1/$everything",
+        path_template="/fhir/R4/Patient/{id}/$everything",
+        query_params=None,
+        resource_type="Patient",
+        resource_id="p-1",
+        operation="$everything",
+        started_at=datetime.now(timezone.utc),
+        ended_at=datetime.now(timezone.utc),
+        attempts=[],
+        final_status_code=500,
+        final_exception=None,
+        action="operation",
+        outcome="error",
+    )
+    payload = ev.to_non_phi_dict()
+    assert payload["action"] == "operation"
+    assert payload["outcome"] == "error"
+
+
+def test_serialize_exception_returns_none_for_none_input() -> None:
+    assert serialize_exception(None) is None
+
+
+def test_serialize_exception_returns_type_and_message_for_plain_exception() -> None:
+    assert serialize_exception(ValueError("bad")) == {
+        "type": "ValueError",
+        "message": "bad",
+    }
+
+
+def test_serialize_exception_honors_sanitize_for_logging_when_present() -> None:
+    class _SanitizingError(Exception):
+        def sanitize_for_logging(self) -> dict[str, Any]:
+            return {"type": "MedplumHTTPError", "status": 404}
+
+    payload = serialize_exception(_SanitizingError("would-leak/PHI/path"))
+    assert payload == {"type": "MedplumHTTPError", "status": 404}
+
+
+def test_serialize_exception_falls_back_to_str_when_sanitizer_returns_non_dict() -> (
+    None
+):
+    class _BadSanitizerError(Exception):
+        def sanitize_for_logging(self) -> str:  # type: ignore[override]
+            return "not-a-dict"
+
+    payload = serialize_exception(_BadSanitizerError("msg"))
+    assert payload == {"type": "_BadSanitizerError", "message": "msg"}
+
+
+def test_underscored_alias_remains_for_backwards_compatibility() -> None:
+    from pymedplum.hooks import _serialize_exception, serialize_exception
+
+    assert _serialize_exception is serialize_exception
+
+
+def test_sync_client_populates_action_for_read() -> None:
+    with respx.mock(base_url="https://api.medplum.com") as mock:
+        mock.post("/oauth2/token").respond(json=TOKEN_RESPONSE)
+        mock.get("/fhir/R4/Patient/p-1").respond(
+            200, json={"resourceType": "Patient", "id": "p-1"}
+        )
+        with sync_hook_client() as (client, events):
+            client.read_resource("Patient", "p-1")
+
+    fhir_events = [e for e in events if e.resource_type == "Patient"]
+    assert len(fhir_events) == 1
+    assert fhir_events[0].action == "read"
+    assert fhir_events[0].outcome == "success"
+
+
+def test_sync_client_populates_action_for_search() -> None:
+    with respx.mock(base_url="https://api.medplum.com") as mock:
+        mock.post("/oauth2/token").respond(json=TOKEN_RESPONSE)
+        mock.get("/fhir/R4/Patient").respond(
+            200, json={"resourceType": "Bundle", "entry": []}
+        )
+        with sync_hook_client() as (client, events):
+            client.search_resources("Patient", {"identifier": "mrn|123"})
+
+    fhir_events = [e for e in events if e.resource_type == "Patient"]
+    assert len(fhir_events) == 1
+    assert fhir_events[0].action == "search"
+
+
+def test_sync_client_populates_action_for_bot_execute() -> None:
+    with respx.mock(base_url="https://api.medplum.com") as mock:
+        mock.post("/oauth2/token").respond(json=TOKEN_RESPONSE)
+        mock.post("/fhir/R4/Bot/bot-1/$execute").respond(200, json={"ok": True})
+        with sync_hook_client() as (client, events):
+            client.execute_bot(bot_id="bot-1", input_data={"x": 1})
+
+    fhir_events = [e for e in events if e.resource_type == "Bot"]
+    assert len(fhir_events) == 1
+    assert fhir_events[0].action == "operation"
+    assert fhir_events[0].operation == "$execute"
+
+
+def test_sync_client_populates_action_for_ccda_export() -> None:
+    with respx.mock(base_url="https://api.medplum.com") as mock:
+        mock.post("/oauth2/token").respond(json=TOKEN_RESPONSE)
+        mock.get("/fhir/R4/Patient/p-1/$ccda-export").respond(
+            200, headers={"Content-Type": "application/xml"}, content=b"<XML/>"
+        )
+        with sync_hook_client() as (client, events):
+            client.export_ccda("p-1")
+
+    fhir_events = [e for e in events if e.resource_type == "Patient"]
+    assert len(fhir_events) == 1
+    assert fhir_events[0].action == "operation"
+    assert fhir_events[0].operation == "$ccda-export"
+
+
+def test_sync_client_populates_action_for_binary_upload() -> None:
+    with respx.mock(base_url="https://api.medplum.com") as mock:
+        mock.post("/oauth2/token").respond(json=TOKEN_RESPONSE)
+        mock.post("/fhir/R4/Binary").respond(
+            200, json={"resourceType": "Binary", "id": "bin-1"}
+        )
+        with sync_hook_client() as (client, events):
+            client.upload_binary(b"%PDF-bytes", "application/pdf")
+
+    fhir_events = [e for e in events if e.resource_type == "Binary"]
+    assert len(fhir_events) == 1
+    assert fhir_events[0].action == "create"
+
+
+def test_sync_client_populates_action_for_binary_download() -> None:
+    with respx.mock(base_url="https://api.medplum.com") as mock:
+        mock.post("/oauth2/token").respond(json=TOKEN_RESPONSE)
+        mock.get("/fhir/R4/Binary/bin-1").respond(
+            200, headers={"Content-Type": "application/pdf"}, content=b"x"
+        )
+        with sync_hook_client() as (client, events):
+            client.download_binary("bin-1")
+
+    fhir_events = [e for e in events if e.resource_type == "Binary"]
+    assert len(fhir_events) == 1
+    assert fhir_events[0].action == "read"
+
+
+def test_sync_client_populates_outcome_error_for_5xx() -> None:
+    from pymedplum.exceptions import ServerError
+
+    with respx.mock(base_url="https://api.medplum.com") as mock:
+        mock.post("/oauth2/token").respond(json=TOKEN_RESPONSE)
+        mock.get("/fhir/R4/Patient/p-1").respond(500, json={})
+        with sync_hook_client() as (client, events), pytest.raises(ServerError):
+            client.read_resource("Patient", "p-1")
+
+    fhir_events = [e for e in events if e.resource_type == "Patient"]
+    assert len(fhir_events) == 1
+    assert fhir_events[0].outcome == "error"
+
+
+def test_sync_client_classifies_token_endpoint_as_non_fhir() -> None:
+    with respx.mock(base_url="https://api.medplum.com") as mock:
+        mock.post("/oauth2/token").respond(json=TOKEN_RESPONSE)
+        mock.get("/fhir/R4/Patient/p-1").respond(
+            200, json={"resourceType": "Patient", "id": "p-1"}
+        )
+        with sync_hook_client() as (client, events):
+            client.read_resource("Patient", "p-1")
+
+    auth_events = [e for e in events if "/oauth2/" in e.path]
+    assert len(auth_events) == 1
+    assert auth_events[0].action is None
+    assert auth_events[0].outcome == "success"
