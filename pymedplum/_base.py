@@ -42,6 +42,8 @@ from .hooks import (
     PreparedRequest,
     RequestAttempt,
     RequestEvent,
+    _compute_action,
+    _compute_outcome,
     _parse_fhir_url,
     _parse_query_params,
 )
@@ -266,6 +268,18 @@ class _AttemptTracker:
         resource_type, resource_id, operation, path_template = _parse_fhir_url(
             parsed.path, self.fhir_url_path
         )
+        action = _compute_action(
+            method=self.method,
+            path=parsed.path,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            operation=operation,
+            fhir_url_path=self.fhir_url_path,
+        )
+        outcome = _compute_outcome(
+            final_status_code=self.final_status_code,
+            final_exception=self.final_exception,
+        )
         return RequestEvent(
             method=self.method,
             path=parsed.path,
@@ -279,6 +293,8 @@ class _AttemptTracker:
             attempts=self.attempts,
             final_status_code=self.final_status_code,
             final_exception=self.final_exception,
+            action=action,
+            outcome=outcome,
         )
 
 
@@ -533,9 +549,21 @@ class BaseClient:
     ) -> RequestEvent:
         parsed = urlparse(url)
         resource_type, resource_id, operation, path_template = _parse_fhir_url(
-            parsed.path
+            parsed.path, self.fhir_url_path
         )
         query_params = _parse_query_params(parsed.query)
+        action = _compute_action(
+            method=method,
+            path=parsed.path,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            operation=operation,
+            fhir_url_path=self.fhir_url_path,
+        )
+        outcome = _compute_outcome(
+            final_status_code=final_status,
+            final_exception=final_exception,
+        )
         return RequestEvent(
             method=method,
             path=parsed.path,
@@ -549,6 +577,8 @@ class BaseClient:
             attempts=attempts,
             final_status_code=final_status,
             final_exception=final_exception,
+            action=action,
+            outcome=outcome,
         )
 
     def _dispatch_on_request_complete_sync(self, event: RequestEvent) -> None:

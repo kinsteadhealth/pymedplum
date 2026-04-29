@@ -531,13 +531,13 @@ async def test_phi_in_500_error_does_not_leak_into_logs(trigger_500_with_phi):
 async def test_phi_in_500_error_hook_final_exception_is_clean(
     trigger_500_with_phi,
 ):
-    from pymedplum.hooks import _serialize_exception
+    from pymedplum.hooks import serialize_exception
 
     _, events, _ = trigger_500_with_phi
     data_events = [e for e in events if e.path_template == "/fhir/R4/Patient/{id}"]
     assert data_events, "hook did not fire for the 500"
     serialized_excs = [
-        json.dumps(_serialize_exception(e.final_exception))
+        json.dumps(serialize_exception(e.final_exception))
         for e in data_events
         if e.final_exception is not None
     ]
