@@ -908,17 +908,37 @@ PyMedplum exposes two public extension points on the constructor:
 ### Type aliases
 
 ```python
+from collections.abc import Callable
+from typing import Literal
+
 from pymedplum.hooks import (
     BeforeRequestHook,
     OnRequestCompleteHook,
     PreparedRequest,
+    RequestAction,
     RequestAttempt,
     RequestEvent,
+    RequestOutcome,
+    serialize_exception,
 )
 
 BeforeRequestHook = Callable[[PreparedRequest], PreparedRequest | None]
 OnRequestCompleteHook = Callable[[RequestEvent], None]
+
+RequestAction = Literal[
+    "read", "search", "create", "update", "patch", "delete",
+    "operation", "batch_or_transaction",
+]
+RequestOutcome = Literal["success", "error"]
 ```
+
+`serialize_exception(exc)` is the SDK helper used internally to
+reduce a `BaseException` to a dict suitable for logging. It honors
+`exc.sanitize_for_logging()` if present — useful when building
+custom audit payloads. The result is JSON-serializable as long as
+`sanitize_for_logging()` returns JSON-serializable primitives (the
+SDK's own exceptions do; third-party exceptions are the caller's
+responsibility).
 
 `AsyncMedplumClient` additionally accepts an async-callable
 `on_request_complete`:
@@ -963,6 +983,16 @@ Per-wire attempt record.
 Fires once per logical SDK call. See
 [Audit Logging](advanced/audit_logging.md) for the full field
 reference, PHI notes, and worked examples.
+
+Two computed fields callers can read directly without re-deriving
+FHIR semantics from the URL:
+
+- `event.action: RequestAction | None` — `read`, `search`, `create`,
+  `update`, `patch`, `delete`, `operation`, `batch_or_transaction`,
+  or `None` for non-FHIR calls. Use `event.action is None` to skip
+  auth / system-endpoint events in audit hooks.
+- `event.outcome: RequestOutcome` — `"success"` if the SDK finished
+  with a 2xx/3xx and no exception; `"error"` otherwise.
 
 Key methods:
 
