@@ -298,12 +298,11 @@ def test_merge_clears_ambient_obo(
     """Merge runs as the calling credential, never as an OBO target.
     Even when the client has a default_on_behalf_of set, neither the
     GET nor the PUT should carry X-Medplum-On-Behalf-Of."""
-    client = MedplumClient(
+    with MedplumClient(
         base_url=_BASE_URL,
         access_token="tkn",
         default_on_behalf_of="ProjectMembership/some-other-id",
-    )
-    try:
+    ) as client:
         membership = membership_factory(access=[])
         get_route, put_route = mock_membership_endpoints(membership, next_version="2")
         client.merge_project_membership_access(
@@ -318,8 +317,6 @@ def test_merge_clears_ambient_obo(
                 "x-medplum-on-behalf-of"
             )
             assert obo is None, f"Unexpected OBO header on admin call: {obo!r}"
-    finally:
-        client.close()
 
 
 def test_merge_falls_back_to_read_when_update_returns_no_version(
