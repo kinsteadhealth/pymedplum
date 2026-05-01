@@ -9,7 +9,10 @@ import pytest
 
 from pymedplum import (
     AsyncMedplumClient,
+    get_project_membership_access_parameter,
+    get_project_membership_access_policy_id,
     get_resource_accounts,
+    make_project_membership_access,
     resource_has_account,
 )
 
@@ -78,17 +81,10 @@ def _create_mso_env(medplum_client, test_id, prefix, extra_resources=None):
         if membership:
             cleanup.append(("ProjectMembership", membership["id"]))
             membership["access"] = [
-                {
-                    "policy": {"reference": f"AccessPolicy/{policy['id']}"},
-                    "parameter": [
-                        {
-                            "name": "organization",
-                            "valueReference": {
-                                "reference": f"Organization/{org['id']}"
-                            },
-                        }
-                    ],
-                }
+                make_project_membership_access(
+                    f"AccessPolicy/{policy['id']}",
+                    {"organization": f"Organization/{org['id']}"},
+                )
             ]
             medplum_client.update_resource(membership)
             memberships[label] = membership
@@ -823,6 +819,64 @@ def test_mso_compartment_isolation(medplum_client, create_scoped_client, test_id
             assert patient_b["id"] not in found_b
         finally:
             doctor_a_client.close()
+
+    finally:
+        for resource_type, resource_id in reversed(cleanup):
+            try:
+                medplum_client.delete_resource(resource_type, resource_id)
+            except Exception as e:
+                print(f"Warning: Failed to delete {resource_type}/{resource_id}: {e}")
+
+
+def test_mso_env_membership_access_inspectors(medplum_client, test_id):
+    """The access entries `_create_mso_env` writes are inspectable
+    via the public access helpers (round-trip through the server)."""
+    if not medplum_client.project_id:
+        pytest.skip("MEDPLUM_PROJECT_ID must be set")
+
+    env = _create_mso_env(medplum_client, test_id, "Inspect")
+    cleanup = list(env["cleanup"])
+
+    try:
+        membership = medplum_client.read_resource(
+            "ProjectMembership", env["memberships"]["PracA"]["id"]
+        )
+        access = membership.get("access") or []
+        assert access, "PracA membership should have one access entry"
+        entry = access[0]
+
+        assert get_project_membership_access_policy_id(entry) == env["policy"]["id"]
+        org_param = get_project_membership_access_parameter(entry, "organization")
+        assert org_param is not None
+        assert org_param["valueReference"] == {
+            "reference": f"Organization/{env['org_a']['id']}"
+        }
+
+        # Caller-built ProjectMembershipAccess models normalize to the
+        # same FHIR JSON the dict builder produces.
+        from pymedplum.access import normalize_access_entry
+        from pymedplum.fhir import (
+            ProjectMembershipAccess,
+            ProjectMembershipAccessParameter,
+            Reference,
+        )
+
+        pyd = ProjectMembershipAccess(
+            policy=Reference(reference=f"AccessPolicy/{env['policy']['id']}"),
+            parameter=[
+                ProjectMembershipAccessParameter(
+                    name="organization",
+                    value_reference=Reference(
+                        reference=f"Organization/{env['org_a']['id']}"
+                    ),
+                )
+            ],
+        )
+        dict_entry = make_project_membership_access(
+            f"AccessPolicy/{env['policy']['id']}",
+            {"organization": f"Organization/{env['org_a']['id']}"},
+        )
+        assert normalize_access_entry(pyd) == normalize_access_entry(dict_entry)
 
     finally:
         for resource_type, resource_id in reversed(cleanup):

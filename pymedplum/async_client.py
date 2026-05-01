@@ -40,9 +40,19 @@ from ._security import (
     validate_resource_id,
     validate_resource_type,
 )
+from .access import (
+    MergeResult,
+    _normalize_project_membership_id,
+    build_merged_access,
+    merged_equals_remote,
+    normalize_access_entry,
+    partition_access,
+    validate_managed_access,
+)
 from .bundle import FHIRBundle
 from .exceptions import (
     MedplumError,
+    PreconditionFailedError,
     TokenRefreshCooldownError,
 )
 from .fhir.base import MedplumFHIRBase
@@ -59,6 +69,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from .fhir.operationoutcome import OperationOutcome
+    from .fhir.projectmembership import ProjectMembershipAccess
     from .types import PatchOperation, QueryTypes, SummaryMode, TotalMode
 
 _request_logger = logging.getLogger("pymedplum.request")
@@ -572,13 +583,25 @@ class AsyncMedplumClient(BaseClient):
 
     @overload
     async def read_resource(
-        self, resource_type: str, resource_id: str, as_fhir: type[ResourceT]
+        self,
+        resource_type: str,
+        resource_id: str,
+        as_fhir: type[ResourceT],
+        *,
+        headers: dict[str, str] | None = None,
+        on_behalf_of: str | None = None,
     ) -> ResourceT:
         pass
 
     @overload
     async def read_resource(
-        self, resource_type: str, resource_id: str, as_fhir: None = None
+        self,
+        resource_type: str,
+        resource_id: str,
+        as_fhir: None = None,
+        *,
+        headers: dict[str, str] | None = None,
+        on_behalf_of: str | None = None,
     ) -> dict[str, Any]:
         pass
 
@@ -1403,6 +1426,243 @@ class AsyncMedplumClient(BaseClient):
             params=params,
             headers=headers,
         )
+
+    async def merge_project_membership_access(
+        self,
+        membership_id: str,
+        *,
+        managed_access: list[ProjectMembershipAccess | dict[str, Any]],
+        managed_policy_ids: set[str],
+        force: bool = False,
+        max_retries: int = 1,
+    ) -> MergeResult:
+        """Atomically sync ``ProjectMembership.access`` to a desired list.
+
+        Reads the membership, builds the new ``access`` list, writes it
+        back with ``If-Match`` from ``meta.versionId``, and short-circuits
+        if the desired list is byte-equal to the remote. On 412
+        (concurrent writer race), re-reads and retries up to
+        ``max_retries`` times before raising.
+
+        ``managed_policy_ids`` partitions the existing ``access`` list:
+        entries pointing at one of those AccessPolicy IDs are treated
+        as ours and replaced; entries pointing elsewhere are preserved
+        untouched. In a single-writer app the "preserved" branch is
+        empty in practice — the partition exists to keep a manual admin
+        edit in Medplum's UI from being silently overwritten.
+
+        Args:
+            membership_id: ProjectMembership ID — bare ``"abc"`` or
+                ``"ProjectMembership/abc"``; normalized internally.
+            managed_access: Desired list of access entries the caller
+                owns. Pass ``[]`` to remove all of them (lockout
+                primitive). Every entry must reference a policy in
+                ``managed_policy_ids``; otherwise the helper would
+                write access it could not later remove cleanly.
+            managed_policy_ids: AccessPolicy IDs the caller manages.
+                Typically a singleton like ``{practice_policy_id}``.
+                Pass the union of current and historical IDs during a
+                policy rotation so old entries get cleaned up. Empty
+                sets are rejected.
+            force: If False (default) and the merged list is byte-equal
+                to the remote, skip the PUT. If True, write regardless.
+            max_retries: Number of 412 re-read+retry attempts before
+                raising. Default 1 (so two attempts total).
+
+        Returns:
+            :class:`MergeResult` with whether a write occurred, the
+            resulting ``versionId``, and counts for observability.
+
+        Raises:
+            PreconditionFailedError: After ``max_retries + 1``
+                consecutive 412s.
+            ValueError: If ``membership_id``, ``managed_policy_ids``,
+                managed entries, or the remote ProjectMembership's
+                ``meta.versionId`` are unusable.
+            OperationOutcomeError: For other Medplum-side failures.
+        """
+        validate_managed_access(managed_access, managed_policy_ids)
+        normalized_managed = [normalize_access_entry(e) for e in managed_access]
+        return await self._merge_pm_access_with_mutator(
+            membership_id,
+            mutator=lambda _current: normalized_managed,
+            managed_policy_ids=managed_policy_ids,
+            force=force,
+            max_retries=max_retries,
+        )
+
+    async def add_project_membership_access_entry(
+        self,
+        membership_id: str,
+        entry: ProjectMembershipAccess | dict[str, Any],
+        *,
+        managed_policy_ids: set[str],
+        force: bool = False,
+        max_retries: int = 1,
+    ) -> MergeResult:
+        """Atomically append one entry to the managed slice.
+
+        Reads the membership, takes the current managed slice, appends
+        ``entry`` (if it isn't already present), and writes back with
+        ``If-Match``. The read-modify-write happens inside the 412
+        retry loop, so concurrent writes by other callers — including
+        adds and removes against the same managed slice — are
+        preserved across the operation.
+
+        Idempotent: if a structurally-equal entry already exists in
+        the managed slice, no PUT is sent.
+
+        Args:
+            membership_id: ProjectMembership ID — bare or full reference.
+            entry: The access entry to append. Must reference a policy
+                in ``managed_policy_ids``.
+            managed_policy_ids: AccessPolicy IDs the caller manages.
+            force: Write even if the entry was already present.
+            max_retries: 412 retries before giving up.
+
+        Returns:
+            :class:`MergeResult`.
+        """
+        validate_managed_access([entry], managed_policy_ids)
+        target = normalize_access_entry(entry)
+
+        def mutator(current: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            if any(existing == target for existing in current):
+                return list(current)
+            return [*current, target]
+
+        return await self._merge_pm_access_with_mutator(
+            membership_id,
+            mutator=mutator,
+            managed_policy_ids=managed_policy_ids,
+            force=force,
+            max_retries=max_retries,
+        )
+
+    async def remove_project_membership_access_entry(
+        self,
+        membership_id: str,
+        entry: ProjectMembershipAccess | dict[str, Any],
+        *,
+        managed_policy_ids: set[str],
+        force: bool = False,
+        max_retries: int = 1,
+    ) -> MergeResult:
+        """Atomically remove a structurally-equal entry from the managed slice.
+
+        Reads the membership, filters the managed slice for entries
+        equal to ``entry``, and writes back with ``If-Match``. The
+        read-modify-write happens inside the 412 retry loop, so
+        concurrent writes by other callers are preserved across the
+        operation.
+
+        Only entries inside the managed slice are considered — an entry
+        pointing at a policy outside ``managed_policy_ids`` is never
+        touched, even if it happens to match structurally.
+
+        Idempotent: if no matching entry exists, no PUT is sent.
+
+        Args:
+            membership_id: ProjectMembership ID — bare or full reference.
+            entry: The access entry to remove. Must reference a policy
+                in ``managed_policy_ids``.
+            managed_policy_ids: AccessPolicy IDs the caller manages.
+            force: Write even if no matching entry was present.
+            max_retries: 412 retries before giving up.
+
+        Returns:
+            :class:`MergeResult`.
+        """
+        validate_managed_access([entry], managed_policy_ids)
+        target = normalize_access_entry(entry)
+
+        def mutator(current: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            return [e for e in current if e != target]
+
+        return await self._merge_pm_access_with_mutator(
+            membership_id,
+            mutator=mutator,
+            managed_policy_ids=managed_policy_ids,
+            force=force,
+            max_retries=max_retries,
+        )
+
+    async def _merge_pm_access_with_mutator(
+        self,
+        membership_id: str,
+        *,
+        mutator: Any,
+        managed_policy_ids: set[str],
+        force: bool,
+        max_retries: int,
+    ) -> MergeResult:
+        """Run a read / partition / mutate / write loop with 412 retry.
+
+        ``mutator`` receives the current managed slice (as a list of
+        normalized FHIR JSON dicts) and returns the new managed slice.
+        It is re-invoked against fresh state on every retry, so
+        concurrent writes by other callers are preserved.
+        """
+        bare_id = _normalize_project_membership_id(membership_id)
+        if not managed_policy_ids:
+            raise ValueError("managed_policy_ids must not be empty")
+        if max_retries < 0:
+            raise ValueError("max_retries must be >= 0")
+
+        # Membership administration runs as the calling credential, never
+        # as an OBO target — clear any ambient/default OBO for these calls.
+        attempt = 0
+        while True:
+            membership = await self.read_resource(
+                "ProjectMembership", bare_id, on_behalf_of=""
+            )
+            version_id = membership.get("meta", {}).get("versionId")
+            if not isinstance(version_id, str) or not version_id:
+                raise ValueError(
+                    "ProjectMembership response is missing meta.versionId; "
+                    "refusing to write without optimistic concurrency"
+                )
+
+            current_access = membership.get("access") or []
+            current_managed, untouched = partition_access(
+                current_access, managed_policy_ids
+            )
+            new_managed = [normalize_access_entry(e) for e in mutator(current_managed)]
+            validate_managed_access(new_managed, managed_policy_ids)
+            merged = build_merged_access(untouched, new_managed)
+
+            if not force and merged_equals_remote(merged, current_access):
+                return MergeResult(
+                    updated=False,
+                    version_id=version_id,
+                    managed_count=len(new_managed),
+                    untouched_count=len(untouched),
+                )
+
+            membership["access"] = merged
+            try:
+                updated = await self.update_resource(membership, on_behalf_of="")
+            except PreconditionFailedError:
+                if attempt >= max_retries:
+                    raise
+                attempt += 1
+                continue
+
+            new_version = updated.get("meta", {}).get("versionId")
+            if not isinstance(new_version, str) or not new_version:
+                # Some servers return 204 / empty body on update. Re-read
+                # to surface the post-write versionId.
+                refreshed = await self.read_resource(
+                    "ProjectMembership", bare_id, on_behalf_of=""
+                )
+                new_version = refreshed.get("meta", {}).get("versionId") or ""
+
+            return MergeResult(
+                updated=True,
+                version_id=new_version,
+                managed_count=len(new_managed),
+                untouched_count=len(untouched),
+            )
 
     async def get(self, path: str, **kwargs: Any) -> dict[str, Any]:
         """GET from any Medplum endpoint (not just FHIR).

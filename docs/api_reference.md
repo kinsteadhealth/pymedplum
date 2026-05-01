@@ -645,6 +645,160 @@ resource_has_account(patient, "Organization/org-456")  # True/False
 get_resource_accounts(patient)  # ["Organization/org-456", ...]
 ```
 
+### ProjectMembership Access
+
+Helpers and methods for managing the parameterized AccessPolicy slice
+of `ProjectMembership.access`. See
+[ProjectMembership Access](advanced/project_membership.md) for the
+full multi-tenant pattern.
+
+#### `merge_project_membership_access(membership_id, *, managed_access, managed_policy_ids, force=False, max_retries=1) -> MergeResult`
+
+Atomically sync `ProjectMembership.access` to a desired list. Available on both `MedplumClient` (sync) and `AsyncMedplumClient` (async, identical signature).
+
+Reads the membership, builds the new `access` list, writes it back with `If-Match` from `meta.versionId`, and skips the PUT if the desired list is byte-equal to the remote. On 412, re-reads and retries up to `max_retries` times before raising.
+
+`managed_policy_ids` partitions the existing list: entries pointing at one of those AccessPolicy IDs are replaced; entries pointing elsewhere are preserved untouched. Single-writer apps (the common case) get an empty "preserved" branch — the partition exists so a manual admin edit in Medplum's UI isn't silently overwritten.
+
+**Parameters**:
+- `membership_id` (str): ProjectMembership ID — bare `"abc"` or `"ProjectMembership/abc"`; normalized internally.
+- `managed_access` (list[ProjectMembershipAccess | dict]): New value for the managed slice. Pass `[]` to remove all managed entries (lockout). Every entry must reference a policy in `managed_policy_ids`.
+- `managed_policy_ids` (set[str]): AccessPolicy IDs that count as "ours". Any entry referencing a policy outside this set is preserved untouched. Empty sets are rejected.
+- `force` (bool): If `False` (default) and the merged list is byte-equal to the remote, skip the PUT. If `True`, write regardless.
+- `max_retries` (int): Number of 412 re-read+retry attempts before raising. Default `1`.
+
+**Returns**: `MergeResult` — see below.
+
+**Raises**:
+- `PreconditionFailedError` — after `max_retries + 1` consecutive 412s.
+- `ValueError` — if the membership ID, `managed_policy_ids`, managed entries, or the remote `meta.versionId` are unusable.
+
+**Example**:
+```python
+from pymedplum import make_project_membership_access
+
+# Alice works at three practices — pass one entry per tenant.
+result = client.merge_project_membership_access(
+    "alice-membership-id",
+    managed_access=[
+        make_project_membership_access(
+            "AccessPolicy/practice-policy",
+            {"organization": "Organization/practice-a"},
+        ),
+        make_project_membership_access(
+            "AccessPolicy/practice-policy",
+            {"organization": "Organization/practice-b"},
+        ),
+        make_project_membership_access(
+            "AccessPolicy/practice-policy",
+            {"organization": "Organization/practice-c"},
+        ),
+    ],
+    managed_policy_ids={"practice-policy"},
+)
+print(result.updated, result.version_id, result.managed_count)
+```
+
+#### `add_project_membership_access_entry(membership_id, entry, *, managed_policy_ids, force=False, max_retries=1) -> MergeResult`
+
+Atomically append one entry to the managed slice. Available on both clients.
+
+The read-modify-write happens inside the 412 retry loop, so concurrent writes by other callers (adds or removes against the same managed slice) are preserved across the operation. Idempotent: if a structurally-equal entry already exists, no PUT is sent.
+
+**Parameters**:
+- `membership_id` (str): ProjectMembership ID — bare or full reference.
+- `entry` (ProjectMembershipAccess | dict): Access entry to append. Must reference a policy in `managed_policy_ids`.
+- `managed_policy_ids` (set[str]): AccessPolicy IDs the caller manages.
+- `force` (bool): Write even if the entry was already present.
+- `max_retries` (int): 412 retries before giving up. Default `1`.
+
+**Example**:
+```python
+client.add_project_membership_access_entry(
+    "alice-membership-id",
+    make_project_membership_access(
+        "AccessPolicy/practice-policy",
+        {"organization": "Organization/practice-d"},
+    ),
+    managed_policy_ids={"practice-policy"},
+)
+```
+
+#### `remove_project_membership_access_entry(membership_id, entry, *, managed_policy_ids, force=False, max_retries=1) -> MergeResult`
+
+Atomically remove a structurally-equal entry from the managed slice. Available on both clients.
+
+Same atomicity guarantee as `add_project_membership_access_entry`. Only the managed slice is searched — entries pointing at policies outside `managed_policy_ids` are never touched, even if they happen to match structurally. Idempotent: if no matching entry exists, no PUT is sent.
+
+**Parameters**: identical shape to `add_project_membership_access_entry`.
+
+**Example**:
+```python
+client.remove_project_membership_access_entry(
+    "alice-membership-id",
+    make_project_membership_access(
+        "AccessPolicy/practice-policy",
+        {"organization": "Organization/practice-c"},
+    ),
+    managed_policy_ids={"practice-policy"},
+)
+```
+
+#### `MergeResult`
+
+Frozen dataclass returned by `merge_project_membership_access`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `updated` | bool | Whether a PUT was sent. `False` means the merged list was byte-equal and `force=False`. |
+| `version_id` | str | `meta.versionId` after the merge. New value when `updated=True`, pre-existing when `updated=False`. |
+| `managed_count` | int | Entries in the managed slice after the merge. |
+| `untouched_count` | int | Entries preserved untouched. |
+
+#### `make_project_membership_access(policy, parameters) -> dict`
+
+Build a single `ProjectMembership.access` entry dict.
+
+**Parameters**:
+- `policy` (str | Reference | dict): AccessPolicy reference. Bare ID, `"AccessPolicy/<id>"`, `Reference` model, or raw reference dict.
+- `parameters` (Mapping[str, str | Reference | dict]): Parameter name → value. Reference-shaped values (`"ResourceType/id"`, `Reference`, dicts with `reference`) emit `valueReference`; plain strings emit `valueString`.
+
+**Returns**: FHIR JSON dict suitable for inclusion in `ProjectMembership.access`.
+
+**Raises**: `ValueError` for malformed inputs.
+
+#### `normalize_access_policy_reference(policy) -> dict`
+
+Return a `{"reference": "AccessPolicy/<id>"}` dict for a bare ID, full reference string, `Reference` model, or raw reference dict. Raises `ValueError` for empty or non-`AccessPolicy` inputs.
+
+#### `normalize_access_policy_id(policy) -> str`
+
+Return the bare AccessPolicy ID for any of the same input shapes as `normalize_access_policy_reference`.
+
+#### `get_project_membership_access_policy_id(entry) -> str | None`
+
+Return the bare AccessPolicy ID from an access entry. Returns `None` for malformed entries instead of raising.
+
+#### `get_project_membership_access_parameter(entry, name) -> dict | None`
+
+Return the named parameter dict from an access entry, or `None` if absent. Accepts dict and Pydantic entries.
+
+#### `partition_access(current, managed_policy_ids) -> tuple[list[dict], list[dict]]`
+
+Split a `ProjectMembership.access` list into `(managed, untouched)`. Pure / deterministic. Malformed entries fall into `untouched`.
+
+#### `build_merged_access(untouched, managed_access) -> list[dict]`
+
+Concatenate untouched (in original order) with managed entries (in caller order). Both are normalized to FHIR JSON.
+
+#### `merged_equals_remote(merged, remote) -> bool`
+
+Byte-equality via canonical JSON (sorted keys). Insignificant key ordering doesn't cause false negatives.
+
+#### `validate_managed_access(managed_access, managed_policy_ids) -> None`
+
+Reject managed entries whose policies fall outside `managed_policy_ids`. Raises `ValueError` on the first offender.
+
 ### Async Jobs
 
 #### `get_async_job_status(job) -> dict`

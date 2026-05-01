@@ -5,6 +5,14 @@ authenticated service act as a specific `ProjectMembership`. PyMedplum
 sends the membership reference in the `X-Medplum-On-Behalf-Of` header
 on every outbound request where OBO is active.
 
+When OBO is in effect, Medplum applies the target membership's
+`accessPolicy` and `access` entries to the request — that membership's
+parameterized access rules are what determine what the call can see
+or write. See
+[ProjectMembership Access](project_membership.md) for how to keep
+those access entries in sync with your application's source of
+truth.
+
 There are three ways to set OBO on a PyMedplum client. This page
 walks through each, the precedence rules between them, and how OBO
 interacts with async tasks and worker pools.

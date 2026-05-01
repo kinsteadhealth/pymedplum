@@ -1,6 +1,19 @@
 """Pymedplum - Unofficial Medplum Python SDK."""
 
 from .__version__ import __version__
+from .access import (
+    MergeResult,
+    build_merged_access,
+    get_project_membership_access_parameter,
+    get_project_membership_access_policy_id,
+    make_project_membership_access,
+    merged_equals_remote,
+    normalize_access_entry,
+    normalize_access_policy_id,
+    normalize_access_policy_reference,
+    partition_access,
+    validate_managed_access,
+)
 from .async_client import AsyncMedplumClient
 from .bundle import FHIRBundle
 from .client import MedplumClient
@@ -41,6 +54,7 @@ __all__ = [
     "InsecureTransportError",
     "MedplumClient",
     "MedplumError",
+    "MergeResult",
     "NetworkError",
     "NotFoundError",
     "OperationOutcomeError",
@@ -54,12 +68,22 @@ __all__ = [
     "UnsafeRedirectError",
     "ValidationError",
     "__version__",
+    "build_merged_access",
     "build_reference",
     "extract_identifier",
     "get_code_display",
     "get_patient_display_name",
+    "get_project_membership_access_parameter",
+    "get_project_membership_access_policy_id",
     "get_resource_accounts",
+    "make_project_membership_access",
+    "merged_equals_remote",
+    "normalize_access_entry",
+    "normalize_access_policy_id",
+    "normalize_access_policy_reference",
     "parse_reference",
+    "partition_access",
     "resource_has_account",
     "to_fhir_json",
+    "validate_managed_access",
 ]
