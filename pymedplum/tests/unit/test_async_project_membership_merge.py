@@ -6,8 +6,7 @@ Mirrors the scenario matrix in
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
@@ -21,6 +20,8 @@ from pymedplum import (
     make_project_membership_access,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 _BASE_URL = "https://api.medplum.com/"
 _PM_PATH = f"{_BASE_URL}fhir/R4/ProjectMembership/abc"
@@ -148,9 +149,7 @@ async def test_merge_empty_removes_managed_preserves_untouched(
 ) -> None:
     untouched = _other_entry()
     managed = _managed_entry()
-    _, put_route = _mock_endpoints(
-        respx_mock, _membership(access=[untouched, managed])
-    )
+    _, put_route = _mock_endpoints(respx_mock, _membership(access=[untouched, managed]))
 
     result = await async_client.merge_project_membership_access(
         "abc",
@@ -186,7 +185,7 @@ async def test_merge_raises_when_remote_lacks_version_id(
         return_value=httpx.Response(200, json=body)
     )
 
-    with pytest.raises(ValueError, match="meta.versionId"):
+    with pytest.raises(ValueError, match=r"meta\.versionId"):
         await async_client.merge_project_membership_access(
             "abc",
             managed_access=[_managed_entry()],
@@ -235,9 +234,7 @@ async def test_merge_412_retry_succeeds(
                     "issue": [{"severity": "error", "code": "conflict"}],
                 },
             ),
-            httpx.Response(
-                200, json={**membership_v2, "meta": {"versionId": "3"}}
-            ),
+            httpx.Response(200, json={**membership_v2, "meta": {"versionId": "3"}}),
         ]
     )
 
@@ -258,9 +255,7 @@ async def test_merge_412_exhaustion_raises(
     async_client: AsyncMedplumClient, respx_mock: MockRouter
 ) -> None:
     membership = _membership(access=[])
-    respx_mock.get(_PM_PATH).mock(
-        return_value=httpx.Response(200, json=membership)
-    )
+    respx_mock.get(_PM_PATH).mock(return_value=httpx.Response(200, json=membership))
     respx_mock.put(_PM_PATH).mock(
         return_value=httpx.Response(
             412,

@@ -10,15 +10,6 @@ from urllib.parse import urlparse
 import httpx
 
 from ._auth import TokenManager, TokenSource
-from .access import (
-    MergeResult,
-    _normalize_project_membership_id,
-    build_merged_access,
-    merged_equals_remote,
-    normalize_access_entry,
-    partition_access,
-    validate_managed_access,
-)
 from ._base import (
     MAX_WIRE_ATTEMPTS,
     BaseClient,
@@ -48,6 +39,15 @@ from ._security import (
     validate_operation_name,
     validate_resource_id,
     validate_resource_type,
+)
+from .access import (
+    MergeResult,
+    _normalize_project_membership_id,
+    build_merged_access,
+    merged_equals_remote,
+    normalize_access_entry,
+    partition_access,
+    validate_managed_access,
 )
 from .bundle import FHIRBundle
 from .exceptions import (
@@ -593,13 +593,25 @@ class MedplumClient(BaseClient):
 
     @overload
     def read_resource(
-        self, resource_type: str, resource_id: str, as_fhir: type[ResourceT]
+        self,
+        resource_type: str,
+        resource_id: str,
+        as_fhir: type[ResourceT],
+        *,
+        headers: dict[str, str] | None = None,
+        on_behalf_of: str | None = None,
     ) -> ResourceT:
         pass
 
     @overload
     def read_resource(
-        self, resource_type: str, resource_id: str, as_fhir: None = None
+        self,
+        resource_type: str,
+        resource_id: str,
+        as_fhir: None = None,
+        *,
+        headers: dict[str, str] | None = None,
+        on_behalf_of: str | None = None,
     ) -> dict[str, Any]:
         pass
 
@@ -1533,7 +1545,7 @@ class MedplumClient(BaseClient):
         def mutator(current: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if any(existing == target for existing in current):
                 return list(current)
-            return list(current) + [target]
+            return [*current, target]
 
         return self._merge_pm_access_with_mutator(
             membership_id,
@@ -1613,9 +1625,13 @@ class MedplumClient(BaseClient):
         if max_retries < 0:
             raise ValueError("max_retries must be >= 0")
 
+        # Membership administration runs as the calling credential, never
+        # as an OBO target — clear any ambient/default OBO for these calls.
         attempt = 0
         while True:
-            membership = self.read_resource("ProjectMembership", bare_id)
+            membership = self.read_resource(
+                "ProjectMembership", bare_id, on_behalf_of=""
+            )
             version_id = membership.get("meta", {}).get("versionId")
             if not isinstance(version_id, str) or not version_id:
                 raise ValueError(
@@ -1627,9 +1643,7 @@ class MedplumClient(BaseClient):
             current_managed, untouched = partition_access(
                 current_access, managed_policy_ids
             )
-            new_managed = [
-                normalize_access_entry(e) for e in mutator(current_managed)
-            ]
+            new_managed = [normalize_access_entry(e) for e in mutator(current_managed)]
             validate_managed_access(new_managed, managed_policy_ids)
             merged = build_merged_access(untouched, new_managed)
 
@@ -1643,14 +1657,22 @@ class MedplumClient(BaseClient):
 
             membership["access"] = merged
             try:
-                updated = self.update_resource(membership)
+                updated = self.update_resource(membership, on_behalf_of="")
             except PreconditionFailedError:
                 if attempt >= max_retries:
                     raise
                 attempt += 1
                 continue
 
-            new_version = updated.get("meta", {}).get("versionId") or ""
+            new_version = updated.get("meta", {}).get("versionId")
+            if not isinstance(new_version, str) or not new_version:
+                # Some servers return 204 / empty body on update. Re-read
+                # to surface the post-write versionId.
+                refreshed = self.read_resource(
+                    "ProjectMembership", bare_id, on_behalf_of=""
+                )
+                new_version = refreshed.get("meta", {}).get("versionId") or ""
+
             return MergeResult(
                 updated=True,
                 version_id=new_version,

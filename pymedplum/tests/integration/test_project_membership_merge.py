@@ -66,7 +66,9 @@ def _make_managed_policy(
     )
 
 
-def _make_org(medplum_client: MedplumClient, test_id: str, suffix: str) -> dict[str, Any]:
+def _make_org(
+    medplum_client: MedplumClient, test_id: str, suffix: str
+) -> dict[str, Any]:
     org = Organization(name=f"Merge Org {suffix} - {test_id}")
     return medplum_client.create_resource(to_fhir_json(org))
 
@@ -174,9 +176,7 @@ def test_merge_writes_typed_and_dict_inputs(medplum_client, merge_env):
         assert entry["policy"] == {"reference": f"AccessPolicy/{managed_policy_id}"}
         param = get_project_membership_access_parameter(entry, "organization")
         assert param is not None
-        assert param["valueReference"] == {
-            "reference": f"Organization/{org_a['id']}"
-        }
+        assert param["valueReference"] == {"reference": f"Organization/{org_a['id']}"}
 
 
 def test_merge_preserves_untouched_entries(medplum_client, merge_env):
@@ -255,7 +255,16 @@ def test_merge_idempotent_no_write(medplum_client, merge_env):
 
 
 def test_merge_force_writes_when_byte_equal(medplum_client, merge_env):
-    """`force=True` writes regardless of byte equality."""
+    """`force=True` skips the SDK's byte-equal short-circuit and sends
+    the PUT.
+
+    Note: Medplum itself optimizes byte-equal PUTs and may return the
+    same ``versionId`` as before. ``MergeResult.updated=True`` reflects
+    that the SDK issued a PUT — it does not promise the server bumped
+    the version. The non-force path (covered by
+    ``test_merge_idempotent_no_write``) verifies the SDK *doesn't*
+    issue a PUT when nothing changed.
+    """
     membership_id = merge_env["membership"]["id"]
     managed_policy_id = merge_env["managed_policy"]["id"]
     entry = make_project_membership_access(
@@ -263,7 +272,7 @@ def test_merge_force_writes_when_byte_equal(medplum_client, merge_env):
         {"organization": f"Organization/{merge_env['org_a']['id']}"},
     )
 
-    first = medplum_client.merge_project_membership_access(
+    medplum_client.merge_project_membership_access(
         membership_id,
         managed_access=[entry],
         managed_policy_ids={managed_policy_id},
@@ -276,7 +285,6 @@ def test_merge_force_writes_when_byte_equal(medplum_client, merge_env):
     )
 
     assert forced.updated is True
-    assert forced.version_id != first.version_id
 
 
 def test_merge_rejects_unmanaged_entries(medplum_client, merge_env):
@@ -288,9 +296,7 @@ def test_merge_rejects_unmanaged_entries(medplum_client, merge_env):
             managed_access=[
                 make_project_membership_access(
                     f"AccessPolicy/{merge_env['other_policy']['id']}",
-                    {
-                        "organization": f"Organization/{merge_env['org_a']['id']}"
-                    },
+                    {"organization": f"Organization/{merge_env['org_a']['id']}"},
                 )
             ],
             managed_policy_ids={merge_env["managed_policy"]["id"]},
@@ -338,9 +344,7 @@ def test_merge_real_412_concurrent_writers(medplum_client, merge_env):
     assert org_param["valueReference"]["reference"].endswith(merge_env["org_b"]["id"])
 
 
-def test_merge_does_not_send_obo_header(
-    medplum_client, merge_env, monkeypatch
-):
+def test_merge_does_not_send_obo_header(medplum_client, merge_env, monkeypatch):
     """Membership administration calls go without
     ``X-Medplum-On-Behalf-Of``. OBO is for clinical data, not
     membership administration."""

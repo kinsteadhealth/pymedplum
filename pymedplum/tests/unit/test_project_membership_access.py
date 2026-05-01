@@ -26,7 +26,6 @@ from pymedplum.fhir import (
     Reference,
 )
 
-
 # ---------------------------------------------------------------------------
 # make_project_membership_access
 # ---------------------------------------------------------------------------
@@ -57,9 +56,7 @@ def test_make_access_accepts_bare_policy_id() -> None:
 
 def test_make_access_accepts_reference_model() -> None:
     ref = Reference(reference="AccessPolicy/abc")
-    entry = make_project_membership_access(
-        ref, {"organization": "Organization/org-a"}
-    )
+    entry = make_project_membership_access(ref, {"organization": "Organization/org-a"})
     assert entry["policy"] == {"reference": "AccessPolicy/abc"}
 
 
@@ -72,9 +69,7 @@ def test_make_access_accepts_raw_reference_dict() -> None:
 
 
 def test_make_access_emits_value_string_for_plain_string() -> None:
-    entry = make_project_membership_access(
-        "AccessPolicy/abc", {"role": "admin"}
-    )
+    entry = make_project_membership_access("AccessPolicy/abc", {"role": "admin"})
     assert entry["parameter"] == [{"name": "role", "valueString": "admin"}]
 
 
@@ -110,9 +105,7 @@ def test_make_access_emits_value_reference_for_reference_model() -> None:
 
 def test_make_access_rejects_empty_parameter_name() -> None:
     with pytest.raises(ValueError):
-        make_project_membership_access(
-            "AccessPolicy/abc", {"": "Organization/org-a"}
-        )
+        make_project_membership_access("AccessPolicy/abc", {"": "Organization/org-a"})
 
 
 def test_make_access_rejects_empty_policy_id() -> None:
@@ -130,7 +123,8 @@ def test_make_access_rejects_wrong_resource_type() -> None:
 def test_make_access_rejects_unsupported_value_shape() -> None:
     with pytest.raises((TypeError, ValueError)):
         make_project_membership_access(
-            "AccessPolicy/abc", {"organization": 123}  # type: ignore[dict-item]
+            "AccessPolicy/abc",
+            {"organization": 123},  # type: ignore[dict-item]
         )
 
 
@@ -188,9 +182,7 @@ def test_get_policy_id_from_dict_entry() -> None:
 
 
 def test_get_policy_id_from_pydantic_entry() -> None:
-    entry = ProjectMembershipAccess(
-        policy=Reference(reference="AccessPolicy/abc")
-    )
+    entry = ProjectMembershipAccess(policy=Reference(reference="AccessPolicy/abc"))
     assert get_project_membership_access_policy_id(entry) == "abc"
 
 
@@ -210,9 +202,7 @@ def test_get_policy_id_returns_none_for_malformed(entry) -> None:
 
 
 def test_get_parameter_returns_named() -> None:
-    entry = make_project_membership_access(
-        "abc", {"organization": "Organization/o1"}
-    )
+    entry = make_project_membership_access("abc", {"organization": "Organization/o1"})
     param = get_project_membership_access_parameter(entry, "organization")
     assert param is not None
     assert param["valueReference"] == {"reference": "Organization/o1"}
@@ -296,9 +286,7 @@ def test_partition_rejects_empty_managed_set() -> None:
 
 
 def test_validate_managed_access_accepts_managed() -> None:
-    validate_managed_access(
-        [{"policy": {"reference": "AccessPolicy/m1"}}], {"m1"}
-    )
+    validate_managed_access([{"policy": {"reference": "AccessPolicy/m1"}}], {"m1"})
 
 
 def test_validate_managed_access_rejects_unmanaged() -> None:
@@ -319,9 +307,7 @@ def test_validate_managed_access_rejects_empty_set() -> None:
 
 
 def test_validate_managed_access_accepts_pydantic_entries() -> None:
-    entry = ProjectMembershipAccess(
-        policy=Reference(reference="AccessPolicy/m1")
-    )
+    entry = ProjectMembershipAccess(policy=Reference(reference="AccessPolicy/m1"))
     validate_managed_access([entry], {"m1"})
 
 
@@ -358,9 +344,11 @@ def test_build_merged_access_preserves_order() -> None:
         {"policy": {"reference": "AccessPolicy/m2"}},
     ]
     merged = build_merged_access(untouched, managed)
-    assert [
-        get_project_membership_access_policy_id(e) for e in merged
-    ] == ["u", "m1", "m2"]
+    assert [get_project_membership_access_policy_id(e) for e in merged] == [
+        "u",
+        "m1",
+        "m2",
+    ]
 
 
 def test_build_merged_access_empty_managed_returns_untouched() -> None:

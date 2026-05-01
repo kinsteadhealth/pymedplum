@@ -25,7 +25,7 @@ caller's responsibility.
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -60,8 +60,7 @@ def _normalize_project_membership_id(membership_id: str) -> str:
     """
     if not isinstance(membership_id, str):
         raise TypeError(
-            "membership_id must be a string, got "
-            f"{type(membership_id).__name__}"
+            f"membership_id must be a string, got {type(membership_id).__name__}"
         )
     bare = membership_id.strip()
     if not bare:
@@ -70,8 +69,7 @@ def _normalize_project_membership_id(membership_id: str) -> str:
         resource_type, _, resource_id = bare.partition("/")
         if resource_type != _PROJECT_MEMBERSHIP_RESOURCE_TYPE:
             raise ValueError(
-                "membership_id must reference ProjectMembership, got "
-                f"'{resource_type}'"
+                f"membership_id must reference ProjectMembership, got '{resource_type}'"
             )
         if not resource_id:
             raise ValueError("membership_id is missing an ID")
@@ -111,8 +109,7 @@ def _entry_to_dict(entry: BaseModel | Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(entry, Mapping):
         return dict(entry)
     raise TypeError(
-        "Access entry must be a Pydantic model or mapping, got "
-        f"{type(entry).__name__}"
+        f"Access entry must be a Pydantic model or mapping, got {type(entry).__name__}"
     )
 
 
@@ -173,7 +170,7 @@ def normalize_access_policy_id(
 
     Accepts the same shapes as :func:`normalize_access_policy_reference`.
     """
-    ref = normalize_access_policy_reference(policy)["reference"]
+    ref: str = normalize_access_policy_reference(policy)["reference"]
     return ref.split("/", 1)[1]
 
 
@@ -187,9 +184,7 @@ def _coerce_parameter_value(
     """
     if isinstance(value, str):
         if not value:
-            raise ValueError(
-                f"Parameter '{name}' value must not be an empty string"
-            )
+            raise ValueError(f"Parameter '{name}' value must not be an empty string")
         if "/" in value:
             return {"valueReference": {"reference": value}}
         return {"valueString": value}
@@ -252,8 +247,7 @@ def make_project_membership_access(
 
     if not isinstance(parameters, Mapping):
         raise TypeError(
-            "parameters must be a Mapping, got "
-            f"{type(parameters).__name__}"
+            f"parameters must be a Mapping, got {type(parameters).__name__}"
         )
 
     parameter_list: list[dict[str, Any]] = []
@@ -311,9 +305,10 @@ def get_project_membership_access_parameter(
     parameters = data.get("parameter")
     if not isinstance(parameters, Iterable):
         return None
-    for param in parameters:
-        if isinstance(param, BaseModel):
-            param = to_fhir_json(param)
+    for raw_param in parameters:
+        param = (
+            to_fhir_json(raw_param) if isinstance(raw_param, BaseModel) else raw_param
+        )
         if not isinstance(param, Mapping):
             continue
         if param.get("name") == name:
@@ -336,15 +331,15 @@ def normalize_access_entry(
         # Round-trip through json to reject non-JSON-serializable values
         # while preserving dict shape (cheap and avoids surprising mutations
         # of caller-owned objects).
-        return json.loads(json.dumps(entry))
+        result: dict[str, Any] = json.loads(json.dumps(entry))
+        return result
     raise TypeError(
-        "Access entry must be a Pydantic model or mapping, got "
-        f"{type(entry).__name__}"
+        f"Access entry must be a Pydantic model or mapping, got {type(entry).__name__}"
     )
 
 
 def partition_access(
-    current: list[BaseModel | Mapping[str, Any]] | None,
+    current: Sequence[BaseModel | Mapping[str, Any]] | None,
     managed_policy_ids: set[str],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Split current ``access`` into (managed, untouched).
@@ -386,8 +381,8 @@ def partition_access(
 
 
 def build_merged_access(
-    untouched: list[BaseModel | Mapping[str, Any]],
-    managed_access: list[BaseModel | Mapping[str, Any]],
+    untouched: Sequence[BaseModel | Mapping[str, Any]],
+    managed_access: Sequence[BaseModel | Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     """Build the merged ``ProjectMembership.access`` list.
 
@@ -405,8 +400,8 @@ def _stable_dump(value: Any) -> str:
 
 
 def merged_equals_remote(
-    merged: list[BaseModel | Mapping[str, Any]],
-    remote: list[BaseModel | Mapping[str, Any]] | None,
+    merged: Sequence[BaseModel | Mapping[str, Any]],
+    remote: Sequence[BaseModel | Mapping[str, Any]] | None,
 ) -> bool:
     """Return ``True`` if the merged list is byte-equal to remote.
 
@@ -421,7 +416,7 @@ def merged_equals_remote(
 
 
 def validate_managed_access(
-    managed_access: list[BaseModel | Mapping[str, Any]],
+    managed_access: Sequence[BaseModel | Mapping[str, Any]],
     managed_policy_ids: set[str],
 ) -> None:
     """Reject managed entries that reference unmanaged policies.
@@ -443,8 +438,7 @@ def validate_managed_access(
         policy_id = get_project_membership_access_policy_id(entry)
         if policy_id is None:
             raise ValueError(
-                f"managed_access[{index}] has no resolvable AccessPolicy "
-                "reference"
+                f"managed_access[{index}] has no resolvable AccessPolicy reference"
             )
         if policy_id not in managed_policy_ids:
             raise ValueError(

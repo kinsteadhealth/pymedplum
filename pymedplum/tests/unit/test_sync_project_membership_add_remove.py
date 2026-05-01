@@ -18,7 +18,6 @@ from pymedplum import (
     make_project_membership_access,
 )
 
-
 _BASE_URL = "https://api.medplum.com/"
 _PM_PATH = f"{_BASE_URL}fhir/R4/ProjectMembership/abc"
 
@@ -224,9 +223,7 @@ def test_remove_preserves_concurrent_add_via_412_retry(
     entry_x = _entry("x")
 
     initial = _membership(version_id="1", access=[entry_a])
-    after_concurrent = _membership(
-        version_id="2", access=[entry_a, entry_x]
-    )
+    after_concurrent = _membership(version_id="2", access=[entry_a, entry_x])
 
     respx_mock.get(_PM_PATH).mock(
         side_effect=[

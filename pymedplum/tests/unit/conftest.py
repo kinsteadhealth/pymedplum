@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
@@ -11,6 +10,8 @@ from respx import MockRouter
 
 from pymedplum.client import MedplumClient
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 _BASE_URL = "https://api.medplum.com/"
 
@@ -18,11 +19,8 @@ _BASE_URL = "https://api.medplum.com/"
 @pytest.fixture
 def sync_client() -> Iterator[MedplumClient]:
     """Sync MedplumClient with a static access token (no OAuth roundtrip)."""
-    client = MedplumClient(base_url=_BASE_URL, access_token="tkn")
-    try:
+    with MedplumClient(base_url=_BASE_URL, access_token="tkn") as client:
         yield client
-    finally:
-        client.close()
 
 
 @pytest.fixture

@@ -15,7 +15,6 @@ from pymedplum import (
     make_project_membership_access,
 )
 
-
 _BASE_URL = "https://api.medplum.com/"
 _PM_PATH = f"{_BASE_URL}fhir/R4/ProjectMembership/abc"
 
@@ -143,7 +142,7 @@ def test_merge_raises_when_remote_lacks_version_id(
         return_value=httpx.Response(200, json=body)
     )
 
-    with pytest.raises(ValueError, match="meta.versionId"):
+    with pytest.raises(ValueError, match=r"meta\.versionId"):
         sync_client.merge_project_membership_access(
             "abc",
             managed_access=[_managed_entry()],
@@ -193,9 +192,7 @@ def test_merge_412_retry_succeeds(
                     "issue": [{"severity": "error", "code": "conflict"}],
                 },
             ),
-            httpx.Response(
-                200, json={**membership_v2, "meta": {"versionId": "3"}}
-            ),
+            httpx.Response(200, json={**membership_v2, "meta": {"versionId": "3"}}),
         ]
     )
 
@@ -217,9 +214,7 @@ def test_merge_412_exhaustion_raises(
     membership_factory: Any,
 ) -> None:
     membership = membership_factory(access=[])
-    respx_mock.get(_PM_PATH).mock(
-        return_value=httpx.Response(200, json=membership)
-    )
+    respx_mock.get(_PM_PATH).mock(return_value=httpx.Response(200, json=membership))
     respx_mock.put(_PM_PATH).mock(
         return_value=httpx.Response(
             412,
@@ -294,3 +289,65 @@ def test_merge_rejects_empty_managed_policy_ids(
             managed_access=[],
             managed_policy_ids=set(),
         )
+
+
+def test_merge_clears_ambient_obo(
+    membership_factory: Any,
+    mock_membership_endpoints: Any,
+) -> None:
+    """Merge runs as the calling credential, never as an OBO target.
+    Even when the client has a default_on_behalf_of set, neither the
+    GET nor the PUT should carry X-Medplum-On-Behalf-Of."""
+    client = MedplumClient(
+        base_url=_BASE_URL,
+        access_token="tkn",
+        default_on_behalf_of="ProjectMembership/some-other-id",
+    )
+    try:
+        membership = membership_factory(access=[])
+        get_route, put_route = mock_membership_endpoints(membership, next_version="2")
+        client.merge_project_membership_access(
+            "abc",
+            managed_access=[_managed_entry()],
+            managed_policy_ids={"managed-1"},
+        )
+        assert get_route.called
+        assert put_route.called
+        for call in (*get_route.calls, *put_route.calls):
+            obo = {k.lower(): v for k, v in call.request.headers.items()}.get(
+                "x-medplum-on-behalf-of"
+            )
+            assert obo is None, f"Unexpected OBO header on admin call: {obo!r}"
+    finally:
+        client.close()
+
+
+def test_merge_falls_back_to_read_when_update_returns_no_version(
+    sync_client: MedplumClient,
+    respx_mock: MockRouter,
+    membership_factory: Any,
+) -> None:
+    """If the PUT response lacks meta.versionId (e.g., 204 No Content
+    or empty body), the helper re-reads to surface the post-write
+    versionId on MergeResult."""
+    membership_v1 = membership_factory(version_id="1", access=[])
+    membership_v2 = membership_factory(version_id="2", access=[])
+
+    respx_mock.get(_PM_PATH).mock(
+        side_effect=[
+            httpx.Response(200, json=membership_v1),
+            httpx.Response(200, json=membership_v2),
+        ]
+    )
+    respx_mock.put(_PM_PATH).mock(
+        # No meta on PUT response — forces the follow-up read.
+        return_value=httpx.Response(200, json={})
+    )
+
+    result = sync_client.merge_project_membership_access(
+        "abc",
+        managed_access=[_managed_entry()],
+        managed_policy_ids={"managed-1"},
+    )
+    assert result.updated is True
+    assert result.version_id == "2"

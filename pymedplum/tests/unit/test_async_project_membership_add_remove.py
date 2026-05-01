@@ -6,8 +6,7 @@ Mirrors the scenario matrix in
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
@@ -19,6 +18,8 @@ from pymedplum import (
     make_project_membership_access,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 _BASE_URL = "https://api.medplum.com/"
 _PM_PATH = f"{_BASE_URL}fhir/R4/ProjectMembership/abc"
@@ -248,9 +249,7 @@ async def test_remove_preserves_concurrent_add_via_412_retry(
     entry_x = _entry("x")
 
     initial = _membership(version_id="1", access=[entry_a])
-    after_concurrent = _membership(
-        version_id="2", access=[entry_a, entry_x]
-    )
+    after_concurrent = _membership(version_id="2", access=[entry_a, entry_x])
 
     respx_mock.get(_PM_PATH).mock(
         side_effect=[
@@ -295,9 +294,7 @@ async def test_remove_only_touches_managed_slice(
         "AccessPolicy/other",
         {"organization": "Organization/org-a"},
     )
-    _, put_route = _mock_endpoints(
-        respx_mock, _membership(access=[managed, unmanaged])
-    )
+    _, put_route = _mock_endpoints(respx_mock, _membership(access=[managed, unmanaged]))
 
     await async_client.remove_project_membership_access_entry(
         "abc",
