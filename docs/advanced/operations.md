@@ -66,6 +66,11 @@ result = client.execute_operation(
 
 In multi-tenant MSO (Management Services Organization) setups, Medplum uses `meta.accounts` to assign resources to accounts — typically Organizations — which drive compartment-based access control via AccessPolicies.
 
+`$set-accounts` and `ProjectMembership.access` are complementary halves of multi-tenancy:
+
+- `set_accounts` (this section) puts a *resource* (Patient, Encounter, …) under one or more tenant compartments.
+- `merge_project_membership_access` (see [ProjectMembership Access](project_membership.md)) gives a *user* access to those compartments via a parameterized AccessPolicy entry on their `ProjectMembership`.
+
 `set_accounts` wraps Medplum’s `$set-accounts` operation:
 
 ```python

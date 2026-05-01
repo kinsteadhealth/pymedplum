@@ -43,3 +43,59 @@ membership = client.invite_user(
 print(membership["id"])
 ```
 
+### Example: repair or replace a user's parameterized access
+
+After invitation (or during a tenant move) the parameterized
+`ProjectMembership.access` slice that grants tenant access often
+needs to be set or rewritten. Three methods, all on the client and
+all atomic with `If-Match`-driven 412 retry:
+
+- `merge_project_membership_access` — replace the whole managed slice
+  with a desired list (bulk reconcile).
+- `add_project_membership_access_entry` — atomically add one tenant.
+- `remove_project_membership_access_entry` — atomically remove one
+  tenant.
+
+Use the bulk form when you have the full desired list — typically a
+one-shot script during data migration, an admin tool that reads all
+of a user's tenant assignments in one query, or a recovery job that
+restores a known-good state:
+
+```python
+from pymedplum import make_project_membership_access
+
+client.merge_project_membership_access(
+    membership["id"],
+    managed_access=[
+        make_project_membership_access(
+            "AccessPolicy/practice-policy",
+            {"organization": "Organization/practice-a"},
+        ),
+        make_project_membership_access(
+            "AccessPolicy/practice-policy",
+            {"organization": "Organization/practice-b"},
+        ),
+    ],
+    managed_policy_ids={"practice-policy"},
+)
+```
+
+Use the single-entry forms when reacting to a UI event:
+
+```python
+client.add_project_membership_access_entry(
+    membership["id"],
+    make_project_membership_access(
+        "AccessPolicy/practice-policy",
+        {"organization": "Organization/practice-c"},
+    ),
+    managed_policy_ids={"practice-policy"},
+)
+```
+
+To revoke the entire managed grant in one shot without touching
+unrelated entries, call `merge_project_membership_access` with
+`managed_access=[]`. See
+[ProjectMembership Access](project_membership.md) for the full
+contract.
+
