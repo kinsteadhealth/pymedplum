@@ -628,22 +628,9 @@ client.set_accounts(
 )
 ```
 
-#### `get_resource_accounts(resource) -> list[str]`
-
-Return list of account reference strings from a resource's `meta.accounts`.
-
-#### `resource_has_account(resource, account_ref) -> bool`
-
-Check if a resource is assigned to a given account.
-
-**Example**:
-```python
-from pymedplum import get_resource_accounts, resource_has_account
-
-patient = client.read_resource("Patient", "123")
-resource_has_account(patient, "Organization/org-456")  # True/False
-get_resource_accounts(patient)  # ["Organization/org-456", ...]
-```
+Reading account assignments back off a resource is done with the module-level
+helpers `get_resource_accounts`, `extract_account_references`, and
+`resource_has_account` — see [FHIR Helpers → Accounts](#accounts).
 
 ### ProjectMembership Access
 
@@ -1052,6 +1039,327 @@ async def main():
 - `search_resource_pages` returns an async iterator (use `async for`)
 - Use `async with` for the `on_behalf_of` context manager
 - The client itself supports `async with` for automatic cleanup
+
+## FHIR Helpers
+
+Pure, stateless functions for projecting FHIR data to and from plain Python —
+no client, no I/O. Import them from the top-level package:
+
+```python
+from pymedplum import (
+    parse_reference, build_reference, resolve_id,
+    get_patient_display_name, extract_identifier,
+    get_code_display, get_code_by_system, coding_parts,
+    get_resource_accounts, extract_account_references, resource_has_account,
+    to_fhir_json,
+)
+```
+
+Every helper that reads a resource accepts **either** a plain `dict` **or** a
+typed `pymedplum.fhir` model (a Pydantic model is converted with
+`model_dump(by_alias=True, exclude_none=True)` internally), so the same call
+works whether you fetched with `as_fhir=...` or not.
+
+### References
+
+#### `parse_reference(reference) -> tuple[str, str]`
+
+Split a FHIR reference **string** into its `(resource_type, id)` parts. Strict:
+use this when a malformed reference is a programming error you want surfaced.
+
+**Parameters**:
+
+- `reference` (str): A reference string like `"Patient/123"`.
+
+**Returns**: `tuple[str, str]` — `(resource_type, id)`.
+
+**Raises**: `ValueError` if `reference` is empty or has no `/` separator.
+
+**Example**:
+```python
+resource_type, resource_id = parse_reference("Patient/abc-123")
+# ("Patient", "abc-123")
+```
+
+#### `build_reference(resource_type, resource_id) -> str`
+
+Build a `"Type/id"` reference string. The inverse of `parse_reference`.
+
+**Parameters**:
+
+- `resource_type` (str): FHIR resource type, e.g. `"Patient"`.
+- `resource_id` (str): The bare resource id.
+
+**Returns**: `str` — e.g. `"Patient/123"`.
+
+**Example**:
+```python
+build_reference("Patient", "123")  # "Patient/123"
+```
+
+#### `resolve_id(reference) -> str | None`
+
+Pull the bare id out of whatever shape a reference arrives in, **leniently**.
+Where `parse_reference` raises, `resolve_id` returns `None` — reach for it when
+the input may be missing or partial and you'd rather branch than catch. Mirrors
+`@medplum/core`'s `resolveId`, with added support for plain id/reference
+strings.
+
+**Parameters**:
+
+- `reference` (str | dict | BaseModel | None): One of:
+    - a reference string — `"Patient/123"` → `"123"`
+    - a bare id string — `"123"` → `"123"`
+    - a Reference dict/model — `{"reference": "Patient/123"}` → `"123"`
+    - a Resource dict/model — returns its `id`
+
+**Returns**: `str | None` — the bare id, or `None` when none can be found
+(including `None` input, empty string, an empty dict, or a trailing-slash-only
+string like `"Patient/"`).
+
+**Example**:
+```python
+resolve_id("Patient/123")                 # "123"
+resolve_id("123")                          # "123"
+resolve_id({"reference": "Patient/abc"})   # "abc"
+resolve_id(patient)                         # patient.id
+resolve_id(None)                            # None
+```
+
+### Names & Identifiers
+
+#### `get_patient_display_name(patient) -> str`
+
+Best-effort human-readable name from a Patient's first `HumanName`. Prefers
+`name[0].text`, then joins `given` + `family`.
+
+**Parameters**:
+
+- `patient` (dict | BaseModel): A Patient resource.
+
+**Returns**: `str` — the display name, or `"Unknown"` when no usable name is
+present.
+
+**Example**:
+```python
+get_patient_display_name({"name": [{"given": ["John"], "family": "Doe"}]})
+# "John Doe"
+```
+
+#### `extract_identifier(resource, system) -> str | None`
+
+Return the value of the first `identifier` entry whose `system` matches.
+
+**Parameters**:
+
+- `resource` (dict | BaseModel): Any resource with an `identifier` array.
+- `system` (str): The identifier system URI to match, e.g.
+  `"http://hospital.org/mrn"`.
+
+**Returns**: `str | None` — the matching identifier value, or `None`.
+
+**Example**:
+```python
+extract_identifier(patient, "http://hospital.org/mrn")  # "123456"
+```
+
+### Codings & CodeableConcepts
+
+A `CodeableConcept` can carry free `text` plus one or more `coding` entries from
+different systems (e.g. an ICD-10 code **and** a SNOMED code). The three helpers
+below cover the common reads; pick by intent.
+
+| Need | Use |
+| --- | --- |
+| A label to show a human | `get_code_display` |
+| The code for **one specific** system | `get_code_by_system` |
+| The `(code, system, display, text)` of the primary coding, for a DTO | `coding_parts` |
+
+#### `get_code_display(codeable_concept) -> str | None`
+
+A display label for a CodeableConcept: returns `text` if present, otherwise the
+**first** coding's `display`.
+
+**Parameters**:
+
+- `codeable_concept` (dict | BaseModel): The CodeableConcept.
+
+**Returns**: `str | None` — the display text, or `None` if neither `text` nor a
+coding `display` is set. (Note: this does **not** fall back to the raw `code`;
+use `get_code_by_system` or `coding_parts` if you need the code.)
+
+**Example**:
+```python
+get_code_display({"text": "Type 2 Diabetes"})              # "Type 2 Diabetes"
+get_code_display({"coding": [{"display": "Hypertension"}]})  # "Hypertension"
+```
+
+#### `get_code_by_system(codeable_concept, system) -> str | None`
+
+The code of the first coding whose `system` matches — the Medplum-canonical way
+(`@medplum/core` `getCodeBySystem`) to read a code when a concept may carry
+several systems.
+
+**Parameters**:
+
+- `codeable_concept` (dict | BaseModel | None): The CodeableConcept.
+- `system` (str): The coding system URI to match.
+
+**Returns**: `str | None` — the matching code, or `None`.
+
+**Example**:
+```python
+concept = {"coding": [
+    {"system": "http://snomed.info/sct", "code": "44054006"},
+    {"system": "http://hl7.org/fhir/sid/icd-10-cm", "code": "E11.9"},
+]}
+get_code_by_system(concept, "http://hl7.org/fhir/sid/icd-10-cm")  # "E11.9"
+get_code_by_system(concept, "http://loinc.org")                   # None
+```
+
+#### `coding_parts(codeable_concept) -> tuple[str | None, str | None, str | None, str | None]`
+
+Decompose a CodeableConcept into `(code, system, display, text)` in one call —
+a low-level accessor for projecting to a DTO. Reads the **first (primary)**
+coding plus the concept-level `text`.
+
+**Parameters**:
+
+- `codeable_concept` (dict | BaseModel | None): The CodeableConcept. `None`
+  yields an all-`None` tuple.
+
+**Returns**: `tuple[str | None, str | None, str | None, str | None]` —
+`(code, system, display, text)`. Empty strings are normalized to `None`.
+
+> The first coding is **arbitrary** when a concept carries codings from multiple
+> systems. If you care about a particular system, use `get_code_by_system`
+> rather than assuming `coding[0]`.
+
+**Example**:
+```python
+coding_parts({
+    "coding": [{"code": "E11.9",
+                "system": "http://hl7.org/fhir/sid/icd-10-cm",
+                "display": "Type 2 diabetes"}],
+    "text": "DM2",
+})
+# ("E11.9", "http://hl7.org/fhir/sid/icd-10-cm", "Type 2 diabetes", "DM2")
+
+coding_parts({"text": "free text only"})  # (None, None, None, "free text only")
+```
+
+### Accounts
+
+Medplum uses account assignments for compartment-based multi-tenant access
+control. The current field is `meta.accounts` (plural, `Reference[]`); the older
+`meta.account` (singular) is **`@deprecated`** in Medplum but still present on
+resources written before the migration, so a correct reader must consider both.
+These helpers normalize the two the same way Medplum's own
+`extractAccountReferences` does — the singular account first, deduped against
+the plural list — and return reference **strings** (this SDK is
+reference-string oriented). To *write* assignments, use the `set_accounts`
+client operation under [Multi-Tenant Accounts](#multi-tenant-accounts).
+
+#### `get_resource_accounts(resource) -> list[str]`
+
+All account references assigned to a resource.
+
+**Parameters**:
+
+- `resource` (dict | BaseModel): The FHIR resource.
+
+**Returns**: `list[str]` — account references (e.g.
+`["Organization/abc", "Practitioner/xyz"]`); `[]` when none are assigned.
+Malformed entries (non-dict, or missing `reference`) are skipped.
+
+**Example**:
+```python
+get_resource_accounts(patient)  # ["Organization/org-1", "Organization/org-2"]
+```
+
+#### `extract_account_references(meta) -> list[str]`
+
+The `meta`-level primitive behind `get_resource_accounts` — use it when you
+already hold a `meta` dict rather than the whole resource.
+
+**Parameters**:
+
+- `meta` (dict | BaseModel | None): A resource's `meta` object (a plain dict
+  or a typed `Meta` model).
+
+**Returns**: `list[str]` — normalized account references (singular-first,
+deduped); `[]` for `None`/empty meta.
+
+**Example**:
+```python
+extract_account_references({
+    "account": {"reference": "Organization/org-1"},      # deprecated singular
+    "accounts": [{"reference": "Organization/org-2"}],   # current plural
+})
+# ["Organization/org-1", "Organization/org-2"]
+```
+
+#### `resource_has_account(resource, account_ref) -> bool`
+
+Whether a resource is assigned to a given account (checks both singular and
+plural via `get_resource_accounts`).
+
+**Parameters**:
+
+- `resource` (dict | BaseModel): The FHIR resource.
+- `account_ref` (str): The account reference to test, e.g.
+  `"Organization/org-1"`.
+
+**Returns**: `bool`.
+
+**Example**:
+```python
+resource_has_account(patient, "Organization/org-1")  # True / False
+```
+
+### Serialization
+
+#### `to_fhir_json(resource) -> dict`
+
+Normalize a resource to a FHIR-JSON `dict`. A Pydantic model is dumped with
+`by_alias=True` (camelCase FHIR field names) and `exclude_none=True`; a `dict`
+is returned unchanged (same object, not a copy).
+
+**Parameters**:
+
+- `resource` (dict | BaseModel): The resource to normalize.
+
+**Returns**: `dict` — FHIR-JSON ready for serialization.
+
+**Example**:
+```python
+from pymedplum.fhir import Patient, HumanName
+
+to_fhir_json(Patient(name=[HumanName(given=["John"], family="Doe")]))
+# {"resourceType": "Patient", "name": [{"given": ["John"], "family": "Doe"}]}
+```
+
+### Resource Metadata Properties
+
+Every `pymedplum.fhir` resource model also exposes read-only properties for
+Medplum's `meta` extensions, so you don't have to reach into `meta` yourself.
+They tolerate `meta` being either a typed model or a raw dict.
+
+| Property | Type | Reads |
+| --- | --- | --- |
+| `resource.medplum_account` | `str \| None` | Primary account (first of `medplum_accounts`) |
+| `resource.medplum_accounts` | `list[str]` | All account references (singular + plural, normalized) |
+| `resource.medplum_author` | `str \| None` | `meta.author.reference` — who created/updated it |
+| `resource.medplum_project` | `str \| None` | `meta.project` — the owning Medplum project id |
+| `resource.medplum_compartment` | `list \| None` | `meta.compartment` — access-control compartments |
+
+**Example**:
+```python
+patient = client.read_resource("Patient", "123", as_fhir=Patient)
+patient.medplum_account    # "Organization/org-1"
+patient.medplum_accounts   # ["Organization/org-1", "Organization/org-2"]
+patient.medplum_author     # "Practitioner/np-7"
+```
 
 ## Hooks
 

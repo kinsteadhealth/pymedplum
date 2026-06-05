@@ -456,16 +456,25 @@ except RateLimitError:
 from pymedplum import (
     parse_reference,
     build_reference,
+    resolve_id,
     get_patient_display_name,
     extract_identifier,
-    get_code_display
+    get_code_display,
+    get_code_by_system,
+    coding_parts,
+    get_resource_accounts,
 )
 
-# Parse references
+# Parse references (strict: raises on a non "Type/id" string)
 resource_type, resource_id = parse_reference("Patient/123")
 
 # Build references
 ref = build_reference("Patient", "123")
+
+# Resolve an id leniently from a string, bare id, Reference, or Resource
+resolve_id("Patient/123")              # "123"
+resolve_id("123")                      # "123"
+resolve_id({"reference": "Patient/1"})  # "1"
 
 # Get patient name
 patient = client.read_resource("Patient", "123")
@@ -474,9 +483,20 @@ name = get_patient_display_name(patient)  # "John Doe"
 # Extract identifiers
 mrn = extract_identifier(patient, "http://hospital.org/mrn")
 
-# Get code display
-concept = {"coding": [{"display": "Hypertension"}]}
-display = get_code_display(concept)
+# CodeableConcept: display text, a code for a specific system, or all parts
+concept = {
+    "coding": [
+        {"system": "http://snomed.info/sct", "code": "38341003"},
+        {"system": "http://hl7.org/fhir/sid/icd-10-cm", "code": "I10",
+         "display": "Hypertension"},
+    ],
+}
+get_code_display(concept)                                        # "Hypertension"
+get_code_by_system(concept, "http://hl7.org/fhir/sid/icd-10-cm")  # "I10"
+coding_parts(concept)  # ("38341003", "http://snomed.info/sct", None, None)
+
+# Account assignments (reads meta.accounts and the deprecated meta.account)
+get_resource_accounts(patient)  # ["Organization/org-1", ...]
 ```
 
 ## Documentation
