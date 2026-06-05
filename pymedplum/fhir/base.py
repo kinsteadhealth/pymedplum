@@ -97,3 +97,43 @@ class MedplumFHIRBase(BaseModel):
 
         meta_data = self.meta if isinstance(self.meta, dict) else self.meta.model_dump()
         return meta_data.get("compartment")
+
+    @property
+    def medplum_accounts(self) -> list[str]:
+        """Access Medplum's account assignments as reference strings.
+
+        Accounts (``meta.accounts``, and the deprecated singular
+        ``meta.account``) drive compartment-based multi-tenant access
+        control. Normalized via the canonical account-first, deduped
+        semantics — see ``pymedplum.helpers.extract_account_references``.
+
+        Returns:
+            List of account references (e.g. ``["Organization/org-1"]``);
+            empty when none are assigned.
+
+        Example:
+            >>> patient.medplum_accounts
+            ['Organization/org-1']
+        """
+        # Local import keeps the generated FHIR base free of a load-time
+        # dependency on the helpers module (which imports only pydantic).
+        from pymedplum.helpers import extract_account_references
+
+        if not hasattr(self, "meta") or not self.meta:
+            return []
+        meta_data = self.meta if isinstance(self.meta, dict) else self.meta.model_dump()
+        return extract_account_references(meta_data)
+
+    @property
+    def medplum_account(self) -> str | None:
+        """The primary account reference (first of :attr:`medplum_accounts`).
+
+        Returns:
+            The primary account reference or None.
+
+        Example:
+            >>> patient.medplum_account
+            'Organization/org-1'
+        """
+        accounts = self.medplum_accounts
+        return accounts[0] if accounts else None

@@ -4,7 +4,11 @@ import pytest
 
 from pymedplum import MedplumClient
 from pymedplum._base import BaseClient
-from pymedplum.helpers import get_resource_accounts, resource_has_account
+from pymedplum.helpers import (
+    extract_account_references,
+    get_resource_accounts,
+    resource_has_account,
+)
 
 
 def test_apply_accounts_single_string():
@@ -115,6 +119,78 @@ def test_resource_has_account_false():
 
 def test_resource_has_account_no_meta():
     assert not resource_has_account({"resourceType": "Patient"}, "Org/1")
+
+
+# Tests for legacy singular meta.account support (deprecated by Medplum in
+# favor of meta.accounts, but still emitted on older resources). Mirrors
+# @medplum/core extractAccountReferences: account-first, deduped.
+def test_get_resource_accounts_singular_account_only():
+    resource = {"meta": {"account": {"reference": "Organization/org-1"}}}
+    assert get_resource_accounts(resource) == ["Organization/org-1"]
+
+
+def test_get_resource_accounts_singular_and_plural_account_first():
+    resource = {
+        "meta": {
+            "account": {"reference": "Organization/org-1"},
+            "accounts": [{"reference": "Organization/org-2"}],
+        }
+    }
+    assert get_resource_accounts(resource) == [
+        "Organization/org-1",
+        "Organization/org-2",
+    ]
+
+
+def test_get_resource_accounts_singular_deduped_against_plural():
+    resource = {
+        "meta": {
+            "account": {"reference": "Organization/org-1"},
+            "accounts": [
+                {"reference": "Organization/org-1"},
+                {"reference": "Organization/org-2"},
+            ],
+        }
+    }
+    assert get_resource_accounts(resource) == [
+        "Organization/org-1",
+        "Organization/org-2",
+    ]
+
+
+def test_resource_has_account_matches_singular_account():
+    resource = {"meta": {"account": {"reference": "Organization/org-1"}}}
+    assert resource_has_account(resource, "Organization/org-1")
+
+
+# Tests for extract_account_references (the meta-level primitive)
+def test_extract_account_references_plural():
+    meta = {"accounts": [{"reference": "Organization/org-1"}]}
+    assert extract_account_references(meta) == ["Organization/org-1"]
+
+
+def test_extract_account_references_singular():
+    meta = {"account": {"reference": "Organization/org-1"}}
+    assert extract_account_references(meta) == ["Organization/org-1"]
+
+
+def test_extract_account_references_account_first():
+    meta = {
+        "account": {"reference": "Organization/org-1"},
+        "accounts": [{"reference": "Organization/org-2"}],
+    }
+    assert extract_account_references(meta) == [
+        "Organization/org-1",
+        "Organization/org-2",
+    ]
+
+
+def test_extract_account_references_none_meta():
+    assert extract_account_references(None) == []
+
+
+def test_extract_account_references_empty_meta():
+    assert extract_account_references({}) == []
 
 
 def test_set_accounts_prefer_async_without_propagate_raises():

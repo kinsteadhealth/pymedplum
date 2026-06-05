@@ -61,6 +61,46 @@ def build_reference(resource_type: str, resource_id: str) -> str:
     return f"{resource_type}/{resource_id}"
 
 
+def resolve_id(
+    reference: str | dict[str, Any] | BaseModel | None,
+) -> str | None:
+    """Return the bare resource id from a reference, leniently.
+
+    Unlike :func:`parse_reference` (which requires a ``"Type/id"`` string
+    and raises on anything else), this accepts the shapes a FHIR id
+    actually arrives in and never raises — it returns ``None`` when no id
+    can be found. Mirrors ``@medplum/core``'s ``resolveId``, with added
+    support for bare-id and reference *strings*.
+
+    Accepts:
+        - a reference string (``"Patient/123"`` -> ``"123"``)
+        - a bare id string (``"123"`` -> ``"123"``)
+        - a Reference dict/model (``{"reference": "Patient/123"}`` -> ``"123"``)
+        - a Resource dict/model (returns its ``id``)
+
+    Example:
+        >>> resolve_id("Patient/123")
+        '123'
+        >>> resolve_id({"reference": "Patient/abc"})
+        'abc'
+        >>> resolve_id(None) is None
+        True
+    """
+    if reference is None:
+        return None
+    if isinstance(reference, BaseModel):
+        reference = _to_dict(reference)
+    if isinstance(reference, dict):
+        ref_str = reference.get("reference")
+        if isinstance(ref_str, str) and ref_str:
+            return ref_str.rsplit("/", 1)[-1] or None
+        resource_id = reference.get("id")
+        return resource_id if isinstance(resource_id, str) and resource_id else None
+    if isinstance(reference, str) and reference:
+        return reference.rsplit("/", 1)[-1] or None
+    return None
+
+
 def get_patient_display_name(patient: dict[str, Any] | BaseModel) -> str:
     """Extract a display-friendly name from a Patient resource.
 
@@ -158,6 +198,66 @@ def get_code_display(codeable_concept: dict[str, Any] | BaseModel) -> str | None
     return None
 
 
+def _clean_str(value: Any) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+def coding_parts(
+    codeable_concept: dict[str, Any] | BaseModel | None,
+) -> tuple[str | None, str | None, str | None, str | None]:
+    """Return ``(code, system, display, text)`` from a CodeableConcept.
+
+    A low-level projection accessor: reads the **first** (primary) coding
+    plus the concept's free ``text``. A CodeableConcept may carry codings
+    from several systems (e.g. ICD-10 and SNOMED); when you need the code
+    for a specific system, use :func:`get_code_by_system` instead.
+
+    Example:
+        >>> coding_parts({"coding": [{"code": "E11.9", "display": "DM2"}]})
+        ('E11.9', None, 'DM2', None)
+    """
+    if codeable_concept is None:
+        return None, None, None, None
+    codeable_concept = _to_dict(codeable_concept)
+    text = _clean_str(codeable_concept.get("text"))
+    coding_list = codeable_concept.get("coding") or []
+    if not coding_list:
+        return None, None, None, text
+    first = coding_list[0]
+    return (
+        _clean_str(first.get("code")),
+        _clean_str(first.get("system")),
+        _clean_str(first.get("display")),
+        text,
+    )
+
+
+def get_code_by_system(
+    codeable_concept: dict[str, Any] | BaseModel | None, system: str
+) -> str | None:
+    """Return the code of the first coding matching ``system``.
+
+    The Medplum-canonical way to pull a code from a CodeableConcept that
+    may carry multiple systems. Mirrors ``@medplum/core``'s
+    ``getCodeBySystem``.
+
+    Example:
+        >>> concept = {"coding": [
+        ...     {"system": "http://snomed.info/sct", "code": "44054006"},
+        ...     {"system": "http://hl7.org/fhir/sid/icd-10-cm", "code": "E11.9"},
+        ... ]}
+        >>> get_code_by_system(concept, "http://hl7.org/fhir/sid/icd-10-cm")
+        'E11.9'
+    """
+    if codeable_concept is None:
+        return None
+    codeable_concept = _to_dict(codeable_concept)
+    for coding in codeable_concept.get("coding") or []:
+        if isinstance(coding, dict) and coding.get("system") == system:
+            return _clean_str(coding.get("code"))
+    return None
+
+
 def to_fhir_json(resource: dict[str, Any] | BaseModel) -> dict[str, Any]:
     """Convert a resource to FHIR JSON format.
 
@@ -179,14 +279,51 @@ def to_fhir_json(resource: dict[str, Any] | BaseModel) -> dict[str, Any]:
     return _to_dict(resource)
 
 
+def extract_account_references(meta: dict[str, Any] | None) -> list[str]:
+    """Normalize a resource's ``meta.account`` and ``meta.accounts`` into one
+    list of reference strings.
+
+    Medplum stores account assignments — used for compartment-based
+    multi-tenant access control — in ``meta.accounts`` (plural). The legacy
+    ``meta.account`` (singular) is ``@deprecated`` in Medplum but still
+    present on older resources, so a correct reader must consider both.
+    Mirrors ``@medplum/core``'s ``extractAccountReferences``: the singular
+    account comes first and is deduped against the plural list.
+
+    Returns reference strings (this SDK is reference-string oriented), not
+    Reference objects.
+
+    Example:
+        >>> extract_account_references({
+        ...     "account": {"reference": "Organization/org-1"},
+        ...     "accounts": [{"reference": "Organization/org-2"}],
+        ... })
+        ['Organization/org-1', 'Organization/org-2']
+    """
+    if not meta:
+        return []
+    plural = [
+        acc["reference"]
+        for acc in meta.get("accounts") or []
+        if isinstance(acc, dict) and acc.get("reference")
+    ]
+    account = meta.get("account")
+    account_ref = account.get("reference") if isinstance(account, dict) else None
+    if account_ref and account_ref not in plural:
+        return [account_ref, *plural]
+    return plural
+
+
 def get_resource_accounts(resource: dict[str, Any] | BaseModel) -> list[str]:
     """Return the account references assigned to a resource.
 
-    Reads from Medplum's meta.accounts field, which stores account
-    assignments used for compartment-based multi-tenant access control.
+    Reads from Medplum's ``meta.accounts`` (and the deprecated singular
+    ``meta.account``), which store the account assignments used for
+    compartment-based multi-tenant access control. See
+    :func:`extract_account_references` for the normalization semantics.
 
     Args:
-        resource: FHIR resource dict
+        resource: FHIR resource dict or model
 
     Returns:
         List of reference strings (e.g., ["Organization/abc", "Practitioner/xyz"])
@@ -205,11 +342,7 @@ def get_resource_accounts(resource: dict[str, Any] | BaseModel) -> list[str]:
         ['Organization/org-1', 'Organization/org-2']
     """
     resource = _to_dict(resource)
-    return [
-        acc["reference"]
-        for acc in resource.get("meta", {}).get("accounts", [])
-        if isinstance(acc, dict) and "reference" in acc
-    ]
+    return extract_account_references(resource.get("meta"))
 
 
 def resource_has_account(resource: dict[str, Any], account_ref: str) -> bool:
