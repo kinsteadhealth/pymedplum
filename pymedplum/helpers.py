@@ -220,10 +220,12 @@ def coding_parts(
         return None, None, None, None
     codeable_concept = _to_dict(codeable_concept)
     text = _clean_str(codeable_concept.get("text"))
-    coding_list = codeable_concept.get("coding") or []
-    if not coding_list:
+    coding_list = codeable_concept.get("coding")
+    if not isinstance(coding_list, list) or not coding_list:
         return None, None, None, text
     first = coding_list[0]
+    if not isinstance(first, dict):
+        return None, None, None, text
     return (
         _clean_str(first.get("code")),
         _clean_str(first.get("system")),
@@ -279,7 +281,9 @@ def to_fhir_json(resource: dict[str, Any] | BaseModel) -> dict[str, Any]:
     return _to_dict(resource)
 
 
-def extract_account_references(meta: dict[str, Any] | None) -> list[str]:
+def extract_account_references(
+    meta: dict[str, Any] | BaseModel | None,
+) -> list[str]:
     """Normalize a resource's ``meta.account`` and ``meta.accounts`` into one
     list of reference strings.
 
@@ -302,13 +306,18 @@ def extract_account_references(meta: dict[str, Any] | None) -> list[str]:
     """
     if not meta:
         return []
+    meta = _to_dict(meta)
     plural = [
-        acc["reference"]
+        ref
         for acc in meta.get("accounts") or []
-        if isinstance(acc, dict) and acc.get("reference")
+        if isinstance(acc, dict) and (ref := _clean_str(acc.get("reference")))
     ]
     account = meta.get("account")
-    account_ref = account.get("reference") if isinstance(account, dict) else None
+    account_ref = (
+        _clean_str(account.get("reference"))
+        if isinstance(account, dict)
+        else None
+    )
     if account_ref and account_ref not in plural:
         return [account_ref, *plural]
     return plural

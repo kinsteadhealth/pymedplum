@@ -1284,7 +1284,8 @@ already hold a `meta` dict rather than the whole resource.
 
 **Parameters**:
 
-- `meta` (dict | None): A resource's `meta` object.
+- `meta` (dict | BaseModel | None): A resource's `meta` object (a plain dict
+  or a typed `Meta` model).
 
 **Returns**: `list[str]` — normalized account references (singular-first,
 deduped); `[]` for `None`/empty meta.

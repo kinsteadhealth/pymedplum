@@ -102,6 +102,24 @@ def test_coding_parts_none():
     assert coding_parts(None) == (None, None, None, None)
 
 
+def test_coding_parts_malformed_coding_not_a_list():
+    # `coding` present but not a list — degrade, don't raise.
+    assert coding_parts({"coding": "nope", "text": "t"}) == (
+        None,
+        None,
+        None,
+        "t",
+    )
+
+
+def test_coding_parts_malformed_first_not_a_dict():
+    assert coding_parts({"coding": ["nope"]}) == (None, None, None, None)
+
+
+def test_coding_parts_malformed_first_is_none():
+    assert coding_parts({"coding": [None]}) == (None, None, None, None)
+
+
 def test_coding_parts_pydantic_model():
     concept = CodeableConcept(
         coding=[Coding(code="E11.9", system=ICD10, display="Type 2 diabetes")],

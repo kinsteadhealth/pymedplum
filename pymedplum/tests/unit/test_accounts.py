@@ -193,6 +193,23 @@ def test_extract_account_references_empty_meta():
     assert extract_account_references({}) == []
 
 
+def test_extract_account_references_accepts_pydantic_meta():
+    from pymedplum.fhir import Meta, Reference
+
+    meta = Meta(accounts=[Reference(reference="Organization/org-1")])
+    assert extract_account_references(meta) == ["Organization/org-1"]
+
+
+def test_extract_account_references_skips_non_string_plural_ref():
+    meta = {"accounts": [{"reference": 5}, {"reference": "Organization/org-1"}]}
+    assert extract_account_references(meta) == ["Organization/org-1"]
+
+
+def test_extract_account_references_skips_non_string_singular_ref():
+    meta = {"account": {"reference": 123}}
+    assert extract_account_references(meta) == []
+
+
 def test_set_accounts_prefer_async_without_propagate_raises():
     client = MedplumClient()
     with pytest.raises(ValueError, match="prefer_async only takes effect"):
