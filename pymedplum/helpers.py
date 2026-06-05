@@ -314,9 +314,7 @@ def extract_account_references(
     ]
     account = meta.get("account")
     account_ref = (
-        _clean_str(account.get("reference"))
-        if isinstance(account, dict)
-        else None
+        _clean_str(account.get("reference")) if isinstance(account, dict) else None
     )
     if account_ref and account_ref not in plural:
         return [account_ref, *plural]
