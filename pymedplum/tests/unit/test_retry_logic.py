@@ -177,6 +177,273 @@ def test_retry_504_eventual_success(mock_client):
         assert route.call_count == 2
 
 
+def test_post_create_not_replayed_on_502(mock_client):
+    """A bare POST must not be replayed on 5xx — a 502/504 can arrive
+    after the origin committed the write, so a replay would create a
+    duplicate clinical resource. Exactly one wire call."""
+    with respx.mock:
+        route = respx.post("https://api.test.medplum.com/fhir/R4/Patient")
+        route.mock(return_value=httpx.Response(502, text="Bad Gateway"))
+
+        with pytest.raises(ServerError) as exc_info:
+            mock_client.create_resource({"resourceType": "Patient"})
+
+        assert exc_info.value.status_code == 502
+        assert route.call_count == 1
+
+
+def test_post_create_retried_on_503(mock_client):
+    """503 means no healthy upstream took the request (not processed), so
+    a bare POST is replay-safe and keeps the retry."""
+    with respx.mock:
+        route = respx.post("https://api.test.medplum.com/fhir/R4/Patient")
+        route.mock(
+            side_effect=[
+                httpx.Response(503, text="Service Unavailable"),
+                httpx.Response(201, json={"resourceType": "Patient", "id": "p1"}),
+            ]
+        )
+
+        result = mock_client.create_resource({"resourceType": "Patient"})
+        assert result["id"] == "p1"
+        assert route.call_count == 2
+
+
+def test_post_create_not_replayed_on_504(mock_client):
+    """504 (gateway timeout) is ambiguous like 502 — a bare POST must
+    not be replayed."""
+    with respx.mock:
+        route = respx.post("https://api.test.medplum.com/fhir/R4/Patient")
+        route.mock(return_value=httpx.Response(504, text="Gateway Timeout"))
+
+        with pytest.raises(ServerError) as exc_info:
+            mock_client.create_resource({"resourceType": "Patient"})
+
+        assert exc_info.value.status_code == 504
+        assert route.call_count == 1
+
+
+def test_post_conditional_create_retried_on_502(mock_client):
+    """POST with If-None-Exist is replay-safe server-side (conditional
+    create is transactional), so it keeps the 5xx retry."""
+    with respx.mock:
+        route = respx.post("https://api.test.medplum.com/fhir/R4/Patient")
+        route.mock(
+            side_effect=[
+                httpx.Response(502, text="Bad Gateway"),
+                httpx.Response(201, json={"resourceType": "Patient", "id": "p1"}),
+            ]
+        )
+
+        result = mock_client.create_resource_if_none_exist(
+            {"resourceType": "Patient"}, "identifier=MRN|123"
+        )
+        assert result["id"] == "p1"
+        assert route.call_count == 2
+
+
+def test_put_update_retried_on_502(mock_client):
+    """PUT is idempotent and keeps the 5xx retry."""
+    with respx.mock:
+        route = respx.put("https://api.test.medplum.com/fhir/R4/Patient/123")
+        route.mock(
+            side_effect=[
+                httpx.Response(502, text="Bad Gateway"),
+                httpx.Response(200, json={"resourceType": "Patient", "id": "123"}),
+            ]
+        )
+
+        result = mock_client.update_resource({"resourceType": "Patient", "id": "123"})
+        assert result["id"] == "123"
+        assert route.call_count == 2
+
+
+def test_post_still_retried_on_429(mock_client):
+    """429 means the request was rejected before processing — replaying
+    any method, including bare POST, cannot duplicate a write."""
+    with respx.mock:
+        route = respx.post("https://api.test.medplum.com/fhir/R4/Patient")
+        route.mock(
+            side_effect=[
+                httpx.Response(429, headers={"Retry-After": "0"}),
+                httpx.Response(201, json={"resourceType": "Patient", "id": "p1"}),
+            ]
+        )
+
+        result = mock_client.create_resource({"resourceType": "Patient"})
+        assert result["id"] == "p1"
+        assert route.call_count == 2
+
+
+def test_get_retried_on_connect_error(mock_client):
+    """A connect-level failure (pre-send) is retried for any method and
+    succeeds once the connection recovers — the routine ECS/ALB
+    connection-churn case."""
+    with respx.mock:
+        route = respx.get("https://api.test.medplum.com/fhir/R4/Patient/123")
+        route.mock(
+            side_effect=[
+                httpx.ConnectError("connection reset"),
+                httpx.Response(200, json={"resourceType": "Patient", "id": "123"}),
+            ]
+        )
+
+        result = mock_client.read_resource("Patient", "123")
+        assert result["id"] == "123"
+        assert route.call_count == 2
+
+
+def test_post_create_retried_on_connect_error(mock_client):
+    """ConnectError is pre-send (request never reached the server), so even
+    a bare POST is safe to retry — no duplicate-write risk."""
+    with respx.mock:
+        route = respx.post("https://api.test.medplum.com/fhir/R4/Patient")
+        route.mock(
+            side_effect=[
+                httpx.ConnectError("connection refused"),
+                httpx.Response(201, json={"resourceType": "Patient", "id": "p1"}),
+            ]
+        )
+
+        result = mock_client.create_resource({"resourceType": "Patient"})
+        assert result["id"] == "p1"
+        assert route.call_count == 2
+
+
+def test_post_create_not_retried_on_read_timeout(mock_client):
+    """A read timeout is ambiguous (the request was sent; the write may
+    have committed), so a bare POST is NOT replayed — it surfaces as
+    NetworkError after a single attempt."""
+    from pymedplum.exceptions import NetworkError
+
+    with respx.mock:
+        route = respx.post("https://api.test.medplum.com/fhir/R4/Patient")
+        route.mock(side_effect=httpx.ReadTimeout("read timed out"))
+
+        with pytest.raises(NetworkError):
+            mock_client.create_resource({"resourceType": "Patient"})
+
+        assert route.call_count == 1
+
+
+def test_get_retried_on_read_timeout(mock_client):
+    """A read timeout on an idempotent GET is safe to retry."""
+    with respx.mock:
+        route = respx.get("https://api.test.medplum.com/fhir/R4/Patient/123")
+        route.mock(
+            side_effect=[
+                httpx.ReadTimeout("read timed out"),
+                httpx.Response(200, json={"resourceType": "Patient", "id": "123"}),
+            ]
+        )
+
+        result = mock_client.read_resource("Patient", "123")
+        assert result["id"] == "123"
+        assert route.call_count == 2
+
+
+def test_conditional_create_retried_on_remote_protocol_error(mock_client):
+    """A stale-keepalive 'server disconnected' is ambiguous, but a
+    conditional create (If-None-Exist) is replay-safe, so it retries."""
+    with respx.mock:
+        route = respx.post("https://api.test.medplum.com/fhir/R4/Patient")
+        route.mock(
+            side_effect=[
+                httpx.RemoteProtocolError("Server disconnected"),
+                httpx.Response(201, json={"resourceType": "Patient", "id": "p1"}),
+            ]
+        )
+
+        result = mock_client.create_resource_if_none_exist(
+            {"resourceType": "Patient"}, "identifier=MRN|123"
+        )
+        assert result["id"] == "p1"
+        assert route.call_count == 2
+
+
+def test_transport_error_exhausts_budget_then_networkerror(mock_client):
+    """A persistent transport failure retries up to the budget (3 attempts)
+    then raises NetworkError."""
+    from pymedplum.exceptions import NetworkError
+
+    with respx.mock:
+        route = respx.get("https://api.test.medplum.com/fhir/R4/Patient/123")
+        route.mock(side_effect=httpx.ConnectError("down"))
+
+        with pytest.raises(NetworkError):
+            mock_client.read_resource("Patient", "123")
+
+        assert route.call_count == 3
+
+
+def test_transport_retry_then_success_reports_clean_event(mock_client):
+    """A retried-then-succeeded transport error must not leave a stale
+    failure on the completion event (final_exception cleared on retry)."""
+    events = []
+    mock_client._on_request_complete = events.append
+    with respx.mock:
+        route = respx.get("https://api.test.medplum.com/fhir/R4/Patient/123")
+        route.mock(
+            side_effect=[
+                httpx.ConnectError("blip"),
+                httpx.Response(200, json={"resourceType": "Patient", "id": "123"}),
+            ]
+        )
+
+        mock_client.read_resource("Patient", "123")
+
+    assert len(events) == 1
+    assert events[0].final_status_code == 200
+    assert events[0].final_exception is None
+    # The failed first attempt is still recorded for observability.
+    assert len(events[0].attempts) == 2
+
+
+def test_terminal_transport_error_reports_networkerror_to_hook(mock_client):
+    """On a terminal transport failure the completion event carries the
+    wrapped NetworkError (not the raw httpx exception) so hooks/telemetry
+    observe the SDK type; the raw cause is preserved via __cause__."""
+    from pymedplum.exceptions import NetworkError
+
+    events = []
+    mock_client._on_request_complete = events.append
+    with respx.mock:
+        respx.get("https://api.test.medplum.com/fhir/R4/Patient/123").mock(
+            side_effect=httpx.ConnectError("down")
+        )
+        with pytest.raises(NetworkError):
+            mock_client.read_resource("Patient", "123")
+
+    assert len(events) == 1
+    assert isinstance(events[0].final_exception, NetworkError)
+    assert isinstance(events[0].final_exception.__cause__, httpx.ConnectError)
+
+
+def test_post_refresh_replay_transport_error_is_handled(mock_client):
+    """A transport error on the post-401-refresh replay must go through the
+    same transport handling (wrapped/retried), not escape as raw httpx —
+    the _refresh_and_retry_once replay now sits inside the retry try-block."""
+    with respx.mock:
+        respx.post("https://api.test.medplum.com/oauth2/token").mock(
+            return_value=httpx.Response(
+                200, json={"access_token": "fresh", "expires_in": 3600}
+            )
+        )
+        route = respx.get("https://api.test.medplum.com/fhir/R4/Patient/123")
+        route.mock(
+            side_effect=[
+                httpx.Response(401, text="expired"),  # initial → triggers refresh
+                httpx.ConnectError("blip on replay"),  # replay after refresh
+                httpx.Response(200, json={"resourceType": "Patient", "id": "123"}),
+            ]
+        )
+
+        result = mock_client.read_resource("Patient", "123")
+        assert result["id"] == "123"
+        # initial 401 + replay ConnectError + retried success
+        assert route.call_count == 3
+
+
 def test_no_retry_on_400(mock_client):
     """Test that 400 errors do not trigger retries"""
     from pymedplum.exceptions import BadRequestError

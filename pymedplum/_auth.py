@@ -156,7 +156,20 @@ class AsyncTokenManager(_TokenManagerBase):
                 if self._refresh_task is task_to_await and task_to_await.done():
                     self._refresh_task = None
 
-    async def force_refresh(self, http_client: httpx.AsyncClient) -> None:
+    async def force_refresh(
+        self,
+        http_client: httpx.AsyncClient,
+        *,
+        stale_token: str | None = None,
+    ) -> None:
+        """Refresh the token after a 401, deduplicating stragglers.
+
+        ``stale_token`` is the bearer that received the 401. If the
+        manager already holds a different token, a refresh completed
+        after that request was sent — skip the fetch and let the caller
+        replay with the newer token. Without this, N straggler 401s
+        after a mass invalidation fan out into N sequential OAuth calls.
+        """
         if self.source == TokenSource.EXTERNAL:
             raise MedplumError(
                 "Cannot refresh an externally-provided access token. "
@@ -169,6 +182,13 @@ class AsyncTokenManager(_TokenManagerBase):
         logger.debug("token: reactive refresh triggered after 401")
         task_to_await: asyncio.Task[None] | None = None
         async with self._lock:
+            if (
+                stale_token is not None
+                and self.access_token
+                and self.access_token != stale_token
+            ):
+                logger.debug("token: already refreshed since 401; skipping")
+                return
             if self._is_in_cooldown_locked():
                 assert self.failed_refresh_at is not None
                 remaining = (
@@ -374,7 +394,17 @@ class TokenManager(_TokenManagerBase):
                 if self._refresh_future is future_to_wait and future_to_wait.done():
                     self._refresh_future = None
 
-    def force_refresh(self, http_client: httpx.Client) -> None:
+    def force_refresh(
+        self,
+        http_client: httpx.Client,
+        *,
+        stale_token: str | None = None,
+    ) -> None:
+        """Refresh the token after a 401, deduplicating stragglers.
+
+        See :meth:`AsyncTokenManager.force_refresh` for the
+        ``stale_token`` rationale.
+        """
         if self.source == TokenSource.EXTERNAL:
             raise MedplumError(
                 "Cannot refresh an externally-provided access token. "
@@ -387,6 +417,13 @@ class TokenManager(_TokenManagerBase):
         logger.debug("token: reactive refresh triggered after 401")
         future_to_wait: concurrent.futures.Future[None] | None = None
         with self._lock:
+            if (
+                stale_token is not None
+                and self.access_token
+                and self.access_token != stale_token
+            ):
+                logger.debug("token: already refreshed since 401; skipping")
+                return
             if self._is_in_cooldown_locked():
                 assert self.failed_refresh_at is not None
                 remaining = (

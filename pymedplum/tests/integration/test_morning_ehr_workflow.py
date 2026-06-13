@@ -43,10 +43,6 @@ from pymedplum.fhir import (
     TaskRestriction,
 )
 
-# =============================================================================
-# Fixtures - Set up morning workflow scenario
-# =============================================================================
-
 
 @pytest.fixture
 def dr_morning_provider(medplum_client, test_id):
@@ -100,11 +96,6 @@ def morning_patients(medplum_client, test_id):
     # Cleanup
     for patient in patients:
         medplum_client.delete_resource("Patient", patient["id"])
-
-
-# =============================================================================
-# Test 1: Review Today's Schedule
-# =============================================================================
 
 
 def test_01_review_todays_schedule(
@@ -200,11 +191,6 @@ def test_01_review_todays_schedule(
         # Cleanup
         for appt in created_appointments:
             medplum_client.delete_resource("Appointment", appt["id"])
-
-
-# =============================================================================
-# Test 2: Prepare for Diabetic Patient Visit
-# =============================================================================
 
 
 def test_02_prepare_for_diabetic_patient(
@@ -349,11 +335,6 @@ def test_02_prepare_for_diabetic_patient(
             medplum_client.delete_resource(resource_type, resource_id)
 
 
-# =============================================================================
-# Test 3: Review Critical Lab Results
-# =============================================================================
-
-
 def test_03_review_critical_lab_results(
     medplum_client,
     dr_morning_provider,
@@ -480,11 +461,6 @@ def test_03_review_critical_lab_results(
             medplum_client.delete_resource(resource_type, resource_id)
 
 
-# =============================================================================
-# Test 4: Process Inbox Messages
-# =============================================================================
-
-
 def test_04_process_inbox_messages(
     medplum_client,
     dr_morning_provider,
@@ -600,11 +576,6 @@ def test_04_process_inbox_messages(
             medplum_client.delete_resource(resource_type, resource_id)
 
 
-# =============================================================================
-# Test 5: Review Pending Tasks
-# =============================================================================
-
-
 def test_05_review_pending_tasks(
     medplum_client,
     dr_morning_provider,
@@ -707,11 +678,6 @@ def test_05_review_pending_tasks(
             medplum_client.delete_resource(resource_type, resource_id)
 
 
-# =============================================================================
-# Test 6: Check Preventive Care Gaps
-# =============================================================================
-
-
 def test_06_check_preventive_care_gaps(
     medplum_client,
     dr_morning_provider,
@@ -795,11 +761,6 @@ def test_06_check_preventive_care_gaps(
         # Cleanup
         for resource_type, resource_id in created_resources:
             medplum_client.delete_resource(resource_type, resource_id)
-
-
-# =============================================================================
-# Test 7: Review Overnight Documents/Faxes
-# =============================================================================
 
 
 def test_07_review_overnight_documents(
@@ -898,11 +859,6 @@ def test_07_review_overnight_documents(
         # Cleanup
         for resource_type, resource_id in created_resources:
             medplum_client.delete_resource(resource_type, resource_id)
-
-
-# =============================================================================
-# Test 8: Comprehensive Morning Workflow
-# =============================================================================
 
 
 def test_08_comprehensive_morning_workflow(

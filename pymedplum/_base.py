@@ -28,7 +28,10 @@ from .exceptions import (
     AuthenticationError,
     AuthorizationError,
     BadRequestError,
+    ConflictError,
+    GoneError,
     MedplumError,
+    NetworkError,
     NotFoundError,
     OperationOutcomeError,
     PreconditionFailedError,
@@ -84,7 +87,12 @@ def _resolve_if_match(
         if isinstance(meta, dict):
             version_id = meta.get("versionId")
         elif meta is not None:
-            version_id = getattr(meta, "versionId", None)
+            # Generated Meta models declare ``version_id`` with alias
+            # "versionId"; Pydantic v2 exposes the field name, not the
+            # alias, so check both.
+            version_id = getattr(meta, "version_id", None) or getattr(
+                meta, "versionId", None
+            )
         if version_id:
             return f'W/"{version_id}"'
         return None
@@ -96,6 +104,11 @@ _STATUS_EXCEPTIONS: dict[int, tuple[Callable[..., MedplumError], str]] = {
     401: (AuthenticationError, "Authentication failed or token expired"),
     403: (AuthorizationError, "Access denied - insufficient permissions"),
     404: (NotFoundError, "Resource not found"),
+    409: (
+        ConflictError,
+        "Conflict - request lost a race with a concurrent operation",
+    ),
+    410: (GoneError, "Resource deleted"),
     412: (
         PreconditionFailedError,
         "Precondition failed - resource may have been modified by another process",
@@ -145,7 +158,7 @@ def _raise_or_json(
             response=response,
         )
 
-    raise OperationOutcomeError(outcome=outcome or {})
+    raise OperationOutcomeError(outcome=outcome or {}, status_code=status)
 
 
 def _finalize_response(
@@ -298,23 +311,162 @@ class _AttemptTracker:
         )
 
 
+def _stamp_bundle_accounts(
+    data: dict[str, Any],
+    accounts: str | list[str],
+    apply_accounts: Callable[[dict[str, Any], str | list[str]], dict[str, Any]],
+) -> dict[str, Any]:
+    """Return a copy of ``data`` with ``meta.accounts`` stamped on each entry.
+
+    Never mutates the caller's bundle, its ``entry`` list, or the entry
+    dicts — ``to_fhir_json`` returns dict inputs by identity, so in-place
+    writes here would leak account refs back into a reused bundle and
+    accumulate across calls.
+    """
+    entries = data.get("entry")
+    if not isinstance(entries, list):
+        return data
+    new_entries: list[Any] = []
+    for entry in entries:
+        if isinstance(entry, dict) and isinstance(entry.get("resource"), dict):
+            stamped = apply_accounts(entry["resource"], accounts)
+            new_entries.append({**entry, "resource": stamped})
+        else:
+            new_entries.append(entry)
+    return {**data, "entry": new_entries}
+
+
+def _is_absolute_url(value: str) -> bool:
+    """True if ``value`` carries a scheme or a host (i.e. is not a bare path).
+
+    Used to decide whether an async-job string needs the same-origin
+    check before the bearer token is attached. ``urlparse`` lowercases
+    the scheme, so this catches mixed-case schemes (``HTTPS://``) and
+    protocol-relative (``//host``) forms that a case-sensitive
+    ``startswith`` would miss — both then fail the same-origin guard.
+    """
+    parsed = urlparse(value)
+    return bool(parsed.scheme or parsed.netloc)
+
+
+def _coerce_param_value(value: Any) -> str | None:
+    """Coerce one query-param value to wire format; ``None`` means skip."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
 def _merge_params_into_url(url: str, params: Any) -> str:
     """Fold query params into the URL up front for a single wire URL.
 
-    ``None`` or empty params leave the URL unchanged.
+    ``None`` or empty params leave the URL unchanged. Params are merged
+    with any query string already on the URL — ``httpx.URL(url, params=...)``
+    would silently *replace* it, dropping caller params.
     """
     if not params:
         return url
-    return str(httpx.URL(url, params=params))
+    return str(httpx.URL(url).copy_merge_params(params))
+
+
+_IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "PUT", "DELETE", "OPTIONS"})
+
+# 502/504 can be emitted by a gateway *after* the origin committed a write
+# (slow create, LB idle timeout), so replaying a non-idempotent POST risks a
+# duplicate. 503 and 429 are rejections *before* processing (no healthy
+# upstream / rate-limit), so they are replay-safe for every method.
+_AMBIGUOUS_COMMIT_STATUS = frozenset({502, 504})
+
+
+def _is_replay_safe(method: str, headers: dict[str, str] | None) -> bool:
+    """Return True if re-sending this request cannot duplicate a write.
+
+    A 502/504 can arrive from a load balancer *after* the origin server
+    committed the write, so replaying a bare POST risks creating a
+    duplicate resource. Idempotent methods are always safe; a POST is
+    safe only when it carries ``If-None-Exist`` (FHIR conditional
+    create), which makes the replay a no-op server-side.
+    """
+    if method.upper() in _IDEMPOTENT_METHODS:
+        return True
+    if method.upper() != "POST" or not headers:
+        return False
+    # A conditional create is replay-safe only with a real query — an
+    # empty/blank If-None-Exist is not conditional server-side.
+    return any(
+        k.lower() == "if-none-exist" and (v or "").strip() for k, v in headers.items()
+    )
+
+
+def _backoff_with_jitter(attempt: int) -> float:
+    """Exponential backoff (capped at 2.0s) plus jitter, for de-correlating retries.
+
+    secrets.SystemRandom for jitter — same shape as random.random(), but
+    doesn't trip Bandit B311 / pyflakes scanners that flag ``random`` usage
+    in security-relevant modules. Jitter here is purely for de-correlating
+    retries; not security-critical.
+    """
+    backoff: float = min(0.25 * (2**attempt), 2.0)
+    jitter: float = secrets.SystemRandom().random() * 0.2
+    return backoff + jitter
+
+
+def _is_transport_retryable(
+    exc: httpx.TransportError, method: str, headers: dict[str, str] | None
+) -> bool:
+    """Decide whether a transport-level failure is safe to retry.
+
+    Pre-send failures — connection never established (``ConnectError`` /
+    ``ConnectTimeout``) or the pool wait timed out (``PoolTimeout``) — mean
+    the request never reached the server, so they are safe to retry for ANY
+    method. Ambiguous failures (the request was sent, then the read timed
+    out, the connection dropped, or a protocol error occurred — e.g. a
+    stale keepalive connection reset during an upstream deploy) may have
+    been processed and committed, so they are retried only for replay-safe
+    requests — the same rule the 502/504 gate uses.
+    """
+    if isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)):
+        return True
+    return _is_replay_safe(method, headers)
+
+
+def _transport_budget_exceeded(attempt: int) -> bool:
+    """Transport-error retry budget: up to 2 retries (3 attempts total)."""
+    return attempt >= 2
+
+
+def _wrap_transport_error(exc: httpx.TransportError, attempts: int) -> NetworkError:
+    """Wrap a raw httpx transport failure as ``NetworkError``.
+
+    The SDK never lets a raw httpx exception escape to callers: wrapping in
+    ``NetworkError`` (a ``MedplumError``) lets consumers catch transient
+    network faults alongside other SDK errors and map them to a retryable
+    status (e.g. 503) instead of a 500. The message carries only the
+    exception type — never ``str(exc)`` — to keep URLs/details out of logs.
+    """
+    return NetworkError(
+        f"Network error after {attempts} attempt(s): {type(exc).__name__}"
+    )
 
 
 def _retry_delay(
-    response: httpx.Response, attempt: int, *, max_retry_delay_seconds: float = 60.0
+    response: httpx.Response,
+    attempt: int,
+    *,
+    method: str,
+    headers: dict[str, str] | None,
+    max_retry_delay_seconds: float = 60.0,
 ) -> float | None:
     """Return delay seconds for a retryable response, or ``None`` if terminal.
 
-    429 consults ``parse_retry_after_429``. 5xx uses exponential backoff
-    with jitter, capped at 2.0s — the historical SDK policy.
+    429 consults ``parse_retry_after_429`` and applies to every method —
+    a rate-limit reject happens before the server processes the request.
+    503 likewise retries for every method (no healthy upstream → not
+    processed). Only the ambiguous-commit 502/504 are gated on
+    :func:`_is_replay_safe` (no replaying non-idempotent POSTs). Retries
+    use exponential backoff with jitter, capped at 2.0s — the historical
+    SDK policy.
     """
     status = response.status_code
     if status == 429:
@@ -322,13 +474,35 @@ def _retry_delay(
             parse_retry_after_429(response, max_delay_seconds=max_retry_delay_seconds)
         )
     if status in RETRYABLE_STATUS_CODES:
-        backoff: float = min(0.25 * (2**attempt), 2.0)
-        # secrets.SystemRandom for jitter — same shape as random.random(),
-        # but doesn't trip Bandit B311 / pyflakes scanners that flag
-        # ``random`` usage in security-relevant modules. Jitter here is
-        # purely for de-correlating retries; not security-critical.
-        return backoff + secrets.SystemRandom().random() * 0.2
+        if status in _AMBIGUOUS_COMMIT_STATUS and not _is_replay_safe(method, headers):
+            return None
+        return _backoff_with_jitter(attempt)
     return None
+
+
+_DEFAULT_CONNECT_TIMEOUT_SECONDS: float = 5.0
+
+
+def _build_timeout(timeout: float | httpx.Timeout) -> httpx.Timeout:
+    """Split a flat timeout into a short connect + longer read/write/pool.
+
+    A single flat 30s timeout lets a stuck TCP connect pin a worker for the
+    full 30s during network weirdness (DNS, SYN drops, a draining upstream);
+    bounding connect to 5s fails fast so the retry loop can move on. The
+    read/write/pool budget keeps the caller-supplied value. An
+    ``httpx.Timeout`` is passed through unchanged for callers who want full
+    control.
+    """
+    if isinstance(timeout, httpx.Timeout):
+        return timeout
+    connect = min(timeout, _DEFAULT_CONNECT_TIMEOUT_SECONDS)
+    return httpx.Timeout(timeout, connect=connect)
+
+
+def _bearer_from_headers(headers: dict[str, str]) -> str | None:
+    """Extract the bearer token from a finalized wire-header dict."""
+    value = headers.get(AUTHORIZATION_HEADER, "")
+    return value.removeprefix("Bearer ") or None
 
 
 def _retry_budget_exceeded(status_code: int, attempt: int) -> bool:
@@ -748,15 +922,18 @@ class BaseClient:
             if not membership_id:
                 msg = "ProjectMembership identifier cannot be empty"
                 raise ValueError(msg)
-            if not membership_id.startswith("ProjectMembership/"):
-                membership_id = f"ProjectMembership/{membership_id}"
-            if "/" not in membership_id or not membership_id.split("/")[1]:
-                msg = (
-                    f"Invalid ProjectMembership identifier: {membership}. "
-                    "Expected 'ProjectMembership/<id>' or '<id>'."
-                )
-                raise ValueError(msg)
-            return membership_id
+            if "/" in membership_id:
+                resource_type, _, resource_id = membership_id.partition("/")
+                if resource_type != "ProjectMembership" or not resource_id:
+                    msg = (
+                        f"Invalid ProjectMembership identifier: {membership!r}. "
+                        "Expected 'ProjectMembership/<id>' or '<id>'. Profile "
+                        "references (e.g. 'Practitioner/<id>') are not "
+                        "supported here."
+                    )
+                    raise ValueError(msg)
+                return membership_id
+            return f"ProjectMembership/{membership_id}"
 
         if not getattr(membership, "id", None):
             msg = (
@@ -797,7 +974,12 @@ class BaseClient:
         resource: dict[str, Any],
         accounts: str | list[str],
     ) -> dict[str, Any]:
-        """Set meta.accounts on a resource before sending to the server.
+        """Set meta.accounts on a copy of a resource before sending.
+
+        Never mutates the caller's dict — ``to_fhir_json`` returns dict
+        inputs by identity, so in-place writes here would leak
+        ``meta.accounts`` entries back into caller-owned templates and
+        accumulate across calls.
 
         Args:
             resource: FHIR resource dict
@@ -805,13 +987,14 @@ class BaseClient:
                 (e.g., "Organization/abc" or ["Organization/abc"])
 
         Returns:
-            Modified resource dict with meta.accounts set
+            New resource dict with meta.accounts set
         """
         if isinstance(accounts, str):
             accounts = [accounts]
 
-        meta = resource.setdefault("meta", {})
-        existing = meta.setdefault("accounts", [])
+        resource = dict(resource)
+        meta = dict(resource.get("meta") or {})
+        existing = list(meta.get("accounts") or [])
         existing_refs = {
             acc.get("reference") for acc in existing if isinstance(acc, dict)
         }
@@ -826,6 +1009,8 @@ class BaseClient:
                 existing.append({"reference": ref})
                 existing_refs.add(ref)
 
+        meta["accounts"] = existing
+        resource["meta"] = meta
         return resource
 
     def _resolve_async_job_url(
@@ -835,9 +1020,11 @@ class BaseClient:
 
         ``job`` may be a FHIR job ID, an absolute URL the server handed us
         back (in ``issue[0].diagnostics`` of an OperationOutcome), or an
-        OperationOutcome dict / Pydantic model. Absolute URLs are accepted
-        verbatim — if Medplum is compromised enough to misdirect the poll
-        target, the SDK is not the layer that's going to stop the attack.
+        OperationOutcome dict / Pydantic model. Absolute URLs — whether
+        caller-supplied or extracted from an OperationOutcome — must be
+        same-origin with ``base_url``: the poll attaches the bearer token,
+        so a poisoned job URL would otherwise exfiltrate it off-origin.
+        Legitimate Medplum job URLs are always same-origin.
 
         Args:
             job: Job ID, full URL, OperationOutcome dict, or
@@ -845,6 +1032,10 @@ class BaseClient:
 
         Returns:
             Full URL for polling the job status
+
+        Raises:
+            UnsafeRedirectError: If an absolute URL is not same-origin
+                with ``base_url``.
         """
         if isinstance(job, BaseModel):
             job = job.model_dump(by_alias=True, exclude_none=True)
@@ -854,12 +1045,15 @@ class BaseClient:
             if issues and isinstance(issues[0], dict):
                 url = issues[0].get("diagnostics")
                 if isinstance(url, str) and url:
+                    if _is_absolute_url(url):
+                        assert_same_origin(self.base_url, url)
                     return url
             raise ValueError(
                 "Expected OperationOutcome with job URL in issue[0].diagnostics"
             )
 
-        if job.startswith(("http://", "https://")):
+        if _is_absolute_url(job):
+            assert_same_origin(self.base_url, job)
             return job
 
         return f"{self.fhir_base_url}job/{job}/status"
@@ -868,6 +1062,12 @@ class BaseClient:
         """Build query parameters from various input formats.
 
         Returns list of tuples to preserve multi-valued params.
+
+        Python values are coerced to FHIR wire format: ``True``/``False``
+        become ``"true"``/``"false"`` (Medplum rejects ``"True"`` with a
+        400), and ``None`` values are skipped entirely — ``str(None)``
+        would send the literal token ``"None"``, a valid search value
+        that silently matches nothing.
 
         Args:
             query: None, str, dict, or list of tuples
@@ -886,13 +1086,23 @@ class BaseClient:
             for k, v in query.items():
                 # Handle list values by creating multiple params with same key
                 if isinstance(v, list):
-                    params.extend((k, str(item)) for item in v)
+                    params.extend(
+                        (k, coerced)
+                        for item in v
+                        if (coerced := _coerce_param_value(item)) is not None
+                    )
                 else:
-                    params.append((k, str(v)))
+                    coerced = _coerce_param_value(v)
+                    if coerced is not None:
+                        params.append((k, coerced))
             return params
 
         if isinstance(query, list):
-            return [(k, str(v)) for k, v in query]
+            return [
+                (k, coerced)
+                for k, v in query
+                if (coerced := _coerce_param_value(v)) is not None
+            ]
 
         msg = f"Invalid query type: {type(query)}"
         raise ValueError(msg)

@@ -32,10 +32,6 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from pymedplum import AsyncMedplumClient
 from pymedplum.fhir import FHIR_TYPES
 
-# ---------------------------------------------------------------------------
-# FastMCP instance (with fallback shim when mcp extras aren't installed)
-# ---------------------------------------------------------------------------
-
 _MCP_IMPORT_ERROR: ImportError | None = None
 
 try:
@@ -155,10 +151,6 @@ mcp = FastMCP(
     ),
 )
 
-# ---------------------------------------------------------------------------
-# Pydantic input models
-# ---------------------------------------------------------------------------
-
 
 class PatchOp(BaseModel):
     """A single JSON Patch operation (RFC 6902).
@@ -219,11 +211,6 @@ class BundleInput(BaseModel):
         default_factory=list,
         description="List of bundle entries, each with a 'request' containing 'method' and 'url'",
     )
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
 
 
 def _collect_refs(obj: Any, refs: set[str]) -> None:
@@ -335,10 +322,6 @@ def _validate_on_behalf_of(on_behalf_of: str) -> str:
     return f"ProjectMembership/{membership_id}"
 
 
-# ---------------------------------------------------------------------------
-# Read-only enforcement
-# ---------------------------------------------------------------------------
-
 _READ_ONLY_OPERATIONS = frozenset(
     {
         "everything",
@@ -417,10 +400,6 @@ def _check_bot_allowed(bot_id: str) -> None:
         raise PermissionError(msg)
 
 
-# ---------------------------------------------------------------------------
-# Client lifecycle
-# ---------------------------------------------------------------------------
-
 _client: AsyncMedplumClient | None = None
 _client_lock: asyncio.Lock | None = None
 
@@ -495,16 +474,8 @@ async def _with_obo(
         yield client
 
 
-# ---------------------------------------------------------------------------
-# Register tools and resources (import triggers @mcp.tool/@mcp.resource)
-# ---------------------------------------------------------------------------
-
 import pymedplum.mcp.resources  # noqa: E402
 import pymedplum.mcp.tools  # noqa: E402, F401
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
 
 
 def main() -> None:

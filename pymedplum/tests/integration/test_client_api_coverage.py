@@ -10,10 +10,6 @@ import pytest
 
 from pymedplum.fhir import Patient
 
-# ============================================================================
-# SYNC CLIENT TESTS
-# ============================================================================
-
 
 def test_sync_create_resource(medplum_client):
     """Test sync client create_resource method."""
@@ -295,11 +291,6 @@ def test_sync_on_behalf_of_context_manager(medplum_client, medplum_membership):
     assert created2["id"]
 
 
-# ============================================================================
-# ASYNC CLIENT TESTS
-# ============================================================================
-
-
 @pytest.mark.asyncio
 async def test_async_create_resource(async_medplum_client):
     """Test async client create_resource method."""
@@ -568,11 +559,6 @@ async def test_async_post(async_medplum_client):
     assert result["resourceType"] == "Patient"
     assert result["name"][0]["family"] == "AsyncPost"
     assert "id" in result
-
-
-# ============================================================================
-# SYNC/ASYNC FEATURE PARITY TESTS
-# ============================================================================
 
 
 @pytest.mark.asyncio

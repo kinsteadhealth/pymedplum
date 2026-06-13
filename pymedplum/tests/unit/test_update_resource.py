@@ -170,3 +170,66 @@ async def test_async_update_resource_if_match_false_opts_out(
     assert route.called
     request = route.calls[0].request
     assert "if-match" not in {k.lower() for k in request.headers}
+
+
+def test_update_resource_typed_model_attaches_if_match(
+    sync_client: MedplumClient, respx_mock: MockRouter
+) -> None:
+    """Regression: generated Meta declares ``version_id`` (alias
+    "versionId"); resolving If-Match off the model via the camelCase
+    attribute silently returned None, sending an unconditional PUT."""
+    from pymedplum.fhir import Patient
+
+    route = _mock_update(respx_mock, "abc")
+    patient = Patient(id="abc", meta={"versionId": "7"}, active=True)
+    sync_client.update_resource(patient)
+    assert route.called
+    request = route.calls[0].request
+    assert request.headers.get("If-Match") == 'W/"7"'
+
+
+@pytest.mark.asyncio
+async def test_async_update_resource_typed_model_attaches_if_match(
+    respx_mock: MockRouter,
+) -> None:
+    from pymedplum.fhir import Patient
+
+    route = _mock_update(respx_mock, "abc")
+    async with AsyncMedplumClient(
+        base_url="https://api.medplum.com/", access_token="tkn"
+    ) as client:
+        await client.update_resource(Patient(id="abc", meta={"versionId": "7"}))
+    assert route.called
+    request = route.calls[0].request
+    assert request.headers.get("If-Match") == 'W/"7"'
+
+
+def test_update_resource_if_match_survives_accounts_kwarg(
+    sync_client: MedplumClient, respx_mock: MockRouter
+) -> None:
+    """Interaction of two fixes: ``accounts=`` now copies the resource
+    before mutating meta, and If-Match resolves from that serialized
+    data — the copy must still carry meta.versionId."""
+    from pymedplum.fhir import Patient
+
+    route = _mock_update(respx_mock, "abc")
+    sync_client.update_resource(
+        Patient(id="abc", meta={"versionId": "7"}),
+        accounts="Organization/org-1",
+    )
+    assert route.called
+    request = route.calls[0].request
+    assert request.headers.get("If-Match") == 'W/"7"'
+    assert b"Organization/org-1" in request.read()
+
+
+def test_update_resource_typed_model_without_meta_no_header(
+    sync_client: MedplumClient, respx_mock: MockRouter
+) -> None:
+    from pymedplum.fhir import Patient
+
+    route = _mock_update(respx_mock, "abc")
+    sync_client.update_resource(Patient(id="abc"))
+    assert route.called
+    request = route.calls[0].request
+    assert "if-match" not in {k.lower() for k in request.headers}

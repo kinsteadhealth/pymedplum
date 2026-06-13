@@ -335,11 +335,6 @@ def test_parse_query_params_empty_dict_for_bare_question_mark() -> None:
     assert _parse_query_params("?") == {}
 
 
-# =========================================================================
-# before_request hook pipeline
-# =========================================================================
-
-
 @pytest.mark.asyncio
 async def test_before_request_headers_pre_redacted() -> None:
     seen: list[dict[str, str]] = []
@@ -610,11 +605,6 @@ async def test_before_request_injected_obo_header_is_stripped() -> None:
         route.calls[0].request.headers.get("X-Medplum-On-Behalf-Of")
         == "ProjectMembership/REAL"
     )
-
-
-# =========================================================================
-# on_request_complete dispatch (Task 5.4)
-# =========================================================================
 
 
 @pytest.mark.asyncio
@@ -1208,11 +1198,6 @@ def test_sync_client_rejects_async_hook_at_construction() -> None:
             client_secret="s",
             on_request_complete=async_hook,
         )
-
-
-# =========================================================================
-# Regression guards for Phase 5.1 invariants
-# =========================================================================
 
 
 def test_event_to_phi_audit_dict_is_json_serializable_for_simple_case() -> None:

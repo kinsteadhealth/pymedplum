@@ -21,10 +21,6 @@ from pymedplum.fhir import (
     Reference,
 )
 
-# ============================================================================
-# Basic Model Tests
-# ============================================================================
-
 
 def test_patient_minimal():
     """Test creating a minimal Patient resource."""
@@ -78,11 +74,6 @@ def test_patient_full_example():
     assert patient.telecom[0].value == "555-1234"
 
 
-# ============================================================================
-# Practitioner Tests
-# ============================================================================
-
-
 def test_practitioner_minimal():
     """Test creating a minimal Practitioner resource."""
     practitioner = Practitioner()
@@ -96,11 +87,6 @@ def test_practitioner_with_name():
 
     assert practitioner.name[0].given == ["Jane"]
     assert practitioner.name[0].family == "Doctor"
-
-
-# ============================================================================
-# Organization Tests
-# ============================================================================
 
 
 def test_organization_minimal():
@@ -126,11 +112,6 @@ def test_organization_with_identifier():
 
     assert org.name == "Test Clinic"
     assert org.identifier[0].value == "1234567890"
-
-
-# ============================================================================
-# Complex Type Tests
-# ============================================================================
 
 
 def test_human_name_simple():
@@ -221,11 +202,6 @@ def test_contact_point_email():
     assert contact.value == "john.doe@example.com"
 
 
-# ============================================================================
-# Reference Tests
-# ============================================================================
-
-
 def test_reference_simple():
     """Test creating a simple Reference."""
     ref = Reference(reference="Patient/123")
@@ -239,11 +215,6 @@ def test_reference_with_display():
 
     assert ref.reference == "Practitioner/456"
     assert ref.display == "Dr. Jane Smith"
-
-
-# ============================================================================
-# Bundle Tests
-# ============================================================================
 
 
 def test_bundle_minimal():
@@ -267,11 +238,6 @@ def test_bundle_with_entries():
 
     assert len(bundle.entry) == 1
     assert bundle.entry[0].resource["resourceType"] == "Patient"
-
-
-# ============================================================================
-# Validation Tests
-# ============================================================================
 
 
 def test_patient_rejects_invalid_gender():
@@ -313,11 +279,6 @@ def test_model_serialization_to_json():
     assert isinstance(data["name"][0], dict)
 
 
-# ============================================================================
-# Field Alias Tests
-# ============================================================================
-
-
 def test_resource_type_alias():
     """Test that resourceType field alias works."""
     # Creating with Python field name
@@ -339,11 +300,6 @@ def test_field_aliases_in_complex_types():
     assert isinstance(data, dict)
     assert "given" in data
     assert "family" in data
-
-
-# ============================================================================
-# Integration Tests
-# ============================================================================
 
 
 def test_creating_patient_from_dict():
@@ -390,11 +346,6 @@ def test_nested_model_creation():
     assert len(patient.name) == 2
     assert len(patient.identifier) == 2
     assert patient.name[1].use == "nickname"
-
-
-# ============================================================================
-# Edge Cases
-# ============================================================================
 
 
 def test_empty_lists():

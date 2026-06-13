@@ -1547,3 +1547,87 @@ async def test_async_vread_resource_not_found(
 
     with pytest.raises(Exception):  # Should raise NotFoundError
         await async_client.vread_resource("Patient", "patient-123", "999")
+
+
+@pytest.mark.asyncio
+async def test_async_post_create_retried_on_connect_error(
+    async_client: AsyncMedplumClient, respx_mock: MockRouter
+):
+    """ConnectError is pre-send, so even a bare POST is retried (async)."""
+    route = respx_mock.post("https://api.medplum.com/fhir/R4/Patient").mock(
+        side_effect=[
+            httpx.ConnectError("connection refused"),
+            httpx.Response(201, json={"resourceType": "Patient", "id": "p1"}),
+        ]
+    )
+
+    result = await async_client.create_resource({"resourceType": "Patient"})
+    assert result["id"] == "p1"
+    assert route.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_async_post_create_not_retried_on_read_timeout(
+    async_client: AsyncMedplumClient, respx_mock: MockRouter
+):
+    """A read timeout is ambiguous for a bare POST → NetworkError, no replay."""
+    from pymedplum.exceptions import MedplumError, NetworkError
+
+    route = respx_mock.post("https://api.medplum.com/fhir/R4/Patient").mock(
+        side_effect=httpx.ReadTimeout("read timed out")
+    )
+
+    with pytest.raises(NetworkError) as exc_info:
+        await async_client.create_resource({"resourceType": "Patient"})
+
+    assert isinstance(exc_info.value, MedplumError)
+    assert route.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_async_get_retried_on_read_timeout(
+    async_client: AsyncMedplumClient, respx_mock: MockRouter
+):
+    """A read timeout on an idempotent GET is safe to retry (async)."""
+    route = respx_mock.get("https://api.medplum.com/fhir/R4/Patient/123").mock(
+        side_effect=[
+            httpx.ReadTimeout("read timed out"),
+            httpx.Response(200, json={"resourceType": "Patient", "id": "123"}),
+        ]
+    )
+
+    result = await async_client.read_resource("Patient", "123")
+    assert result["id"] == "123"
+    assert route.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_async_post_refresh_replay_transport_error_is_handled(
+    respx_mock: MockRouter,
+):
+    """Async mirror: a transport error on the post-401-refresh replay is
+    handled by the retry loop, not leaked as a raw httpx exception."""
+    respx_mock.post("https://api.medplum.com/oauth2/token").mock(
+        return_value=httpx.Response(
+            200, json={"access_token": "fresh", "expires_in": 3600}
+        )
+    )
+    route = respx_mock.get("https://api.medplum.com/fhir/R4/Patient/123").mock(
+        side_effect=[
+            httpx.Response(401, text="expired"),
+            httpx.ConnectError("blip on replay"),
+            httpx.Response(200, json={"resourceType": "Patient", "id": "123"}),
+        ]
+    )
+
+    # Managed credentials so a 401 triggers a reactive refresh + replay.
+    async with AsyncMedplumClient(
+        base_url="https://api.medplum.com/",
+        client_id="cid",
+        client_secret="cs",
+        access_token="stale",
+    ) as client:
+        result = await client.read_resource("Patient", "123")
+
+    assert result["id"] == "123"
+    assert route.call_count == 3
