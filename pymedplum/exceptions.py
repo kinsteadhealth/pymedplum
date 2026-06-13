@@ -115,6 +115,7 @@ class OperationOutcomeError(MedplumError):
         )
         return {
             "type": type(self).__name__,
+            "status_code": self.status_code,
             "issues": [
                 {
                     "severity": _issue_field(i, "severity"),

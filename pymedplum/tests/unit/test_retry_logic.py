@@ -399,6 +399,51 @@ def test_transport_retry_then_success_reports_clean_event(mock_client):
     assert len(events[0].attempts) == 2
 
 
+def test_terminal_transport_error_reports_networkerror_to_hook(mock_client):
+    """On a terminal transport failure the completion event carries the
+    wrapped NetworkError (not the raw httpx exception) so hooks/telemetry
+    observe the SDK type; the raw cause is preserved via __cause__."""
+    from pymedplum.exceptions import NetworkError
+
+    events = []
+    mock_client._on_request_complete = events.append
+    with respx.mock:
+        respx.get("https://api.test.medplum.com/fhir/R4/Patient/123").mock(
+            side_effect=httpx.ConnectError("down")
+        )
+        with pytest.raises(NetworkError):
+            mock_client.read_resource("Patient", "123")
+
+    assert len(events) == 1
+    assert isinstance(events[0].final_exception, NetworkError)
+    assert isinstance(events[0].final_exception.__cause__, httpx.ConnectError)
+
+
+def test_post_refresh_replay_transport_error_is_handled(mock_client):
+    """A transport error on the post-401-refresh replay must go through the
+    same transport handling (wrapped/retried), not escape as raw httpx —
+    the _refresh_and_retry_once replay now sits inside the retry try-block."""
+    with respx.mock:
+        respx.post("https://api.test.medplum.com/oauth2/token").mock(
+            return_value=httpx.Response(
+                200, json={"access_token": "fresh", "expires_in": 3600}
+            )
+        )
+        route = respx.get("https://api.test.medplum.com/fhir/R4/Patient/123")
+        route.mock(
+            side_effect=[
+                httpx.Response(401, text="expired"),  # initial → triggers refresh
+                httpx.ConnectError("blip on replay"),  # replay after refresh
+                httpx.Response(200, json={"resourceType": "Patient", "id": "123"}),
+            ]
+        )
+
+        result = mock_client.read_resource("Patient", "123")
+        assert result["id"] == "123"
+        # initial 401 + replay ConnectError + retried success
+        assert route.call_count == 3
+
+
 def test_no_retry_on_400(mock_client):
     """Test that 400 errors do not trigger retries"""
     from pymedplum.exceptions import BadRequestError

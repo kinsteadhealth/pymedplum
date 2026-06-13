@@ -49,15 +49,16 @@ def test_bot_crud_operations(medplum_client: MedplumClient):
         # DELETE
         medplum_client.delete_bot(bot_id)
 
-    # Verify deletion - expect 410 Gone error
-    from pymedplum.exceptions import OperationOutcomeError
+    # Verify deletion: Medplum returns 410 Gone for a soft-deleted read,
+    # which the SDK maps to GoneError (a NotFoundError subclass), so the
+    # documented ``except NotFoundError`` recovery path catches it.
+    from pymedplum.exceptions import GoneError, NotFoundError
 
-    with pytest.raises(OperationOutcomeError) as exc_info:
+    with pytest.raises(NotFoundError) as exc_info:
         medplum_client.read_bot(bot_id)
-    # 410 Gone surfaces as OperationOutcomeError; the outcome itself is attached
-    # on exc.outcome for inspection. We can't assert on HTTP status directly
-    # without the response, so we assert the outcome shape instead.
-    assert isinstance(exc_info.value.outcome, dict)
+    assert isinstance(exc_info.value, GoneError)
+    assert exc_info.value.status_code == 410
+    assert isinstance(exc_info.value.response_data, dict)
 
 
 def test_save_bot_code(medplum_client: MedplumClient):

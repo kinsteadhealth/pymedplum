@@ -30,12 +30,13 @@ def test_pagination_next_cross_origin_rejected_sync(
             },
         )
     )
-    client = MedplumClient(base_url="https://api.medplum.com/", access_token="tkn")
-    try:
-        with pytest.raises(UnsafeRedirectError):
-            list(client.search_resource_pages("Patient"))
-    finally:
-        client.close()
+    with (
+        MedplumClient(
+            base_url="https://api.medplum.com/", access_token="tkn"
+        ) as client,
+        pytest.raises(UnsafeRedirectError),
+    ):
+        list(client.search_resource_pages("Patient"))
 
 
 @pytest.mark.asyncio
@@ -61,41 +62,42 @@ async def test_pagination_next_cross_origin_rejected_async(
 
 
 def test_async_job_url_same_origin_accepted() -> None:
-    client = MedplumClient(base_url="https://api.medplum.com/", access_token="tkn")
-    try:
+    with MedplumClient(
+        base_url="https://api.medplum.com/", access_token="tkn"
+    ) as client:
         url = client._resolve_async_job_url(
             "https://api.medplum.com/fhir/R4/job/abc/status"
         )
         assert url == "https://api.medplum.com/fhir/R4/job/abc/status"
-    finally:
-        client.close()
 
 
 def test_async_job_url_cross_origin_rejected() -> None:
     """The job poll attaches the bearer token; a cross-origin job URL
     would exfiltrate it. This was the one escape hatch without the
     same-origin guard every other URL path enforces."""
-    client = MedplumClient(base_url="https://api.medplum.com/", access_token="tkn")
-    try:
-        with pytest.raises(UnsafeRedirectError):
-            client._resolve_async_job_url("https://evil.com/fhir/R4/job/abc/status")
-    finally:
-        client.close()
+    with (
+        MedplumClient(
+            base_url="https://api.medplum.com/", access_token="tkn"
+        ) as client,
+        pytest.raises(UnsafeRedirectError),
+    ):
+        client._resolve_async_job_url("https://evil.com/fhir/R4/job/abc/status")
 
 
 def test_async_job_url_cross_origin_diagnostics_rejected() -> None:
     """Same guard for URLs extracted from OperationOutcome diagnostics —
     a stored/poisoned outcome must not redirect the token off-origin."""
-    client = MedplumClient(base_url="https://api.medplum.com/", access_token="tkn")
     outcome = {
         "resourceType": "OperationOutcome",
         "issue": [{"severity": "information", "diagnostics": "https://evil.com/job"}],
     }
-    try:
-        with pytest.raises(UnsafeRedirectError):
-            client._resolve_async_job_url(outcome)
-    finally:
-        client.close()
+    with (
+        MedplumClient(
+            base_url="https://api.medplum.com/", access_token="tkn"
+        ) as client,
+        pytest.raises(UnsafeRedirectError),
+    ):
+        client._resolve_async_job_url(outcome)
 
 
 @pytest.mark.parametrize(
@@ -113,33 +115,30 @@ def test_async_job_url_cross_origin_scheme_variants_rejected(evil: str) -> None:
     the same-origin guard and exfiltrate the bearer token. Absolute-URL
     detection must be scheme-case-insensitive and catch protocol-relative
     forms — both as a caller string and via OperationOutcome diagnostics."""
-    client = MedplumClient(base_url="https://api.medplum.com/", access_token="tkn")
     outcome = {
         "resourceType": "OperationOutcome",
         "issue": [{"severity": "information", "diagnostics": evil}],
     }
-    try:
+    with MedplumClient(
+        base_url="https://api.medplum.com/", access_token="tkn"
+    ) as client:
         with pytest.raises(UnsafeRedirectError):
             client._resolve_async_job_url(evil)
         with pytest.raises(UnsafeRedirectError):
             client._resolve_async_job_url(outcome)
-    finally:
-        client.close()
 
 
 def test_async_job_url_bare_id_unaffected() -> None:
-    client = MedplumClient(base_url="https://api.medplum.com/", access_token="tkn")
-    try:
+    with MedplumClient(
+        base_url="https://api.medplum.com/", access_token="tkn"
+    ) as client:
         assert (
             client._resolve_async_job_url("abc")
             == "https://api.medplum.com/fhir/R4/job/abc/status"
         )
-    finally:
-        client.close()
 
 
 def test_async_job_url_same_origin_diagnostics_accepted() -> None:
-    client = MedplumClient(base_url="https://api.medplum.com/", access_token="tkn")
     outcome = {
         "resourceType": "OperationOutcome",
         "issue": [
@@ -149,8 +148,8 @@ def test_async_job_url_same_origin_diagnostics_accepted() -> None:
             }
         ],
     }
-    try:
+    with MedplumClient(
+        base_url="https://api.medplum.com/", access_token="tkn"
+    ) as client:
         url = client._resolve_async_job_url(outcome)
         assert url == "https://api.medplum.com/fhir/R4/job/j1/status"
-    finally:
-        client.close()

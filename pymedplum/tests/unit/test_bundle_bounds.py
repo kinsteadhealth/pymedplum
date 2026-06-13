@@ -130,8 +130,7 @@ def test_sync_paginator_skips_include_entries(respx_mock: respx.MockRouter) -> N
     respx_mock.get("https://api.medplum.com/fhir/R4/Observation").mock(
         return_value=httpx.Response(200, json=_bundle_with_includes())
     )
-    client = MedplumClient(access_token="t")
-    try:
+    with MedplumClient(access_token="t") as client:
         out = list(
             client.search_resource_pages(
                 "Observation",
@@ -140,8 +139,6 @@ def test_sync_paginator_skips_include_entries(respx_mock: respx.MockRouter) -> N
             )
         )
         assert [o.id for o in out] == ["o1", "o2"]
-    finally:
-        client.close()
 
 
 @pytest.mark.asyncio
@@ -170,12 +167,9 @@ def test_sync_paginator_include_entries_do_not_consume_cap(
     respx_mock.get("https://api.medplum.com/fhir/R4/Observation").mock(
         return_value=httpx.Response(200, json=_bundle_with_includes())
     )
-    client = MedplumClient(access_token="t")
-    try:
+    with MedplumClient(access_token="t") as client:
         out = list(client.search_resource_pages("Observation", max_resources=2))
         assert [r["id"] for r in out] == ["o1", "o2"]
-    finally:
-        client.close()
 
 
 def test_get_total_uses_bundle_total_when_present() -> None:

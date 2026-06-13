@@ -326,6 +326,21 @@ class MedplumClient(BaseClient):
                 response = self._send_one(
                     prepared, headers, wire_obo, tracker, kwargs, path_template
                 )
+                # The 401-refresh replay also calls _send_one, so it must
+                # sit inside this try to get the same transport handling.
+                if self._should_refresh_on_401(response, attempt):
+                    refreshed = self._refresh_and_retry_once(
+                        prepared,
+                        base_non_auth_headers,
+                        tracker,
+                        on_behalf_of=on_behalf_of,
+                        kwargs=kwargs,
+                        path_template=path_template,
+                        stale_token=_bearer_from_headers(headers),
+                    )
+                    if refreshed is None:
+                        return response
+                    response = refreshed
             except httpx.TransportError as exc:
                 if _is_transport_retryable(
                     exc, prepared.method, prepared.headers
@@ -341,20 +356,13 @@ class MedplumClient(BaseClient):
                     )
                     time.sleep(delay)
                     continue
-                raise _wrap_transport_error(exc, attempt + 1) from exc
-            if self._should_refresh_on_401(response, attempt):
-                refreshed = self._refresh_and_retry_once(
-                    prepared,
-                    base_non_auth_headers,
-                    tracker,
-                    on_behalf_of=on_behalf_of,
-                    kwargs=kwargs,
-                    path_template=path_template,
-                    stale_token=_bearer_from_headers(headers),
-                )
-                if refreshed is None:
-                    return response
-                response = refreshed
+                # Wrap before raising AND record the wrapped error on the
+                # tracker, so on_request_complete hooks observe the SDK's
+                # NetworkError (not a URL-bearing raw httpx exception). The
+                # raw cause is preserved via __cause__ for deep inspection.
+                wrapped = _wrap_transport_error(exc, attempt + 1)
+                tracker.final_exception = wrapped
+                raise wrapped from exc
             delay = _retry_delay(
                 response,
                 attempt,

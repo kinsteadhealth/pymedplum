@@ -448,10 +448,13 @@ def test_operation_outcome_error_sanitize_for_logging():
             }
         ],
     }
-    exc = OperationOutcomeError(outcome=outcome)
+    exc = OperationOutcomeError(outcome=outcome, status_code=409)
     safe = exc.sanitize_for_logging()
+    # status_code (a non-PHI int) is included for observability, matching
+    # the MedplumError base sanitizer; diagnostics are still stripped.
     assert safe == {
         "type": "OperationOutcomeError",
+        "status_code": 409,
         "issues": [{"severity": "error", "code": "invalid"}],
     }
 

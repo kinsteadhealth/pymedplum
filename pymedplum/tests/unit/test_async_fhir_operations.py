@@ -1599,3 +1599,35 @@ async def test_async_get_retried_on_read_timeout(
     result = await async_client.read_resource("Patient", "123")
     assert result["id"] == "123"
     assert route.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_async_post_refresh_replay_transport_error_is_handled(
+    respx_mock: MockRouter,
+):
+    """Async mirror: a transport error on the post-401-refresh replay is
+    handled by the retry loop, not leaked as a raw httpx exception."""
+    respx_mock.post("https://api.medplum.com/oauth2/token").mock(
+        return_value=httpx.Response(
+            200, json={"access_token": "fresh", "expires_in": 3600}
+        )
+    )
+    route = respx_mock.get("https://api.medplum.com/fhir/R4/Patient/123").mock(
+        side_effect=[
+            httpx.Response(401, text="expired"),
+            httpx.ConnectError("blip on replay"),
+            httpx.Response(200, json={"resourceType": "Patient", "id": "123"}),
+        ]
+    )
+
+    # Managed credentials so a 401 triggers a reactive refresh + replay.
+    async with AsyncMedplumClient(
+        base_url="https://api.medplum.com/",
+        client_id="cid",
+        client_secret="cs",
+        access_token="stale",
+    ) as client:
+        result = await client.read_resource("Patient", "123")
+
+    assert result["id"] == "123"
+    assert route.call_count == 3
