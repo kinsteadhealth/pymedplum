@@ -406,15 +406,131 @@ def test_retry_delay_429_and_5xx_and_terminal():
 
     req = httpx.Request("GET", "https://example.test/")
     r429 = httpx.Response(429, request=req)
-    delay = _retry_delay(r429, attempt=0)
+    delay = _retry_delay(r429, attempt=0, method="GET", headers=None)
     assert delay is not None
     assert delay >= 0.0
 
     r503 = httpx.Response(503, request=req)
-    assert _retry_delay(r503, attempt=0) is not None
+    assert _retry_delay(r503, attempt=0, method="GET", headers=None) is not None
 
     r200 = httpx.Response(200, request=req)
-    assert _retry_delay(r200, attempt=0) is None
+    assert _retry_delay(r200, attempt=0, method="GET", headers=None) is None
+
+
+def test_retry_delay_gates_502_504_on_idempotency():
+    """502/504 must not replay a bare POST — they can arrive after the
+    origin committed the write, so a retry creates a duplicate resource."""
+    import httpx
+
+    from pymedplum._base import _retry_delay
+
+    req = httpx.Request("POST", "https://example.test/")
+    for status in (502, 504):
+        resp = httpx.Response(status, request=req)
+        assert _retry_delay(resp, attempt=0, method="POST", headers=None) is None
+        assert _retry_delay(resp, attempt=0, method="PATCH", headers=None) is None
+        # Idempotent methods still retry.
+        assert _retry_delay(resp, attempt=0, method="PUT", headers=None) is not None
+        assert _retry_delay(resp, attempt=0, method="DELETE", headers=None) is not None
+        # Conditional create is replay-safe server-side.
+        assert (
+            _retry_delay(
+                resp,
+                attempt=0,
+                method="POST",
+                headers={"If-None-Exist": "identifier=MRN|1"},
+            )
+            is not None
+        )
+
+
+def test_retry_delay_503_and_429_retry_every_method():
+    """503 (no healthy upstream) and 429 (rate limit) are rejected before
+    processing, so a bare POST is replay-safe for both."""
+    import httpx
+
+    from pymedplum._base import _retry_delay
+
+    req = httpx.Request("POST", "https://example.test/")
+    for status in (503, 429):
+        resp = httpx.Response(status, request=req)
+        assert _retry_delay(resp, attempt=0, method="POST", headers=None) is not None
+        assert _retry_delay(resp, attempt=0, method="PATCH", headers=None) is not None
+
+
+def test_is_replay_safe_requires_nonempty_if_none_exist():
+    """An empty/blank If-None-Exist is not a conditional create
+    server-side, so a bare POST carrying it must stay non-replay-safe."""
+    from pymedplum._base import _is_replay_safe
+
+    assert _is_replay_safe("POST", {"If-None-Exist": ""}) is False
+    assert _is_replay_safe("POST", {"If-None-Exist": "   "}) is False
+    assert _is_replay_safe("POST", {"if-none-exist": "identifier=MRN|1"}) is True
+    assert _is_replay_safe("POST", None) is False
+    # PATCH is never replay-safe, even with an If-None-Exist header.
+    assert _is_replay_safe("PATCH", {"If-None-Exist": "x"}) is False
+    # Idempotent methods are always safe.
+    assert _is_replay_safe("GET", None) is True
+    assert _is_replay_safe("delete", None) is True
+
+
+def test_build_timeout_splits_connect_from_read():
+    """A flat timeout becomes a short connect + the caller's read/write/pool,
+    so a stuck TCP connect can't pin a worker for the full read budget."""
+    import httpx
+
+    from pymedplum._base import _build_timeout
+
+    t = _build_timeout(30.0)
+    assert t.connect == 5.0
+    assert t.read == 30.0
+    assert t.write == 30.0
+    assert t.pool == 30.0
+
+    # A timeout shorter than the connect default keeps the smaller value.
+    assert _build_timeout(2.0).connect == 2.0
+
+    # An explicit httpx.Timeout is passed through untouched.
+    custom = httpx.Timeout(10.0, connect=1.0)
+    assert _build_timeout(custom) is custom
+
+
+def test_is_transport_retryable_presend_vs_ambiguous():
+    """Pre-send failures retry for any method; ambiguous ones only when
+    replay-safe (idempotent method or POST with If-None-Exist)."""
+    import httpx
+
+    from pymedplum._base import _is_transport_retryable
+
+    # Pre-send: request never reached the server → any method.
+    for exc in (
+        httpx.ConnectError("x"),
+        httpx.ConnectTimeout("x"),
+        httpx.PoolTimeout("x"),
+    ):
+        assert _is_transport_retryable(exc, "POST", None) is True
+        assert _is_transport_retryable(exc, "GET", None) is True
+
+    # Ambiguous: sent, maybe processed → replay-safe only.
+    for exc in (
+        httpx.ReadTimeout("x"),
+        httpx.WriteTimeout("x"),
+        httpx.RemoteProtocolError("Server disconnected"),
+    ):
+        assert _is_transport_retryable(exc, "POST", None) is False
+        assert _is_transport_retryable(exc, "GET", None) is True
+        assert (
+            _is_transport_retryable(exc, "POST", {"If-None-Exist": "identifier=MRN|1"})
+            is True
+        )
+
+
+def test_transport_budget_exceeded():
+    from pymedplum._base import _transport_budget_exceeded
+
+    assert _transport_budget_exceeded(0) is False
+    assert _transport_budget_exceeded(1) is False
+    assert _transport_budget_exceeded(2) is True
 
 
 def test_retry_budget_exceeded_caps_correctly():
@@ -428,3 +544,62 @@ def test_retry_budget_exceeded_caps_correctly():
     # 5xx has a budget of 2 retries.
     assert _retry_budget_exceeded(503, 1) is False
     assert _retry_budget_exceeded(503, 2) is True
+
+
+def test_normalize_membership_rejects_profile_references():
+    """Profile references must fail loudly instead of being mangled into
+    'ProjectMembership/Practitioner/abc' and failing server-side."""
+    client = BaseClient()
+
+    for bad in ("Practitioner/abc", "Patient/abc", "ProjectMembership/"):
+        with pytest.raises(ValueError):
+            client._normalize_membership(bad)
+
+    assert (
+        client._normalize_membership("ProjectMembership/abc") == "ProjectMembership/abc"
+    )
+
+
+def test_build_query_params_coerces_bools_to_fhir_tokens():
+    """Medplum rejects 'True'/'False' with a 400; only lowercase is valid."""
+    client = BaseClient()
+
+    assert client._build_query_params({"active": True}) == [("active", "true")]
+    assert client._build_query_params({"active": False}) == [("active", "false")]
+    assert client._build_query_params([("active", True)]) == [("active", "true")]
+    assert client._build_query_params({"status": [True, "draft"]}) == [
+        ("status", "true"),
+        ("status", "draft"),
+    ]
+
+
+def test_build_query_params_skips_none_values():
+    """str(None) would send the literal token 'None' — a valid search
+    value that silently matches nothing."""
+    client = BaseClient()
+
+    assert client._build_query_params({"identifier": None}) == []
+    assert client._build_query_params({"identifier": None, "family": "Smith"}) == [
+        ("family", "Smith")
+    ]
+    assert client._build_query_params([("identifier", None)]) == []
+    assert client._build_query_params({"birthdate": ["ge1990", None]}) == [
+        ("birthdate", "ge1990")
+    ]
+
+
+def test_merge_params_into_url_preserves_existing_query():
+    """httpx.URL(url, params=...) would *replace* the query string,
+    silently dropping params already embedded in the URL."""
+    from pymedplum._base import _merge_params_into_url
+
+    merged = _merge_params_into_url(
+        "https://api.medplum.com/fhir/R4/Patient?name=smith",
+        [("active", "true")],
+    )
+    assert "name=smith" in merged
+    assert "active=true" in merged
+
+    # No params: URL unchanged.
+    url = "https://api.medplum.com/fhir/R4/Patient?name=smith"
+    assert _merge_params_into_url(url, None) == url

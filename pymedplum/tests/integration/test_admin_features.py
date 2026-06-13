@@ -20,11 +20,6 @@ def project_id():
     return pid
 
 
-# =============================================================================
-# PROJECT SECRETS TESTS
-# =============================================================================
-
-
 def test_sync_manage_project_secrets(medplum_client, project_id, test_id):
     """Test managing project secrets with sync client."""
     # Get current project details
@@ -95,11 +90,6 @@ async def test_async_manage_project_secrets(async_medplum_client, project_id, te
     )
 
 
-# =============================================================================
-# PROJECT SITES TESTS
-# =============================================================================
-
-
 def test_sync_manage_project_sites(medplum_client, project_id, test_id):
     """Test managing project sites with sync client."""
     # Get current project details
@@ -165,11 +155,6 @@ async def test_async_manage_project_sites(async_medplum_client, project_id, test
     await async_medplum_client.post(
         f"admin/projects/{project_id}/sites", original_sites
     )
-
-
-# =============================================================================
-# CLIENT APPLICATIONS TESTS
-# =============================================================================
 
 
 def test_sync_create_client_application_via_fhir(medplum_client, test_id):

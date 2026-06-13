@@ -52,20 +52,24 @@ def _issue_field(issue: object, name: str) -> str | None:
 class OperationOutcomeError(MedplumError):
     """FHIR OperationOutcome error.
 
-    The string representation includes the server's ``diagnostics`` and
-    ``details.text`` when present — these are exactly what developers need
-    to triage a failed call ("reference target not found", "extension URL
-    unknown", etc.). The trade-off: these fields can echo caller-supplied
-    values. Keeping PHI out of logs is the application's job, not this
-    string's, and the project-wide policy already forbids logging the
-    exception body at inappropriate log levels.
+    The string representation carries only ``severity/code`` pairs —
+    never the server's ``diagnostics`` or ``details.text``, which can
+    echo caller-supplied values (PHI risk) and routinely end up in
+    error-tracking sinks via ``str(exc)``. This matches the
+    ``BadRequestError`` convention.
 
-    Use ``sanitize_for_logging()`` for structured logging to PHI-restricted
-    sinks; attach ``self.outcome`` explicitly when deeper inspection is
-    needed.
+    The human-readable server text is preserved on ``self.detail`` for
+    interactive triage, and the full OperationOutcome on
+    ``self.outcome``. Use ``sanitize_for_logging()`` for structured
+    logging to PHI-restricted sinks.
     """
 
-    def __init__(self, *, outcome: dict[str, Any] | object) -> None:
+    def __init__(
+        self,
+        *,
+        outcome: dict[str, Any] | object,
+        status_code: int | None = None,
+    ) -> None:
         self.outcome = outcome
         issues = (
             outcome.get("issue", [])
@@ -73,10 +77,11 @@ class OperationOutcomeError(MedplumError):
             else getattr(outcome, "issue", []) or []
         )
         parts = []
+        detail_parts = []
         for issue in issues:
             severity = _issue_field(issue, "severity")
             code = _issue_field(issue, "code")
-            header = f"{severity}/{code}"
+            parts.append(f"{severity}/{code}")
             diagnostics = _issue_field(issue, "diagnostics")
             details_text: str | None = None
             details = (
@@ -94,11 +99,11 @@ class OperationOutcomeError(MedplumError):
                     details_text = text
             detail_segments = [s for s in (diagnostics, details_text) if s]
             if detail_segments:
-                parts.append(f"{header}: {' | '.join(detail_segments)}")
-            else:
-                parts.append(header)
+                detail_parts.append(" | ".join(detail_segments))
+        self.detail: str | None = "; ".join(detail_parts) or None
         super().__init__(
-            "OperationOutcome: " + ("; ".join(parts) if parts else "no issues")
+            "OperationOutcome: " + ("; ".join(parts) if parts else "no issues"),
+            status_code=status_code,
         )
 
     def sanitize_for_logging(self) -> dict[str, object]:
@@ -171,6 +176,33 @@ class NotFoundError(MedplumError):
     pass
 
 
+class GoneError(NotFoundError):
+    """Resource was deleted (HTTP 410 Gone).
+
+    Medplum soft-deletes resources and returns 410 for subsequent reads.
+    Subclasses :class:`NotFoundError` so existing ``except NotFoundError``
+    handlers treat deleted and missing resources uniformly; catch
+    ``GoneError`` first to distinguish "was deleted" from "never existed".
+    """
+
+    pass
+
+
+class ConflictError(MedplumError):
+    """Request conflicts with current server state (HTTP 409).
+
+    Raised when:
+    - Concurrent writes hit a database serialization conflict
+    - A scheduling operation (e.g. ``$book``) loses a slot race
+    - Server returns 409 Conflict
+
+    Recovery:
+    - Re-read the resource and retry the operation against fresh state
+    """
+
+    pass
+
+
 class BadRequestError(MedplumError):
     """Error for 400 Bad Request responses.
 
@@ -181,17 +213,12 @@ class BadRequestError(MedplumError):
 
 
 class ValidationError(MedplumError):
-    """Resource data failed FHIR validation.
+    """Resource data failed validation.
 
-    Raised when:
-    - Creating resource with invalid data
-    - Updating resource with invalid data
-    - Server returns 400 Bad Request with validation errors
-
-    Recovery:
-    - Review FHIR spec for resource type
-    - Check required fields are present
-    - Verify field values match allowed patterns
+    The SDK itself never raises this: server-side FHIR validation
+    failures (HTTP 400) raise :class:`BadRequestError`. This class
+    exists for callers that want to raise or map validation semantics
+    of their own while staying inside the ``MedplumError`` hierarchy.
     """
 
     pass

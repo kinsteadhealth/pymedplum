@@ -26,10 +26,6 @@ from pymedplum.fhir import (
     Reference,
 )
 
-# ---------------------------------------------------------------------------
-# make_project_membership_access
-# ---------------------------------------------------------------------------
-
 
 def test_make_access_returns_doc_shape() -> None:
     entry = make_project_membership_access(
@@ -140,11 +136,6 @@ def test_make_access_omits_parameter_when_empty() -> None:
     assert "parameter" not in entry
 
 
-# ---------------------------------------------------------------------------
-# normalize_access_policy_reference / normalize_access_policy_id
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     "policy",
     [
@@ -169,11 +160,6 @@ def test_normalize_rejects_other_resource_type() -> None:
 def test_normalize_rejects_empty() -> None:
     with pytest.raises(ValueError):
         normalize_access_policy_reference("   ")
-
-
-# ---------------------------------------------------------------------------
-# get_project_membership_access_policy_id / parameter
-# ---------------------------------------------------------------------------
 
 
 def test_get_policy_id_from_dict_entry() -> None:
@@ -228,11 +214,6 @@ def test_get_parameter_handles_pydantic_entry() -> None:
     assert param["valueReference"] == {"reference": "Organization/o1"}
 
 
-# ---------------------------------------------------------------------------
-# partition_access
-# ---------------------------------------------------------------------------
-
-
 def test_partition_separates_managed_and_untouched() -> None:
     managed_ids = {"managed-1"}
     current = [
@@ -280,11 +261,6 @@ def test_partition_rejects_empty_managed_set() -> None:
         partition_access([{"policy": {"reference": "AccessPolicy/abc"}}], set())
 
 
-# ---------------------------------------------------------------------------
-# validate_managed_access
-# ---------------------------------------------------------------------------
-
-
 def test_validate_managed_access_accepts_managed() -> None:
     validate_managed_access([{"policy": {"reference": "AccessPolicy/m1"}}], {"m1"})
 
@@ -311,11 +287,6 @@ def test_validate_managed_access_accepts_pydantic_entries() -> None:
     validate_managed_access([entry], {"m1"})
 
 
-# ---------------------------------------------------------------------------
-# normalize_access_entry
-# ---------------------------------------------------------------------------
-
-
 def test_normalize_access_entry_pydantic_matches_dict() -> None:
     pyd = ProjectMembershipAccess(
         policy=Reference(reference="AccessPolicy/abc"),
@@ -330,11 +301,6 @@ def test_normalize_access_entry_pydantic_matches_dict() -> None:
         "AccessPolicy/abc", {"organization": "Organization/o1"}
     )
     assert normalize_access_entry(pyd) == normalize_access_entry(dict_entry)
-
-
-# ---------------------------------------------------------------------------
-# build_merged_access
-# ---------------------------------------------------------------------------
 
 
 def test_build_merged_access_preserves_order() -> None:
@@ -354,11 +320,6 @@ def test_build_merged_access_preserves_order() -> None:
 def test_build_merged_access_empty_managed_returns_untouched() -> None:
     untouched = [{"policy": {"reference": "AccessPolicy/u"}}]
     assert build_merged_access(untouched, []) == untouched
-
-
-# ---------------------------------------------------------------------------
-# merged_equals_remote
-# ---------------------------------------------------------------------------
 
 
 def test_merged_equals_remote_byte_equal() -> None:

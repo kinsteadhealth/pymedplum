@@ -95,3 +95,113 @@ def test_max_retry_delay_seconds_negative_clamped_to_zero() -> None:
     client = MedplumClient(access_token="t", max_retry_delay_seconds=-5.0)
     assert client.max_retry_delay_seconds == 0.0
     client.close()
+
+
+def _observation(obs_id: str) -> dict:
+    return {
+        "resourceType": "Observation",
+        "id": obs_id,
+        "status": "final",
+        "code": {"text": "test"},
+    }
+
+
+def _bundle_with_includes() -> dict:
+    """One page: two Observation matches plus an included Patient."""
+    return {
+        "resourceType": "Bundle",
+        "type": "searchset",
+        "entry": [
+            {"resource": _observation("o1"), "search": {"mode": "match"}},
+            {"resource": _observation("o2"), "search": {"mode": "match"}},
+            {
+                "resource": {"resourceType": "Patient", "id": "p1"},
+                "search": {"mode": "include"},
+            },
+        ],
+    }
+
+
+def test_sync_paginator_skips_include_entries(respx_mock: respx.MockRouter) -> None:
+    """_include/_revinclude entries must not be yielded as matches —
+    with as_fhir they are a different resource type and crash parsing."""
+    from pymedplum.fhir import Observation
+
+    respx_mock.get("https://api.medplum.com/fhir/R4/Observation").mock(
+        return_value=httpx.Response(200, json=_bundle_with_includes())
+    )
+    client = MedplumClient(access_token="t")
+    try:
+        out = list(
+            client.search_resource_pages(
+                "Observation",
+                {"_include": "Observation:subject"},
+                as_fhir=Observation,
+            )
+        )
+        assert [o.id for o in out] == ["o1", "o2"]
+    finally:
+        client.close()
+
+
+@pytest.mark.asyncio
+async def test_async_paginator_skips_include_entries(
+    respx_mock: respx.MockRouter,
+) -> None:
+    respx_mock.get("https://api.medplum.com/fhir/R4/Observation").mock(
+        return_value=httpx.Response(200, json=_bundle_with_includes())
+    )
+    client = AsyncMedplumClient(access_token="t")
+    try:
+        out = [
+            r
+            async for r in client.search_resource_pages(
+                "Observation", {"_include": "Observation:subject"}
+            )
+        ]
+        assert [r["id"] for r in out] == ["o1", "o2"]
+    finally:
+        await client.aclose()
+
+
+def test_sync_paginator_include_entries_do_not_consume_cap(
+    respx_mock: respx.MockRouter,
+) -> None:
+    respx_mock.get("https://api.medplum.com/fhir/R4/Observation").mock(
+        return_value=httpx.Response(200, json=_bundle_with_includes())
+    )
+    client = MedplumClient(access_token="t")
+    try:
+        out = list(client.search_resource_pages("Observation", max_resources=2))
+        assert [r["id"] for r in out] == ["o1", "o2"]
+    finally:
+        client.close()
+
+
+def test_get_total_uses_bundle_total_when_present() -> None:
+    bundle = FHIRBundle({"resourceType": "Bundle", "total": 42, "entry": []})
+    assert bundle.get_total() == 42
+
+
+def test_get_total_counts_matches_when_single_complete_page() -> None:
+    bundle = FHIRBundle(_bundle_with_includes())
+    # No next link: the page is the full result set; includes don't count.
+    assert bundle.get_total() == 2
+
+
+def test_get_total_returns_none_when_paginated_without_total() -> None:
+    """Without Bundle.total a paginated bundle's entry count is just the
+    page size — returning it as a 'total' would be a lie."""
+    data = _bundle(20)
+    data["link"] = [
+        {"relation": "next", "url": "https://api.medplum.com/fhir/R4/Patient?p=2"}
+    ]
+    bundle = FHIRBundle(data)
+    assert bundle.get_total() is None
+
+
+def test_get_total_counts_modeless_entries_as_matches() -> None:
+    """Entries without ``search.mode`` are primary matches (servers may
+    omit the mode); a complete single page counts them."""
+    bundle = FHIRBundle(_bundle(7))
+    assert bundle.get_total() == 7

@@ -187,9 +187,13 @@ def test_generic_error_on_500(mock_client):
 
 
 @respx.mock
-def test_network_error_handling(mock_client):
-    """Test that network errors are properly handled"""
-    # Mock successful auth
+def test_network_error_wrapped_and_retried(mock_client):
+    """A persistent transport failure is retried (pre-send, any method) and
+    then surfaced as NetworkError — a MedplumError, never a raw httpx
+    exception — so a consumer's MedplumError handler can map it to a
+    retryable status instead of an unhandled 500."""
+    from pymedplum.exceptions import MedplumError, NetworkError
+
     respx.post("https://api.medplum.com/oauth2/token").mock(
         return_value=httpx.Response(
             status_code=200,
@@ -201,13 +205,20 @@ def test_network_error_handling(mock_client):
         )
     )
 
-    # Mock the read request to raise a network error
-    respx.get("https://api.medplum.com/fhir/R4/Patient/123").mock(
+    route = respx.get("https://api.medplum.com/fhir/R4/Patient/123").mock(
         side_effect=httpx.ConnectError("Connection failed")
     )
 
-    with pytest.raises(httpx.ConnectError):
+    with pytest.raises(NetworkError) as exc_info:
         mock_client.read_resource("Patient", "123")
+
+    assert isinstance(exc_info.value, MedplumError)
+    # ConnectError is pre-send → retried up to the budget: 3 attempts total.
+    assert route.call_count == 3
+    # The original transport error is chained for telemetry, message carries
+    # only the type (no URL / no str(exc)).
+    assert isinstance(exc_info.value.__cause__, httpx.ConnectError)
+    assert "Connection failed" not in str(exc_info.value)
 
 
 @respx.mock
@@ -364,10 +375,11 @@ def test_server_error_sanitize_for_logging_drops_body():
     assert "hidden" not in json.dumps(safe)
 
 
-def test_operation_outcome_error_str_includes_diagnostics():
-    """str(exc) must surface the server's diagnostic text — developers triaging
-    a failed call need "reference target not found" / etc. to show up without
-    having to dig into ``exc.response_data["issue"][0]["diagnostics"]``."""
+def test_operation_outcome_error_str_omits_diagnostics():
+    """str(exc) carries only severity/code — diagnostics and details.text
+    can echo caller-supplied values (PHI risk) and routinely reach
+    error-tracking sinks via ``str(exc)``. The server text stays available
+    on ``exc.detail`` and the full outcome on ``exc.outcome``."""
     outcome = {
         "resourceType": "OperationOutcome",
         "issue": [
@@ -383,8 +395,19 @@ def test_operation_outcome_error_str_includes_diagnostics():
     s = str(exc)
     assert "error" in s.lower()
     assert "invalid" in s.lower()
-    assert "reference target not found" in s
-    assert "Subject reference is unresolved" in s
+    assert "reference target not found" not in s
+    assert "Subject reference is unresolved" not in s
+    assert exc.detail is not None
+    assert "reference target not found" in exc.detail
+    assert "Subject reference is unresolved" in exc.detail
+
+
+def test_operation_outcome_error_carries_status_code():
+    exc = OperationOutcomeError(
+        outcome={"issue": [{"severity": "error", "code": "conflict"}]},
+        status_code=418,
+    )
+    assert exc.status_code == 418
 
 
 def test_operation_outcome_error_sanitize_for_logging_strips_diagnostics():
@@ -431,3 +454,93 @@ def test_operation_outcome_error_sanitize_for_logging():
         "type": "OperationOutcomeError",
         "issues": [{"severity": "error", "code": "invalid"}],
     }
+
+
+def test_gone_410_raises_gone_error_caught_as_not_found():
+    """Medplum soft-deletes resources and returns 410 Gone on reads.
+    410 maps to GoneError, a NotFoundError subclass, so deletion
+    recovery paths written as ``except NotFoundError`` work."""
+    from pymedplum._base import _raise_or_json
+    from pymedplum.exceptions import GoneError
+
+    response = httpx.Response(
+        410,
+        json={
+            "resourceType": "OperationOutcome",
+            "issue": [{"severity": "error", "code": "deleted"}],
+        },
+        request=httpx.Request("GET", "https://api.medplum.com/fhir/R4/Patient/x"),
+    )
+    with pytest.raises(NotFoundError) as exc_info:
+        _raise_or_json(response)
+    assert isinstance(exc_info.value, GoneError)
+    assert exc_info.value.status_code == 410
+
+
+def test_conflict_409_raises_conflict_error():
+    """409 (Postgres serialization conflicts, $book slot races) maps to
+    ConflictError instead of a status-less OperationOutcomeError."""
+    from pymedplum._base import _raise_or_json
+    from pymedplum.exceptions import ConflictError
+
+    response = httpx.Response(
+        409,
+        json={
+            "resourceType": "OperationOutcome",
+            "issue": [{"severity": "error", "code": "conflict"}],
+        },
+        request=httpx.Request("POST", "https://api.medplum.com/fhir/R4/Slot/$book"),
+    )
+    with pytest.raises(ConflictError) as exc_info:
+        _raise_or_json(response)
+    assert exc_info.value.status_code == 409
+
+
+def test_unmapped_status_carries_status_code():
+    """Statuses without a dedicated exception still surface status_code."""
+    from pymedplum._base import _raise_or_json
+
+    response = httpx.Response(
+        418,
+        json={"resourceType": "OperationOutcome", "issue": []},
+        request=httpx.Request("GET", "https://api.medplum.com/fhir/R4/Patient/x"),
+    )
+    with pytest.raises(OperationOutcomeError) as exc_info:
+        _raise_or_json(response)
+    assert exc_info.value.status_code == 418
+
+
+def test_operation_outcome_error_detail_none_without_diagnostics():
+    exc = OperationOutcomeError(
+        outcome={"issue": [{"severity": "error", "code": "invalid"}]},
+    )
+    assert exc.detail is None
+    assert str(exc) == "OperationOutcome: error/invalid"
+
+
+@respx.mock
+def test_read_deleted_resource_raises_gone_error_end_to_end(mock_client):
+    """410 through the real request path (not just _raise_or_json):
+    reading a soft-deleted resource lands in ``except NotFoundError``."""
+    from pymedplum.exceptions import GoneError
+
+    respx.post("https://api.medplum.com/oauth2/token").mock(
+        return_value=httpx.Response(
+            200,
+            json={"access_token": "t", "expires_in": 3600},
+        )
+    )
+    respx.get("https://api.medplum.com/fhir/R4/Patient/123").mock(
+        return_value=httpx.Response(
+            410,
+            json={
+                "resourceType": "OperationOutcome",
+                "issue": [{"severity": "error", "code": "deleted"}],
+            },
+        )
+    )
+
+    with pytest.raises(NotFoundError) as exc_info:
+        mock_client.read_resource("Patient", "123")
+    assert isinstance(exc_info.value, GoneError)
+    assert exc_info.value.status_code == 410

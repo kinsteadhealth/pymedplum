@@ -39,13 +39,12 @@ def _membership(
         "project": {"reference": "Project/p1"},
         "user": {"reference": "User/u1"},
         "profile": {"reference": "Practitioner/pr1"},
+        # Without accessPolicy, emptying ``access`` would trip the
+        # unrestricted-fallback guard; these tests exercise merge
+        # concurrency, not the guard.
+        "accessPolicy": {"reference": "AccessPolicy/base"},
         "access": access or [],
     }
-
-
-# ---------------------------------------------------------------------------
-# add_project_membership_access_entry
-# ---------------------------------------------------------------------------
 
 
 def test_add_appends_to_existing_managed(
@@ -170,11 +169,6 @@ def test_add_rejects_unmanaged_entry(sync_client: MedplumClient) -> None:
         )
 
 
-# ---------------------------------------------------------------------------
-# remove_project_membership_access_entry
-# ---------------------------------------------------------------------------
-
-
 def test_remove_drops_matching_entry(
     sync_client: MedplumClient, mock_membership_endpoints: Any
 ) -> None:
@@ -282,3 +276,81 @@ def test_remove_only_touches_managed_slice(
     sent = put_route.calls[0].request.read().decode()
     assert "AccessPolicy/managed-1" not in sent  # ours got removed
     assert "AccessPolicy/other" in sent  # unmanaged preserved
+
+
+def _membership_without_access_policy(
+    access: list[dict[str, Any]],
+) -> dict[str, Any]:
+    membership = _membership(access=access)
+    membership.pop("accessPolicy")
+    return membership
+
+
+def test_remove_last_entry_without_access_policy_fails_closed(
+    sync_client: MedplumClient, mock_membership_endpoints: Any
+) -> None:
+    """Emptying ``access`` on a membership with no accessPolicy would
+    trigger Medplum's legacy '*' fallback — unrestricted project access.
+    The lockout must fail closed, not open."""
+    membership = _membership_without_access_policy([_entry("a")])
+    _, put_route = mock_membership_endpoints(membership)
+
+    with pytest.raises(ValueError, match="unrestricted project-wide access"):
+        sync_client.remove_project_membership_access_entry(
+            "abc",
+            _entry("a"),
+            managed_policy_ids={"managed-1"},
+        )
+    assert not put_route.called
+
+
+def test_remove_last_entry_with_explicit_fallback_opt_in(
+    sync_client: MedplumClient, mock_membership_endpoints: Any
+) -> None:
+    """Admin/owner memberships legitimately run with no accessPolicy;
+    the opt-in lets a deliberate flow restore that state."""
+    membership = _membership_without_access_policy([_entry("a")])
+    _, put_route = mock_membership_endpoints(membership)
+
+    result = sync_client.remove_project_membership_access_entry(
+        "abc",
+        _entry("a"),
+        managed_policy_ids={"managed-1"},
+        allow_unrestricted_fallback=True,
+    )
+    assert result.updated is True
+    assert put_route.called
+
+
+def test_merge_empty_on_already_empty_membership_is_noop(
+    sync_client: MedplumClient, mock_membership_endpoints: Any
+) -> None:
+    """A no-op reconcile against an admin membership (already empty
+    access, no accessPolicy) must not raise — nothing transitions."""
+    membership = _membership_without_access_policy([])
+    _, put_route = mock_membership_endpoints(membership)
+
+    result = sync_client.merge_project_membership_access(
+        "abc",
+        managed_access=[],
+        managed_policy_ids={"managed-1"},
+    )
+    assert result.updated is False
+    assert not put_route.called
+
+
+def test_remove_last_entry_with_access_policy_present_writes(
+    sync_client: MedplumClient, mock_membership_endpoints: Any
+) -> None:
+    """With an accessPolicy on the membership, emptying ``access`` is a
+    real lockdown (the policy still applies) — no guard."""
+    membership = _membership(access=[_entry("a")])
+    _, put_route = mock_membership_endpoints(membership)
+
+    result = sync_client.remove_project_membership_access_entry(
+        "abc",
+        _entry("a"),
+        managed_policy_ids={"managed-1"},
+    )
+    assert result.updated is True
+    assert put_route.called

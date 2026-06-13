@@ -4,6 +4,6 @@ __description__ = (
     "and an optional MCP server."
 )
 __url__ = "https://github.com/kinsteadhealth/pymedplum"
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 __author__ = "Kinstead Health"
 __license__ = "Apache-2.0"

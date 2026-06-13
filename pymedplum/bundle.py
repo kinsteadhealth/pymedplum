@@ -91,19 +91,37 @@ class FHIRBundle(Generic[T]):
             resource_class(**resource_dict) for resource_dict in self.get_resources()
         ]
 
-    def get_total(self) -> int:
-        """Get total count of resources.
+    def get_total(self) -> int | None:
+        """Get the total number of matches for the search, if knowable.
 
-        Uses Bundle.total if available, otherwise counts entries.
+        Uses ``Bundle.total`` when present. Medplum only populates it
+        when the search requested ``_total=accurate`` or
+        ``_total=estimate`` (e.g. ``search_with_options(total="accurate")``).
+        Without it, this falls back to counting match entries — but only
+        when the bundle has no ``next`` link, i.e. this single page *is*
+        the complete result set. When more pages exist, returns ``None``
+        rather than passing off the page size as a total.
 
         Returns:
-            Total count of resources
+            Total match count, or ``None`` when the server omitted
+            ``Bundle.total`` and the results are paginated.
         """
         if "total" in self._data:
             total = self._data["total"]
             if isinstance(total, int):
                 return total
-        return len(self.get_resources())
+        if self.get_next_link() is not None:
+            return None
+        entries = self._data.get("entry", [])
+        count = 0
+        for entry in entries:
+            if "resource" not in entry:
+                continue
+            search_info = entry.get("search")
+            mode = search_info.get("mode") if isinstance(search_info, dict) else None
+            if mode is None or mode == "match":
+                count += 1
+        return count
 
     def is_empty(self) -> bool:
         """Check if Bundle has no resources."""

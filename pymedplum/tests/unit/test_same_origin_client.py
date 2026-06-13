@@ -69,3 +69,88 @@ def test_async_job_url_same_origin_accepted() -> None:
         assert url == "https://api.medplum.com/fhir/R4/job/abc/status"
     finally:
         client.close()
+
+
+def test_async_job_url_cross_origin_rejected() -> None:
+    """The job poll attaches the bearer token; a cross-origin job URL
+    would exfiltrate it. This was the one escape hatch without the
+    same-origin guard every other URL path enforces."""
+    client = MedplumClient(base_url="https://api.medplum.com/", access_token="tkn")
+    try:
+        with pytest.raises(UnsafeRedirectError):
+            client._resolve_async_job_url("https://evil.com/fhir/R4/job/abc/status")
+    finally:
+        client.close()
+
+
+def test_async_job_url_cross_origin_diagnostics_rejected() -> None:
+    """Same guard for URLs extracted from OperationOutcome diagnostics —
+    a stored/poisoned outcome must not redirect the token off-origin."""
+    client = MedplumClient(base_url="https://api.medplum.com/", access_token="tkn")
+    outcome = {
+        "resourceType": "OperationOutcome",
+        "issue": [{"severity": "information", "diagnostics": "https://evil.com/job"}],
+    }
+    try:
+        with pytest.raises(UnsafeRedirectError):
+            client._resolve_async_job_url(outcome)
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize(
+    "evil",
+    [
+        "HTTPS://evil.com/fhir/R4/job/abc/status",  # mixed-case scheme
+        "Https://evil.com/job",
+        "hTTpS://evil.com/job",
+        "//evil.com/job",  # protocol-relative
+        "http://evil.com/job",
+    ],
+)
+def test_async_job_url_cross_origin_scheme_variants_rejected(evil: str) -> None:
+    """A case-sensitive scheme check would let HTTPS://evil.com/... skip
+    the same-origin guard and exfiltrate the bearer token. Absolute-URL
+    detection must be scheme-case-insensitive and catch protocol-relative
+    forms — both as a caller string and via OperationOutcome diagnostics."""
+    client = MedplumClient(base_url="https://api.medplum.com/", access_token="tkn")
+    outcome = {
+        "resourceType": "OperationOutcome",
+        "issue": [{"severity": "information", "diagnostics": evil}],
+    }
+    try:
+        with pytest.raises(UnsafeRedirectError):
+            client._resolve_async_job_url(evil)
+        with pytest.raises(UnsafeRedirectError):
+            client._resolve_async_job_url(outcome)
+    finally:
+        client.close()
+
+
+def test_async_job_url_bare_id_unaffected() -> None:
+    client = MedplumClient(base_url="https://api.medplum.com/", access_token="tkn")
+    try:
+        assert (
+            client._resolve_async_job_url("abc")
+            == "https://api.medplum.com/fhir/R4/job/abc/status"
+        )
+    finally:
+        client.close()
+
+
+def test_async_job_url_same_origin_diagnostics_accepted() -> None:
+    client = MedplumClient(base_url="https://api.medplum.com/", access_token="tkn")
+    outcome = {
+        "resourceType": "OperationOutcome",
+        "issue": [
+            {
+                "severity": "information",
+                "diagnostics": "https://api.medplum.com/fhir/R4/job/j1/status",
+            }
+        ],
+    }
+    try:
+        url = client._resolve_async_job_url(outcome)
+        assert url == "https://api.medplum.com/fhir/R4/job/j1/status"
+    finally:
+        client.close()

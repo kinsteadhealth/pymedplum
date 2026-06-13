@@ -16,11 +16,18 @@ from ._base import (
     OnBehalfOfContext,
     _append_search_options,
     _AttemptTracker,
+    _backoff_with_jitter,
+    _bearer_from_headers,
+    _build_timeout,
     _finalize_response,
+    _is_transport_retryable,
     _merge_params_into_url,
     _resolve_if_match,
     _retry_budget_exceeded,
     _retry_delay,
+    _stamp_bundle_accounts,
+    _transport_budget_exceeded,
+    _wrap_transport_error,
 )
 from ._fhir_ops import (
     build_codesystem_lookup_params,
@@ -89,7 +96,7 @@ class MedplumClient(BaseClient):
         access_token: str | None = None,
         project_id: str | None = None,
         fhir_url_path: str = "fhir/R4/",
-        timeout: float = 30.0,
+        timeout: float | httpx.Timeout = 30.0,
         http_client: httpx.Client | None = None,
         before_request: BeforeRequestHook | None = None,
         on_request_complete: OnRequestCompleteHook
@@ -133,7 +140,9 @@ class MedplumClient(BaseClient):
                 )
             self._http = http_client
         else:
-            self._http = httpx.Client(timeout=timeout, follow_redirects=False)
+            self._http = httpx.Client(
+                timeout=_build_timeout(timeout), follow_redirects=False
+            )
         self._owns_http_client = http_client is None
 
         if self.client_id and self.client_secret:
@@ -313,9 +322,26 @@ class MedplumClient(BaseClient):
         for attempt in range(MAX_WIRE_ATTEMPTS):
             wire_obo = self._resolve_on_behalf_of(on_behalf_of)
             headers = self._finalize_headers_for_wire(base_non_auth_headers, wire_obo)
-            response = self._send_one(
-                prepared, headers, wire_obo, tracker, kwargs, path_template
-            )
+            try:
+                response = self._send_one(
+                    prepared, headers, wire_obo, tracker, kwargs, path_template
+                )
+            except httpx.TransportError as exc:
+                if _is_transport_retryable(
+                    exc, prepared.method, prepared.headers
+                ) and not _transport_budget_exceeded(attempt):
+                    # Retrying, not failing — clear the recorded failure so
+                    # the completion event reflects the eventual outcome.
+                    tracker.final_exception = None
+                    delay = _backoff_with_jitter(attempt)
+                    _request_logger.debug(
+                        "request: retry scheduled in %.3fs (reason: transport %s)",
+                        delay,
+                        type(exc).__name__,
+                    )
+                    time.sleep(delay)
+                    continue
+                raise _wrap_transport_error(exc, attempt + 1) from exc
             if self._should_refresh_on_401(response, attempt):
                 refreshed = self._refresh_and_retry_once(
                     prepared,
@@ -324,6 +350,7 @@ class MedplumClient(BaseClient):
                     on_behalf_of=on_behalf_of,
                     kwargs=kwargs,
                     path_template=path_template,
+                    stale_token=_bearer_from_headers(headers),
                 )
                 if refreshed is None:
                     return response
@@ -331,6 +358,8 @@ class MedplumClient(BaseClient):
             delay = _retry_delay(
                 response,
                 attempt,
+                method=prepared.method,
+                headers=prepared.headers,
                 max_retry_delay_seconds=self.max_retry_delay_seconds,
             )
             if delay is not None and not _retry_budget_exceeded(
@@ -357,6 +386,7 @@ class MedplumClient(BaseClient):
         on_behalf_of: str | None,
         kwargs: dict[str, Any],
         path_template: str,
+        stale_token: str | None = None,
     ) -> httpx.Response | None:
         """Force-refresh the token and replay the request exactly once.
 
@@ -364,7 +394,7 @@ class MedplumClient(BaseClient):
         original 401; otherwise returns the replayed response.
         """
         try:
-            self._tokens.force_refresh(self._http)
+            self._tokens.force_refresh(self._http, stale_token=stale_token)
         except (MedplumError, TokenRefreshCooldownError):
             return None
         self.access_token = self._tokens.access_token
@@ -799,7 +829,7 @@ class MedplumClient(BaseClient):
         validate_resource_type(resource_type)
         validate_resource_id(resource_id)
 
-        resolved_if_match = _resolve_if_match(resource, if_match)
+        resolved_if_match = _resolve_if_match(data, if_match)
         merged_headers: dict[str, str] = {}
         if resolved_if_match is not None:
             merged_headers["If-Match"] = resolved_if_match
@@ -1067,7 +1097,9 @@ class MedplumClient(BaseClient):
                 behavior for legitimate bulk-data flows.
 
         Yields:
-            Individual resources from paginated results
+            Individual resources from paginated results. Only primary
+            matches (``entry.search.mode == "match"``, or no mode) are
+            yielded; ``_include`` / ``_revinclude`` entries are skipped.
 
         Examples:
             # Iterate over dict resources
@@ -1088,15 +1120,27 @@ class MedplumClient(BaseClient):
         yielded = 0
         while bundle:
             for entry in bundle.get("entry", []):
-                if "resource" in entry:
-                    if max_resources is not None and yielded >= max_resources:
-                        return
-                    resource = entry["resource"]
-                    if as_fhir:
-                        yield as_fhir(**resource)
-                    else:
-                        yield resource
-                    yielded += 1
+                if "resource" not in entry:
+                    continue
+                # Only yield primary matches. Medplum appends _include /
+                # _revinclude entries (search.mode == "include") to every
+                # page; yielding them would interleave foreign resource
+                # types (crashing as_fhir parsing) and eat into
+                # max_resources. Entries without search.mode are matches.
+                search_info = entry.get("search")
+                mode = (
+                    search_info.get("mode") if isinstance(search_info, dict) else None
+                )
+                if mode is not None and mode != "match":
+                    continue
+                if max_resources is not None and yielded >= max_resources:
+                    return
+                resource = entry["resource"]
+                if as_fhir:
+                    yield as_fhir(**resource)
+                else:
+                    yield resource
+                yielded += 1
 
             next_url = None
             for link in bundle.get("link", []):
@@ -1339,11 +1383,7 @@ class MedplumClient(BaseClient):
         data = to_fhir_json(bundle)
 
         if accounts is not None:
-            for entry in data.get("entry", []):
-                if "resource" in entry and isinstance(entry["resource"], dict):
-                    entry["resource"] = self._apply_accounts(
-                        entry["resource"], accounts
-                    )
+            data = _stamp_bundle_accounts(data, accounts, self._apply_accounts)
 
         return self._request(
             "POST", self.fhir_base_url, json=data, on_behalf_of=on_behalf_of
@@ -1451,6 +1491,7 @@ class MedplumClient(BaseClient):
         managed_policy_ids: set[str],
         force: bool = False,
         max_retries: int = 1,
+        allow_unrestricted_fallback: bool = False,
     ) -> MergeResult:
         """Atomically sync ``ProjectMembership.access`` to a desired list.
 
@@ -1475,6 +1516,16 @@ class MedplumClient(BaseClient):
                 primitive). Every entry must reference a policy in
                 ``managed_policy_ids``; otherwise the helper would
                 write access it could not later remove cleanly.
+
+                Lockout caveat: Medplum grants unrestricted
+                project-wide access (``{"resourceType": "*"}``) to a
+                membership with neither ``access`` entries nor an
+                ``accessPolicy`` — admin/owner memberships rely on
+                this. Emptying the access list of a membership that
+                lacks ``accessPolicy`` would therefore *grant* full
+                access, not revoke it, so that write is rejected with
+                ``ValueError`` unless ``allow_unrestricted_fallback``
+                is set.
             managed_policy_ids: AccessPolicy IDs the caller manages.
                 Typically a singleton like ``{practice_policy_id}``.
                 Pass the union of current and historical IDs during a
@@ -1484,6 +1535,10 @@ class MedplumClient(BaseClient):
                 to the remote, skip the PUT. If True, write regardless.
             max_retries: Number of 412 re-read+retry attempts before
                 raising. Default 1 (so two attempts total).
+            allow_unrestricted_fallback: Permit a write that leaves the
+                membership with an empty access list and no
+                ``accessPolicy`` — i.e. unrestricted project access via
+                Medplum's legacy fallback. Default False (raise).
 
         Returns:
             :class:`MergeResult` with whether a write occurred, the
@@ -1505,6 +1560,7 @@ class MedplumClient(BaseClient):
             managed_policy_ids=managed_policy_ids,
             force=force,
             max_retries=max_retries,
+            allow_unrestricted_fallback=allow_unrestricted_fallback,
         )
 
     def add_project_membership_access_entry(
@@ -1563,6 +1619,7 @@ class MedplumClient(BaseClient):
         managed_policy_ids: set[str],
         force: bool = False,
         max_retries: int = 1,
+        allow_unrestricted_fallback: bool = False,
     ) -> MergeResult:
         """Atomically remove a structurally-equal entry from the managed slice.
 
@@ -1585,6 +1642,11 @@ class MedplumClient(BaseClient):
             managed_policy_ids: AccessPolicy IDs the caller manages.
             force: Write even if no matching entry was present.
             max_retries: 412 retries before giving up.
+            allow_unrestricted_fallback: Permit removing the last access
+                entry from a membership that has no ``accessPolicy`` —
+                which leaves it with unrestricted project access via
+                Medplum's legacy ``'*'`` fallback. Default False (raise
+                ``ValueError`` instead of failing open).
 
         Returns:
             :class:`MergeResult`.
@@ -1601,6 +1663,7 @@ class MedplumClient(BaseClient):
             managed_policy_ids=managed_policy_ids,
             force=force,
             max_retries=max_retries,
+            allow_unrestricted_fallback=allow_unrestricted_fallback,
         )
 
     def _merge_pm_access_with_mutator(
@@ -1611,6 +1674,7 @@ class MedplumClient(BaseClient):
         managed_policy_ids: set[str],
         force: bool,
         max_retries: int,
+        allow_unrestricted_fallback: bool = False,
     ) -> MergeResult:
         """Run a read / partition / mutate / write loop with 412 retry.
 
@@ -1646,6 +1710,27 @@ class MedplumClient(BaseClient):
             new_managed = [normalize_access_entry(e) for e in mutator(current_managed)]
             validate_managed_access(new_managed, managed_policy_ids)
             merged = build_merged_access(untouched, new_managed)
+
+            if (
+                not merged
+                and current_access
+                and not membership.get("accessPolicy")
+                and not allow_unrestricted_fallback
+            ):
+                # Medplum's legacy fallback (server accesspolicy.ts) grants
+                # {"resourceType": "*"} — unrestricted project access — to a
+                # membership with neither access entries nor an accessPolicy.
+                # Emptying this membership's access list would fail open.
+                raise ValueError(
+                    f"Refusing to empty the access list of "
+                    f"ProjectMembership/{bare_id}: it has no accessPolicy, "
+                    "and Medplum grants unrestricted project-wide access "
+                    "('*') to memberships with neither access entries nor "
+                    "an accessPolicy — this lockout would fail open. Set "
+                    "an accessPolicy on the membership first, or pass "
+                    "allow_unrestricted_fallback=True if full access is "
+                    "intended (e.g. admin memberships)."
+                )
 
             if not force and merged_equals_remote(merged, current_access):
                 return MergeResult(

@@ -124,11 +124,6 @@ def test_id():
     return str(uuid.uuid4())[:8]
 
 
-# =============================================================================
-# Factory Fixtures - Return callable functions for creating test resources
-# =============================================================================
-
-
 @pytest.fixture
 def create_test_org(medplum_client):
     """Factory fixture that returns a function to create test organizations."""

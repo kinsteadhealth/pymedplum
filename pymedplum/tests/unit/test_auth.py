@@ -858,3 +858,89 @@ def test_token_manager_close_shuts_down_executor() -> None:
     # ThreadPoolExecutor exposes `_shutdown` after shutdown(); acceptable
     # in tests.
     assert executor._shutdown
+
+
+@pytest.mark.asyncio
+async def test_force_refresh_skips_when_token_already_rotated_async() -> None:
+    """A straggler 401 (request sent with an old token) must not trigger
+    a fresh OAuth call when a refresh already produced a newer token —
+    N stragglers would otherwise fan out into N sequential token fetches."""
+    from pymedplum._auth import AsyncTokenManager
+
+    with respx.mock(base_url="https://api.medplum.com") as mock:
+        token_route = mock.post("/oauth2/token").respond(
+            json={"access_token": "tok-2", "expires_in": 3600},
+        )
+        manager = AsyncTokenManager(
+            client_id="cid",
+            client_secret="cs",
+            access_token="tok-1",
+            token_url=TOKEN_URL,
+        )
+        async with httpx.AsyncClient() as http:
+            await manager.force_refresh(http, stale_token="tok-0")
+            assert token_route.call_count == 0
+            assert manager.access_token == "tok-1"
+
+            # Same token that 401'd → genuinely stale → refresh runs.
+            await manager.force_refresh(http, stale_token="tok-1")
+            assert token_route.call_count == 1
+            assert manager.access_token == "tok-2"
+
+
+def test_force_refresh_skips_when_token_already_rotated_sync() -> None:
+    from pymedplum._auth import TokenManager
+
+    with respx.mock(base_url="https://api.medplum.com") as mock:
+        token_route = mock.post("/oauth2/token").respond(
+            json={"access_token": "tok-2", "expires_in": 3600},
+        )
+        manager = TokenManager(
+            client_id="cid",
+            client_secret="cs",
+            access_token="tok-1",
+            token_url=TOKEN_URL,
+        )
+        try:
+            with httpx.Client() as http:
+                manager.force_refresh(http, stale_token="tok-0")
+                assert token_route.call_count == 0
+                assert manager.access_token == "tok-1"
+
+                manager.force_refresh(http, stale_token="tok-1")
+                assert token_route.call_count == 1
+                assert manager.access_token == "tok-2"
+        finally:
+            manager.close()
+
+
+@pytest.mark.asyncio
+async def test_force_refresh_rotated_token_wins_over_cooldown() -> None:
+    """A straggler whose token already rotated must get the fresh token
+    even while a later refresh failure has the manager in cooldown —
+    the early return fires before the cooldown check."""
+    from datetime import datetime, timezone
+
+    from pymedplum._auth import AsyncTokenManager
+
+    # assert_all_called=False: the token route exists to prove it is
+    # NEVER hit.
+    with respx.mock(
+        base_url="https://api.medplum.com", assert_all_called=False
+    ) as mock:
+        token_route = mock.post("/oauth2/token").respond(
+            json={"access_token": "tok-2", "expires_in": 3600},
+        )
+        manager = AsyncTokenManager(
+            client_id="cid",
+            client_secret="cs",
+            access_token="tok-1",
+            token_url=TOKEN_URL,
+            failed_refresh_at=datetime.now(timezone.utc),
+            failed_refresh_cooldown=timedelta(seconds=60),
+        )
+        async with httpx.AsyncClient() as http:
+            # Does not raise TokenRefreshCooldownError; no fetch.
+            await manager.force_refresh(http, stale_token="tok-0")
+        assert token_route.call_count == 0
+        assert manager.access_token == "tok-1"

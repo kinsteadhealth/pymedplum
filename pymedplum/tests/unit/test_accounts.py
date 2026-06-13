@@ -65,10 +65,61 @@ def test_apply_accounts_empty_list_adds_no_entries():
     assert result["meta"]["accounts"] == []
 
 
-def test_apply_accounts_mutates_in_place():
+def test_apply_accounts_does_not_mutate_caller_dict():
+    # to_fhir_json returns dict inputs by identity, so in-place writes
+    # would leak meta.accounts into caller-owned templates and
+    # accumulate across calls.
     resource = {"resourceType": "Patient"}
     result = BaseClient._apply_accounts(resource, "Organization/org-1")
-    assert result is resource
+    assert result is not resource
+    assert resource == {"resourceType": "Patient"}
+    assert result["meta"]["accounts"] == [{"reference": "Organization/org-1"}]
+
+
+def test_apply_accounts_does_not_mutate_existing_meta():
+    meta = {"accounts": [{"reference": "Organization/org-1"}]}
+    resource = {"resourceType": "Patient", "meta": meta}
+    result = BaseClient._apply_accounts(resource, "Organization/org-2")
+    assert meta == {"accounts": [{"reference": "Organization/org-1"}]}
+    assert result["meta"]["accounts"] == [
+        {"reference": "Organization/org-1"},
+        {"reference": "Organization/org-2"},
+    ]
+
+
+def test_stamp_bundle_accounts_does_not_mutate_caller_bundle():
+    """execute_batch(accounts=...) must not write stamped resources back
+    into the caller's bundle entries — re-stamping a reused bundle would
+    otherwise accumulate account refs across calls."""
+    from pymedplum._base import _stamp_bundle_accounts
+
+    bundle = {
+        "resourceType": "Bundle",
+        "type": "batch",
+        "entry": [
+            {"resource": {"resourceType": "Patient"}, "request": {"method": "POST"}},
+            {"fullUrl": "urn:x"},  # no resource — passes through untouched
+        ],
+    }
+
+    out1 = _stamp_bundle_accounts(
+        bundle, "Organization/org-1", BaseClient._apply_accounts
+    )
+    out2 = _stamp_bundle_accounts(
+        bundle, "Organization/org-2", BaseClient._apply_accounts
+    )
+
+    # Caller's bundle is pristine — no meta leaked, no accumulation.
+    assert bundle["entry"][0]["resource"] == {"resourceType": "Patient"}
+    # Each call stamps its own ref onto a fresh copy.
+    assert out1["entry"][0]["resource"]["meta"]["accounts"] == [
+        {"reference": "Organization/org-1"}
+    ]
+    assert out2["entry"][0]["resource"]["meta"]["accounts"] == [
+        {"reference": "Organization/org-2"}
+    ]
+    # Non-resource entries pass through.
+    assert out1["entry"][1] == {"fullUrl": "urn:x"}
 
 
 def test_get_resource_accounts_basic():

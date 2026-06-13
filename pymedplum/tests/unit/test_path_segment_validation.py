@@ -23,10 +23,6 @@ from pymedplum._security import (
     validate_resource_type,
 )
 
-# ---------------------------------------------------------------------------
-# validate_resource_type
-# ---------------------------------------------------------------------------
-
 
 @pytest.mark.parametrize(
     "bad",
@@ -96,11 +92,6 @@ def test_validate_resource_type_rejects_non_string() -> None:
         validate_resource_type(123)  # type: ignore[arg-type]
 
 
-# ---------------------------------------------------------------------------
-# validate_resource_id
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     "bad",
     [
@@ -148,11 +139,6 @@ def test_validate_resource_id_uses_field_name_in_message() -> None:
         validate_resource_id("", field="version_id")
 
 
-# ---------------------------------------------------------------------------
-# validate_operation_name
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     "bad",
     [
@@ -194,11 +180,6 @@ def test_validate_operation_name_strips_dollar_prefix() -> None:
 )
 def test_validate_operation_name_accepts(good: str) -> None:
     assert validate_operation_name(good) == good.lstrip("$")
-
-
-# ---------------------------------------------------------------------------
-# validate_as_fhir_class
-# ---------------------------------------------------------------------------
 
 
 def test_validate_as_fhir_class_accepts_resource() -> None:
@@ -263,11 +244,6 @@ def test_sync_read_resource_rejects_mismatched_as_fhir(respx_mock: MockRouter) -
             client.read_resource("Patient", "abc", as_fhir=Observation)
     finally:
         client.close()
-
-
-# ---------------------------------------------------------------------------
-# Integration: sync client raises BEFORE hitting the wire
-# ---------------------------------------------------------------------------
 
 
 def _sync_client() -> MedplumClient:
@@ -383,11 +359,6 @@ def test_sync_get_blocks_traversal(respx_mock: MockRouter) -> None:
     assert not respx_mock.calls
 
 
-# ---------------------------------------------------------------------------
-# Integration: async client raises BEFORE hitting the wire
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.asyncio
 async def test_async_read_resource_blocks_traversal(respx_mock: MockRouter) -> None:
     client = _async_client()
@@ -479,11 +450,6 @@ async def test_async_download_binary_blocks_bad_id(
         assert not respx_mock.calls
     finally:
         await client.aclose()
-
-
-# ---------------------------------------------------------------------------
-# Sanity check: valid inputs still reach the wire
-# ---------------------------------------------------------------------------
 
 
 def test_sync_read_resource_accepts_valid_id(respx_mock: MockRouter) -> None:
