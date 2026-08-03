@@ -125,3 +125,66 @@ async def test_async_possibly_committed_flags(
     with pytest.raises(NetworkError) as timeout_exc:
         await async_client.create_resource({"resourceType": "Patient"})
     assert timeout_exc.value.possibly_committed is True
+
+
+def test_possibly_committed_aggregates_across_attempts(
+    sync_client: MedplumClient, respx_mock: MockRouter
+) -> None:
+    """An early sent-then-failed attempt keeps the flag True even when
+    the FINAL attempt provably never went out — deriving from the last
+    exception alone would falsely report 'never sent'."""
+    route = respx_mock.put(f"{_PATIENT_TYPE}/p1").mock(
+        side_effect=[
+            httpx.ReadTimeout("read timed out"),
+            httpx.ConnectError("connection refused"),
+            httpx.ConnectError("connection refused"),
+        ]
+    )
+
+    with pytest.raises(NetworkError) as exc_info:
+        sync_client.update_resource(
+            {"resourceType": "Patient", "id": "p1"}, if_match=False
+        )
+
+    assert route.call_count == 3
+    assert exc_info.value.possibly_committed is True
+
+
+def test_possibly_committed_true_after_ambiguous_status_then_connect_error(
+    sync_client: MedplumClient, respx_mock: MockRouter
+) -> None:
+    """A 503 response proves the request reached the origin — a later
+    connect-phase exhaustion must not reset the flag to False."""
+    route = respx_mock.get(f"{_PATIENT_TYPE}/p1").mock(
+        side_effect=[
+            httpx.Response(503, text="Service Unavailable"),
+            httpx.ConnectError("connection refused"),
+            httpx.ConnectError("connection refused"),
+        ]
+    )
+
+    with pytest.raises(NetworkError) as exc_info:
+        sync_client.read_resource("Patient", "p1")
+
+    assert route.call_count == 3
+    assert exc_info.value.possibly_committed is True
+
+
+async def test_async_possibly_committed_aggregates_across_attempts(
+    async_client: AsyncMedplumClient, respx_mock: MockRouter
+) -> None:
+    route = respx_mock.put(f"{_PATIENT_TYPE}/p1").mock(
+        side_effect=[
+            httpx.ReadTimeout("read timed out"),
+            httpx.ConnectError("connection refused"),
+            httpx.ConnectError("connection refused"),
+        ]
+    )
+
+    with pytest.raises(NetworkError) as exc_info:
+        await async_client.update_resource(
+            {"resourceType": "Patient", "id": "p1"}, if_match=False
+        )
+
+    assert route.call_count == 3
+    assert exc_info.value.possibly_committed is True

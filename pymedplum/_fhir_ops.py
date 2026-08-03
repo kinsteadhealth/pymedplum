@@ -90,14 +90,29 @@ def is_parameters_resource(obj: Any) -> bool:
 
 
 def _coerce_parameters(params: dict[str, Any] | Any) -> dict[str, Any]:
-    """Accept a Parameters dict or Pydantic model; return FHIR JSON."""
+    """Accept a Parameters dict or Pydantic model; return FHIR JSON.
+
+    Rejects non-Parameters resources (``ValueError``) rather than
+    reading them as empty — a Patient or Bundle passed here is an
+    unexpected operation-response shape the caller needs to see, not a
+    silent ``{}``/``None``.
+    """
+    data: dict[str, Any]
     if isinstance(params, dict):
-        return params
-    dump = getattr(params, "model_dump", None)
-    if callable(dump):
-        dumped: dict[str, Any] = dump(by_alias=True, exclude_none=True)
-        return dumped
-    raise TypeError(f"Expected a Parameters dict or model, got {type(params).__name__}")
+        data = params
+    else:
+        dump = getattr(params, "model_dump", None)
+        if not callable(dump):
+            raise TypeError(
+                f"Expected a Parameters dict or model, got {type(params).__name__}"
+            )
+        data = dump(by_alias=True, exclude_none=True)
+    resource_type = data.get("resourceType")
+    if resource_type != "Parameters":
+        raise ValueError(
+            f"Expected a Parameters resource, got resourceType={resource_type!r}"
+        )
+    return data
 
 
 def _parameter_value(param: dict[str, Any]) -> Any:

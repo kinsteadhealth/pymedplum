@@ -94,6 +94,26 @@ def test_parameters_to_dict_accepts_model_and_rejects_junk() -> None:
     assert parameters_to_dict({"resourceType": "Parameters"}) == {}
 
 
+def test_readers_reject_non_parameters_resources() -> None:
+    """A Patient/Bundle passed to the readers is an unexpected response
+    shape — it must raise, not silently read as an empty result."""
+    patient = {"resourceType": "Patient", "id": "p1"}
+
+    with pytest.raises(ValueError, match="Expected a Parameters resource"):
+        parameters_to_dict(patient)
+    with pytest.raises(ValueError, match="Expected a Parameters resource"):
+        get_parameter(patient, "name")
+    with pytest.raises(ValueError, match="Expected a Parameters resource"):
+        get_parameter_resource(patient, "name")
+    with pytest.raises(ValueError, match="resourceType=None"):
+        parameters_to_dict({})
+
+    from pymedplum.fhir import Patient
+
+    with pytest.raises(ValueError, match="Expected a Parameters resource"):
+        parameters_to_dict(Patient(id="p1"))
+
+
 def test_get_parameter_and_resource() -> None:
     params = _params()
     assert get_parameter(params, "display") == "Blood pressure"

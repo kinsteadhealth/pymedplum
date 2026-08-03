@@ -1593,7 +1593,7 @@ The full public exception tree, all re-exported at
 | `ServerError` | 5xx. String form omits the response body; access `exc.response` for the raw body, or `exc.sanitize_for_logging()` for a safe dict. |
 | `OperationOutcomeError` | FHIR OperationOutcome returned with non-success issues. String form omits `diagnostics` / `details.text`; access `exc.outcome` or `exc.sanitize_for_logging()`. |
 | `ValidationError` | Resource validation failure (surfaced from 400s that carry OperationOutcome). |
-| `NetworkError` | Connection/timeout/DNS failure. `exc.possibly_committed` is `True` when the request was sent before the failure (the origin may have committed — re-read before retrying a write) and `False` when it provably never went out (connect-phase failure). |
+| `NetworkError` | Connection/timeout/DNS failure. `exc.possibly_committed` is aggregated across every wire attempt: `True` when any attempt was sent before failing or drew an ambiguous 502/503/504 (the origin may have committed — re-read before retrying a write), `False` when no attempt ever went out (connect-phase failures only). |
 | `InsecureTransportError` | Constructor received a non-`https://` URL without `allow_insecure_http=True` and without a loopback host. |
 | `UnsafeRedirectError` | Follow-up URL (pagination, async job polling, `if_none_exist` absolute URL) is outside the configured origin. |
 | `TokenRefreshCooldownError` | Token refresh attempted during the cooldown window after a prior refresh failure. Has `retry_after: float` (seconds). |

@@ -26,10 +26,12 @@ There is no flag: this is the new default and only behavior. If a
 create must survive retries, use `create_resource_if_none_exist` or
 `conditional_create_batch`.
 
-Related: `NetworkError` gains **`possibly_committed: bool`** — `False`
-when the request provably never went out (connect-phase failure),
-`True` when it was sent and then the transport failed, so the origin
-may have committed. Apply the read-before-retry rule when it's `True`.
+Related: `NetworkError` gains **`possibly_committed: bool`**,
+aggregated across every wire attempt of the request — `False` when no
+attempt ever went out (connect-phase failures only), `True` when any
+attempt was sent before failing or drew an ambiguous 502/503/504, so
+the origin may have committed. Apply the read-before-retry rule when
+it's `True`.
 
 ### Added
 
@@ -81,3 +83,8 @@ may have committed. Apply the read-before-retry rule when it's `True`.
 
 - `execute_transaction` no longer mutates the caller's bundle dict when
   forcing `type: "transaction"`.
+- `update_resource` / `patch_resource` honor a caller-supplied
+  `If-Match` header **case-insensitively**: a lowercase `if-match` in
+  `headers=` now wins over the `if_match` keyword instead of both
+  spellings being sent as a joined header value (the `update_resource`
+  half of this predates 0.6.0).

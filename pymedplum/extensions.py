@@ -16,6 +16,7 @@ R4 by embedding a ``valueReference`` extension inside each
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 SERVICE_TYPE_REFERENCE_URL = "https://medplum.com/fhir/service-type-reference"
@@ -40,6 +41,24 @@ def _camel(key: str) -> str:
     """Normalize a kwarg name to FHIR JSON camelCase (value_string -> valueString)."""
     head, *rest = key.split("_")
     return head + "".join(part[:1].upper() + part[1:] for part in rest)
+
+
+@lru_cache(maxsize=1)
+def _valid_value_keys() -> frozenset[str]:
+    """The FHIR ``value[x]`` field names an Extension may carry.
+
+    Derived from the generated ``Extension`` model (imported lazily so
+    this module stays importable without loading the full model
+    package), so a typo like ``valueBooleann`` is rejected here instead
+    of being written and rejected later by the server.
+    """
+    from .fhir.extension import Extension
+
+    return frozenset(
+        field.alias or name
+        for name, field in Extension.model_fields.items()
+        if (field.alias or name).startswith("value")
+    )
 
 
 def _ext_to_dict(ext: Any) -> dict[str, Any]:
@@ -123,7 +142,15 @@ def set_extension(element: Any, url: str, **value_x: Any) -> None:
             f"got {sorted(value_x)!r}"
         )
     key, value = next(iter(value_x.items()))
-    upsert_extension(element, {"url": url, _camel(key): value}, key_url=url)
+    camel_key = _camel(key)
+    if camel_key not in _valid_value_keys():
+        raise ValueError(
+            f"{key!r} is not a FHIR Extension value[x] field "
+            f"(e.g. valueString, valueBoolean, valueReference)"
+        )
+    if value is None:
+        raise ValueError(f"{key!r} must not be None — use remove_extension() to clear")
+    upsert_extension(element, {"url": url, camel_key: value}, key_url=url)
 
 
 def upsert_extension(element: Any, ext: Any, *, key_url: str) -> None:

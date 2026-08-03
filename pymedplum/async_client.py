@@ -11,6 +11,7 @@ import httpx
 
 from ._auth import AsyncTokenManager, TokenSource
 from ._base import (
+    _AMBIGUOUS_COMMIT_STATUS,
     MAX_WIRE_ATTEMPTS,
     AsyncOnBehalfOfContext,
     BaseClient,
@@ -21,9 +22,11 @@ from ._base import (
     _build_timeout,
     _classify_batch_chunk,
     _finalize_response,
+    _has_header,
     _is_transport_retryable,
     _merge_params_into_url,
     _parse_operation_response,
+    _request_never_sent,
     _resolve_if_match,
     _retry_budget_exceeded,
     _retry_delay,
@@ -331,6 +334,10 @@ class AsyncMedplumClient(BaseClient):
         _, _, _, path_template = _parse_fhir_url(
             urlparse(prepared.url).path, self.fhir_url_path
         )
+        # Aggregated across attempts: True once any attempt was sent
+        # before failing or drew an ambiguous status — the final
+        # exception alone can hide an earlier maybe-committed send.
+        possibly_committed = False
         for attempt in range(MAX_WIRE_ATTEMPTS):
             wire_obo = self._resolve_on_behalf_of(on_behalf_of)
             headers = self._finalize_headers_for_wire(base_non_auth_headers, wire_obo)
@@ -354,6 +361,8 @@ class AsyncMedplumClient(BaseClient):
                         return response
                     response = refreshed
             except httpx.TransportError as exc:
+                if not _request_never_sent(exc):
+                    possibly_committed = True
                 if _is_transport_retryable(
                     exc, prepared.method, prepared.headers, replay_safe=replay_safe
                 ) and not _transport_budget_exceeded(attempt):
@@ -372,9 +381,13 @@ class AsyncMedplumClient(BaseClient):
                 # tracker, so on_request_complete hooks observe the SDK's
                 # NetworkError (not a URL-bearing raw httpx exception). The
                 # raw cause is preserved via __cause__ for deep inspection.
-                wrapped = _wrap_transport_error(exc, attempt + 1)
+                wrapped = _wrap_transport_error(
+                    exc, attempt + 1, possibly_committed=possibly_committed
+                )
                 tracker.final_exception = wrapped
                 raise wrapped from exc
+            if response.status_code in _AMBIGUOUS_COMMIT_STATUS:
+                possibly_committed = True
             delay = _retry_delay(
                 response,
                 attempt,
@@ -957,10 +970,11 @@ class AsyncMedplumClient(BaseClient):
         validate_resource_type(resource_type)
         validate_resource_id(resource_id)
 
-        resolved_if_match = _resolve_if_match(data, if_match)
         merged_headers: dict[str, str] = {}
-        if resolved_if_match is not None:
-            merged_headers["If-Match"] = resolved_if_match
+        if not _has_header(headers, "If-Match"):
+            resolved_if_match = _resolve_if_match(data, if_match)
+            if resolved_if_match is not None:
+                merged_headers["If-Match"] = resolved_if_match
         if headers:
             merged_headers.update(headers)
 
@@ -1194,7 +1208,7 @@ class AsyncMedplumClient(BaseClient):
         validate_resource_type(resource_type)
         validate_resource_id(resource_id)
         patch_headers = {"Content-Type": "application/json-patch+json"}
-        if if_match is not None:
+        if if_match is not None and not _has_header(headers, "If-Match"):
             patch_headers["If-Match"] = if_match
         if headers:
             patch_headers.update(headers)

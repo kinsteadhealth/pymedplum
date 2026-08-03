@@ -372,12 +372,14 @@ class NetworkError(MedplumError):
     - Network unreachable
 
     ``possibly_committed`` distinguishes the two outcomes a transport
-    failure can hide: ``False`` means the request provably never went
-    out (connect-phase failure — DNS, TCP connect, pool wait), so a
-    write can be retried blindly. ``True`` means the request was sent
-    and then the failure happened (read timeout, dropped connection,
-    ambiguous gateway status), so the origin may have committed the
-    write — re-read state before retrying anything non-idempotent.
+    failure can hide, aggregated across every wire attempt of the
+    request: ``False`` means no attempt ever went out (connect-phase
+    failures only — DNS, TCP connect, pool wait), so a write can be
+    retried blindly. ``True`` means at least one attempt was sent
+    before failing (read timeout, dropped connection) or drew an
+    ambiguous gateway status (502/503/504), so the origin may have
+    committed the write — re-read state before retrying anything
+    non-idempotent.
 
     Recovery:
     - Check internet connection

@@ -115,6 +115,72 @@ def test_patch_explicit_header_wins_over_kwarg(
     assert route.calls[0].request.headers["If-Match"] == 'W/"9"'
 
 
+def test_patch_lowercase_header_wins_without_duplication(
+    sync_client: MedplumClient, respx_mock: MockRouter
+) -> None:
+    """Header names are case-insensitive on the wire — a lowercase
+    caller header must win over the kwarg, not combine with it into
+    a joined 'W/"9", W/"5"' value."""
+    route = respx_mock.patch(_PATIENT_PATH).mock(
+        return_value=httpx.Response(200, json=_patient("6"))
+    )
+
+    sync_client.patch_resource(
+        "Patient",
+        "p1",
+        [{"op": "replace", "path": "/active", "value": True}],
+        headers={"if-match": 'W/"9"'},
+        if_match='W/"5"',
+    )
+
+    assert route.calls[0].request.headers.get_list("if-match") == ['W/"9"']
+
+
+def test_update_lowercase_header_wins_and_required_defers(
+    sync_client: MedplumClient, respx_mock: MockRouter
+) -> None:
+    """A caller-supplied If-Match (any case) owns the guard: no joined
+    header, and if_match="required" must not raise for a version-less
+    resource when the caller already provided the ETag."""
+    route = respx_mock.put(_PATIENT_PATH).mock(
+        return_value=httpx.Response(200, json=_patient("6"))
+    )
+
+    sync_client.update_resource(
+        _patient(None),
+        headers={"if-match": 'W/"9"'},
+        if_match="required",
+    )
+
+    assert route.calls[0].request.headers.get_list("if-match") == ['W/"9"']
+
+
+async def test_async_lowercase_header_wins_without_duplication(
+    async_client: AsyncMedplumClient, respx_mock: MockRouter
+) -> None:
+    patch_route = respx_mock.patch(_PATIENT_PATH).mock(
+        return_value=httpx.Response(200, json=_patient("6"))
+    )
+    await async_client.patch_resource(
+        "Patient",
+        "p1",
+        [{"op": "replace", "path": "/active", "value": True}],
+        headers={"if-match": 'W/"9"'},
+        if_match='W/"5"',
+    )
+    assert patch_route.calls[0].request.headers.get_list("if-match") == ['W/"9"']
+
+    put_route = respx_mock.put(_PATIENT_PATH).mock(
+        return_value=httpx.Response(200, json=_patient("6"))
+    )
+    await async_client.update_resource(
+        _patient(None),
+        headers={"if-match": 'W/"9"'},
+        if_match="required",
+    )
+    assert put_route.calls[0].request.headers.get_list("if-match") == ['W/"9"']
+
+
 def test_execute_transaction_stamps_accounts_without_mutating_caller(
     sync_client: MedplumClient, respx_mock: MockRouter
 ) -> None:

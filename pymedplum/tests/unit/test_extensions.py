@@ -75,6 +75,21 @@ def test_set_extension_accepts_snake_case_and_rejects_arity() -> None:
         set_extension(element, _URL)
 
 
+def test_set_extension_rejects_invalid_value_keywords() -> None:
+    """A typo'd or non-value[x] keyword must fail here, not surface
+    later as a server rejection of a malformed extension."""
+    element: dict[str, Any] = {}
+
+    with pytest.raises(ValueError, match="not a FHIR Extension value"):
+        set_extension(element, _URL, valueBooleann=True)
+    with pytest.raises(ValueError, match="not a FHIR Extension value"):
+        set_extension(element, _URL, foo="x")
+    with pytest.raises(ValueError, match="must not be None"):
+        set_extension(element, _URL, valueString=None)
+
+    assert "extension" not in element
+
+
 def test_set_extension_collapses_duplicate_urls() -> None:
     element = {
         "extension": [

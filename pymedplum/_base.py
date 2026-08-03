@@ -464,6 +464,19 @@ def _merge_params_into_url(url: str, params: Any) -> str:
     return str(httpx.URL(url).copy_merge_params(params))
 
 
+def _has_header(headers: dict[str, str] | None, name: str) -> bool:
+    """Case-insensitively check whether a caller header dict carries ``name``.
+
+    HTTP header names are case-insensitive on the wire, but a plain dict
+    merge is not — without this check a caller's lowercase ``if-match``
+    and an SDK-computed ``If-Match`` would BOTH be sent (httpx joins
+    them into one combined value), instead of the documented
+    explicit-header-wins precedence.
+    """
+    lowered = name.lower()
+    return any(k.lower() == lowered for k in (headers or {}))
+
+
 _IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "PUT", "DELETE", "OPTIONS"})
 
 # 502/503/504 can be emitted *after* the origin committed a write: a gateway
@@ -552,7 +565,9 @@ def _transport_budget_exceeded(attempt: int) -> bool:
     return attempt >= 2
 
 
-def _wrap_transport_error(exc: httpx.TransportError, attempts: int) -> NetworkError:
+def _wrap_transport_error(
+    exc: httpx.TransportError, attempts: int, *, possibly_committed: bool
+) -> NetworkError:
     """Wrap a raw httpx transport failure as ``NetworkError``.
 
     The SDK never lets a raw httpx exception escape to callers: wrapping in
@@ -561,14 +576,16 @@ def _wrap_transport_error(exc: httpx.TransportError, attempts: int) -> NetworkEr
     status (e.g. 503) instead of a 500. The message carries only the
     exception type — never ``str(exc)`` — to keep URLs/details out of logs.
 
-    ``possibly_committed`` records whether the request may have reached
-    the origin: ``False`` only for pre-send failures
-    (:func:`_request_never_sent`), ``True`` for everything ambiguous —
-    the caller-facing signal for the read-before-retry rule.
+    ``possibly_committed`` must be aggregated by the retry loop across
+    EVERY wire attempt, not derived from the final exception alone: an
+    earlier attempt that was sent and then timed out may have committed
+    even when the last attempt died before sending (connect failure).
+    ``False`` therefore means no attempt ever reached the origin — the
+    caller-facing signal for the read-before-retry rule.
     """
     return NetworkError(
         f"Network error after {attempts} attempt(s): {type(exc).__name__}",
-        possibly_committed=not _request_never_sent(exc),
+        possibly_committed=possibly_committed,
     )
 
 
