@@ -232,10 +232,13 @@ def service_type_reference_extension(
         ...     service_type_reference_extension("HealthcareService/123")
         ... ]
     """
-    if not reference or "/" not in reference:
+    resource_type, _, resource_id = (reference or "").partition("/")
+    if resource_type != "HealthcareService" or not resource_id:
         raise ValueError(
             f"Invalid service reference: {reference!r}. "
-            "Expected format like 'HealthcareService/123'."
+            "Medplum's service-type-reference convention embeds a "
+            "HealthcareService reference — expected "
+            "'HealthcareService/<id>'."
         )
     concept: dict[str, Any] = {}
     if codings:

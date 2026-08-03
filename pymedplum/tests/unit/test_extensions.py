@@ -184,6 +184,12 @@ def test_service_type_reference_extension_matches_medplum_shape() -> None:
 
     with pytest.raises(ValueError, match="Invalid service reference"):
         service_type_reference_extension("not-a-reference")
+    # The convention embeds a HealthcareService specifically — a mere
+    # "/" is not enough (a Patient reference here would be meaningless).
+    with pytest.raises(ValueError, match="HealthcareService"):
+        service_type_reference_extension("Patient/123")
+    with pytest.raises(ValueError, match="HealthcareService"):
+        service_type_reference_extension("HealthcareService/")
 
 
 def test_read_service_type_references_dict_and_model() -> None:

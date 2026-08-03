@@ -2902,7 +2902,8 @@ class AsyncMedplumClient(BaseClient):
         wrap_params: bool = False,
         on_behalf_of: str | None = None,
         as_fhir: type[ResourceT],
-    ) -> ResourceT: ...
+    ) -> ResourceT:
+        pass
 
     @overload
     async def execute_operation(
@@ -2917,7 +2918,8 @@ class AsyncMedplumClient(BaseClient):
         wrap_params: bool = False,
         on_behalf_of: str | None = None,
         as_fhir: None = None,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any]:
+        pass
 
     async def execute_operation(
         self,
