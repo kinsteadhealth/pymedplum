@@ -4,9 +4,98 @@ Simplifies working with FHIR search results and batch operations.
 """
 
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
+from .exceptions import BundleEntryError
+
 T = TypeVar("T")
+
+
+def _parse_entry_status(status: Any) -> int | None:
+    """Parse ``entry.response.status`` ("201 Created", "404") to an int."""
+    if isinstance(status, int):
+        return status
+    if isinstance(status, str):
+        head = status.strip().split(" ", 1)[0]
+        try:
+            return int(head)
+        except ValueError:
+            return None
+    return None
+
+
+def _resource_id_from_location(location: Any) -> str | None:
+    """Extract the resource ID from ``entry.response.location``.
+
+    Handles relative and absolute forms, with or without a
+    ``/_history/<version>`` suffix (e.g.
+    ``Patient/123/_history/1`` -> ``"123"``).
+    """
+    if not isinstance(location, str) or not location:
+        return None
+    path = location.split("?", 1)[0]
+    if "/_history/" in path:
+        path = path.split("/_history/", 1)[0]
+    segment = path.rstrip("/").rsplit("/", 1)[-1]
+    return segment or None
+
+
+@dataclass(frozen=True)
+class BundleEntryResult:
+    """Per-entry outcome of a batch/transaction response bundle.
+
+    Attributes:
+        index: Position of the entry in ``Bundle.entry``.
+        status_code: HTTP status parsed from ``entry.response.status``
+            (``None`` when the entry has no parseable response status).
+        ok: ``True`` for a 2xx status. ``False`` otherwise — including
+            entries with no ``response`` element at all, so a
+            search-shaped bundle inspected by mistake reads as failed
+            rather than silently succeeded.
+        resource_id: Resource ID parsed from ``entry.response.location``
+            (``/_history/<version>`` suffix stripped), falling back to
+            ``entry.resource.id``. ``None`` when neither is present —
+            typical for a bare ``201 Created`` entry from a server not
+            echoing bodies.
+        resource: ``entry.resource`` when the server returned one
+            (GET/read entries, and writes under
+            ``Prefer: return=representation``).
+        outcome: ``entry.response.outcome`` (an OperationOutcome),
+            usually present on failures.
+    """
+
+    index: int
+    status_code: int | None
+    ok: bool
+    resource_id: str | None
+    resource: dict[str, Any] | None
+    outcome: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class BatchCreateResult:
+    """Classified outcome of a ``conditional_create_batch`` call.
+
+    Entry ``index`` values refer to positions in the caller's original
+    ``entries`` sequence, across all chunks.
+
+    Attributes:
+        created: Entries the server created (``201 Created``).
+        existed: Entries that matched an existing resource
+            (``200 OK`` — the conditional create was a no-op).
+        failed: Everything else. Collected, never raised — the caller
+            decides how to compensate.
+    """
+
+    created: list[BundleEntryResult]
+    existed: list[BundleEntryResult]
+    failed: list[BundleEntryResult]
+
+    @property
+    def ok(self) -> bool:
+        """True when no entry failed."""
+        return not self.failed
 
 
 class FHIRBundle(Generic[T]):
@@ -161,3 +250,89 @@ class FHIRBundle(Generic[T]):
                 url = link.get("url")
                 return url if isinstance(url, str) else None
         return None
+
+    def entry_results(self) -> list[BundleEntryResult]:
+        """Per-entry outcomes of a batch/transaction *response* bundle.
+
+        Unlike :meth:`get_resources` — which skips entries with no
+        ``resource`` key, exactly what a bare ``201 Created`` write
+        entry looks like — this inspects every entry's ``response``
+        element and returns one :class:`BundleEntryResult` per entry.
+
+        Medplum ``type: transaction`` bundles are **not atomic on
+        failure**: some entries may have committed while others failed.
+        Always inspect per-entry results (or call
+        :meth:`raise_for_entry_errors`) after executing a batch or
+        transaction — a 200 on the outer request proves nothing about
+        the entries.
+
+        Example:
+            >>> response = client.execute_batch(bundle)
+            >>> for result in FHIRBundle(response).entry_results():
+            ...     print(result.index, result.status_code, result.ok)
+        """
+        results: list[BundleEntryResult] = []
+        for index, entry in enumerate(self._data.get("entry", [])):
+            if not isinstance(entry, dict):
+                results.append(
+                    BundleEntryResult(
+                        index=index,
+                        status_code=None,
+                        ok=False,
+                        resource_id=None,
+                        resource=None,
+                        outcome=None,
+                    )
+                )
+                continue
+            response = entry.get("response")
+            response = response if isinstance(response, dict) else {}
+            status_code = _parse_entry_status(response.get("status"))
+            resource = entry.get("resource")
+            resource = resource if isinstance(resource, dict) else None
+            resource_id = _resource_id_from_location(response.get("location"))
+            if resource_id is None and resource is not None:
+                raw_id = resource.get("id")
+                resource_id = raw_id if isinstance(raw_id, str) else None
+            outcome = response.get("outcome")
+            results.append(
+                BundleEntryResult(
+                    index=index,
+                    status_code=status_code,
+                    ok=status_code is not None and 200 <= status_code < 300,
+                    resource_id=resource_id,
+                    resource=resource,
+                    outcome=outcome if isinstance(outcome, dict) else None,
+                )
+            )
+        return results
+
+    def failures(self) -> list[BundleEntryResult]:
+        """Entries of a batch/transaction response that did not succeed.
+
+        See :meth:`entry_results` for why per-entry inspection is
+        mandatory (transactions are not atomic on failure).
+        """
+        return [result for result in self.entry_results() if not result.ok]
+
+    def partition(
+        self,
+    ) -> tuple[list[BundleEntryResult], list[BundleEntryResult]]:
+        """Split entry results into ``(successes, failures)``."""
+        successes: list[BundleEntryResult] = []
+        failures: list[BundleEntryResult] = []
+        for result in self.entry_results():
+            (successes if result.ok else failures).append(result)
+        return successes, failures
+
+    def raise_for_entry_errors(self) -> None:
+        """Raise :class:`~pymedplum.exceptions.BundleEntryError` if any entry failed.
+
+        Medplum ``type: transaction`` bundles are **not atomic on
+        failure** — the successful entries have already committed, so
+        catching this exception is a compensation point, not proof of a
+        clean rollback.
+        """
+        failed = self.failures()
+        if failed:
+            raise BundleEntryError(failed)

@@ -90,3 +90,80 @@ print(api_payload)
 # Output: {'resourceType': 'Patient', 'birthDate': '1990-01-01', 'active': True}
 ```
 
+## Extension Helpers
+
+Read, set, and remove FHIR `extension` entries without open-coding URL
+walking. Every helper accepts both raw dicts and generated Pydantic
+models — they share the `extension` list shape.
+
+```python
+from pymedplum import (
+    get_extension,        # first entry with the URL, or None
+    get_extensions,       # every entry with the URL
+    get_extension_value,  # the value[x] of the first entry with the URL
+    set_extension,        # replace-or-append a simple value[x] extension
+    upsert_extension,     # keyed merge of a complete extension entry
+    remove_extension,     # drop every entry with the URL -> bool
+    get_nested_value,     # child value[x] inside a complex extension
+)
+
+patient = {"resourceType": "Patient"}
+
+set_extension(patient, "https://example.org/flag", valueBoolean=True)
+get_extension_value(patient, "https://example.org/flag")  # True
+remove_extension(patient, "https://example.org/flag")     # True
+
+# Complex (nested) extensions
+ext = {
+    "url": "https://example.org/window",
+    "extension": [{"url": "start", "valueDateTime": "2026-01-01T09:00:00Z"}],
+}
+get_nested_value(ext, "start")  # "2026-01-01T09:00:00Z"
+```
+
+Notes:
+
+- `set_extension` takes exactly one `value[x]` keyword, in camelCase or
+  snake_case form (`valueString=` / `value_string=`). It replaces the
+  first entry with the URL (collapsing duplicates) or appends.
+- `remove_extension` drops the `extension` key entirely when the list
+  empties — FHIR JSON forbids empty arrays.
+- On Pydantic models, assignment triggers validation, so dict entries
+  are coerced to `Extension` models automatically.
+
+### Medplum service-type references
+
+Medplum tags Slot/Schedule `serviceType` concepts with an embedded
+`Reference<HealthcareService>` extension (its R4 stand-in for R5's
+`CodeableReference`). Two helpers carry that convention:
+
+```python
+from pymedplum import (
+    SERVICE_TYPE_REFERENCE_URL,
+    read_service_type_references,
+    service_type_reference_extension,
+)
+
+slot = {
+    "resourceType": "Slot",
+    "serviceType": [
+        service_type_reference_extension("HealthcareService/hs-1"),
+    ],
+}
+
+read_service_type_references(slot)
+# ["HealthcareService/hs-1"]
+```
+
+`service_type_reference_extension(reference, codings=None)` builds the
+`serviceType` CodeableConcept (optionally carrying `Coding` dicts);
+`read_service_type_references(slot_or_schedule)` extracts every tagged
+reference from a dict or model.
+
+## Reading `Parameters` Responses
+
+`parameters_to_dict`, `get_parameter`, and `get_parameter_resource`
+parse FHIR `Parameters` resources (operation responses) back into plain
+Python values — see
+[FHIR Operations & Terminology](advanced/operations.md#reading-parameters-responses).
+

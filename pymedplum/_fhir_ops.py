@@ -1,6 +1,9 @@
-"""Private helper functions for building FHIR operation parameters.
+"""Helper functions for building and reading FHIR operation parameters.
 
-This module is not part of the public API and is subject to change.
+The Parameters-reading helpers — :func:`parameters_to_dict`,
+:func:`get_parameter`, and :func:`get_parameter_resource` — are public
+(re-exported from ``pymedplum``). The ``build_*`` builders remain
+private and subject to change.
 """
 
 import json
@@ -84,6 +87,121 @@ def is_parameters_resource(obj: Any) -> bool:
         return bool(obj.get("resourceType") == "Parameters")
     # Check for Pydantic model with resource_type
     return bool(getattr(obj, "resource_type", None) == "Parameters")
+
+
+def _coerce_parameters(params: dict[str, Any] | Any) -> dict[str, Any]:
+    """Accept a Parameters dict or Pydantic model; return FHIR JSON.
+
+    Rejects non-Parameters resources (``ValueError``) rather than
+    reading them as empty — a Patient or Bundle passed here is an
+    unexpected operation-response shape the caller needs to see, not a
+    silent ``{}``/``None``.
+    """
+    data: dict[str, Any]
+    if isinstance(params, dict):
+        data = params
+    else:
+        dump = getattr(params, "model_dump", None)
+        if not callable(dump):
+            raise TypeError(
+                f"Expected a Parameters dict or model, got {type(params).__name__}"
+            )
+        data = dump(by_alias=True, exclude_none=True)
+    resource_type = data.get("resourceType")
+    if resource_type != "Parameters":
+        raise ValueError(
+            f"Expected a Parameters resource, got resourceType={resource_type!r}"
+        )
+    return data
+
+
+def _parameter_value(param: dict[str, Any]) -> Any:
+    """Extract the value of one ``parameter`` entry.
+
+    Precedence: ``resource``, then nested ``part`` (recursed into a
+    dict), then the first ``value[x]`` field. ``None`` when the entry
+    carries none of them.
+    """
+    if "resource" in param:
+        return param["resource"]
+    part = param.get("part")
+    if isinstance(part, list):
+        return parameters_to_dict({"resourceType": "Parameters", "parameter": part})
+    for key, value in param.items():
+        if key.startswith("value"):
+            return value
+    return None
+
+
+def parameters_to_dict(params: dict[str, Any] | Any) -> dict[str, Any]:
+    """Convert a FHIR Parameters resource to a simple name -> value dict.
+
+    The read-direction inverse of :func:`dict_to_parameters`. Each
+    ``parameter`` entry contributes its ``resource``, nested ``part``
+    (recursed into a dict), or first ``value[x]`` field. A name that
+    appears more than once collects its values into a list.
+
+    Args:
+        params: Parameters resource dict or Pydantic model.
+
+    Returns:
+        Mapping of parameter name to extracted value.
+
+    Example:
+        >>> parameters_to_dict({
+        ...     "resourceType": "Parameters",
+        ...     "parameter": [
+        ...         {"name": "result", "valueBoolean": True},
+        ...         {"name": "display", "valueString": "Blood pressure"},
+        ...     ],
+        ... })
+        {'result': True, 'display': 'Blood pressure'}
+    """
+    data = _coerce_parameters(params)
+    grouped: dict[str, list[Any]] = {}
+    for param in data.get("parameter") or []:
+        if not isinstance(param, dict):
+            continue
+        name = param.get("name")
+        if not isinstance(name, str):
+            continue
+        grouped.setdefault(name, []).append(_parameter_value(param))
+    return {
+        name: values[0] if len(values) == 1 else values
+        for name, values in grouped.items()
+    }
+
+
+def get_parameter(params: dict[str, Any] | Any, name: str) -> Any | None:
+    """Return the value of the first parameter with the given name.
+
+    Same value extraction as :func:`parameters_to_dict` (``resource`` /
+    nested ``part`` / first ``value[x]``). ``None`` when the name is
+    absent — or when the entry carries no value, so check for the name
+    explicitly if that distinction matters.
+    """
+    data = _coerce_parameters(params)
+    for param in data.get("parameter") or []:
+        if isinstance(param, dict) and param.get("name") == name:
+            return _parameter_value(param)
+    return None
+
+
+def get_parameter_resource(
+    params: dict[str, Any] | Any, name: str
+) -> dict[str, Any] | None:
+    """Return the ``resource`` of the first matching parameter carrying one.
+
+    Skips same-named entries without a ``resource`` field. ``None`` when
+    no entry with the name carries a resource.
+    """
+    data = _coerce_parameters(params)
+    for param in data.get("parameter") or []:
+        if isinstance(param, dict) and param.get("name") == name:
+            resource = param.get("resource")
+            if isinstance(resource, dict):
+                return resource
+    return None
 
 
 def _append_optional(

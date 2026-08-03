@@ -1,6 +1,11 @@
 """Pymedplum - Unofficial Medplum Python SDK."""
 
 from .__version__ import __version__
+from ._fhir_ops import (
+    get_parameter,
+    get_parameter_resource,
+    parameters_to_dict,
+)
 from .access import (
     MergeResult,
     build_merged_access,
@@ -15,16 +20,18 @@ from .access import (
     validate_managed_access,
 )
 from .async_client import AsyncMedplumClient
-from .bundle import FHIRBundle
+from .bundle import BatchCreateResult, BundleEntryResult, FHIRBundle
 from .client import MedplumClient
 from .exceptions import (
     AuthenticationError,
     AuthorizationError,
     BadRequestError,
+    BundleEntryError,
     ConflictError,
     GoneError,
     InsecureTransportError,
     MedplumError,
+    MissingVersionIdError,
     NetworkError,
     NotFoundError,
     OperationOutcomeError,
@@ -34,6 +41,18 @@ from .exceptions import (
     TokenRefreshCooldownError,
     UnsafeRedirectError,
     ValidationError,
+)
+from .extensions import (
+    SERVICE_TYPE_REFERENCE_URL,
+    get_extension,
+    get_extension_value,
+    get_extensions,
+    get_nested_value,
+    read_service_type_references,
+    remove_extension,
+    service_type_reference_extension,
+    set_extension,
+    upsert_extension,
 )
 from .helpers import (
     build_reference,
@@ -49,13 +68,17 @@ from .helpers import (
     resource_has_account,
     to_fhir_json,
 )
-from .types import PatchOperation, SummaryMode, TotalMode
+from .types import PatchOperation, SummaryMode, TotalMode, UpdateResult
 
 __all__ = [
+    "SERVICE_TYPE_REFERENCE_URL",
     "AsyncMedplumClient",
     "AuthenticationError",
     "AuthorizationError",
     "BadRequestError",
+    "BatchCreateResult",
+    "BundleEntryError",
+    "BundleEntryResult",
     "ConflictError",
     "FHIRBundle",
     "GoneError",
@@ -63,6 +86,7 @@ __all__ = [
     "MedplumClient",
     "MedplumError",
     "MergeResult",
+    "MissingVersionIdError",
     "NetworkError",
     "NotFoundError",
     "OperationOutcomeError",
@@ -74,6 +98,7 @@ __all__ = [
     "TokenRefreshCooldownError",
     "TotalMode",
     "UnsafeRedirectError",
+    "UpdateResult",
     "ValidationError",
     "__version__",
     "build_merged_access",
@@ -83,6 +108,12 @@ __all__ = [
     "extract_identifier",
     "get_code_by_system",
     "get_code_display",
+    "get_extension",
+    "get_extension_value",
+    "get_extensions",
+    "get_nested_value",
+    "get_parameter",
+    "get_parameter_resource",
     "get_patient_display_name",
     "get_project_membership_access_parameter",
     "get_project_membership_access_policy_id",
@@ -92,10 +123,16 @@ __all__ = [
     "normalize_access_entry",
     "normalize_access_policy_id",
     "normalize_access_policy_reference",
+    "parameters_to_dict",
     "parse_reference",
     "partition_access",
+    "read_service_type_references",
+    "remove_extension",
     "resolve_id",
     "resource_has_account",
+    "service_type_reference_extension",
+    "set_extension",
     "to_fhir_json",
+    "upsert_extension",
     "validate_managed_access",
 ]

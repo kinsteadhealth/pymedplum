@@ -98,6 +98,8 @@ ignore = [
     "TRY003",  # Avoid specifying long messages outside the exception class
     "PLR0912", # Too many branches
     "PLR0913", # Too many arguments to function call
+    "PLR0917", # Too many positional arguments — released public API keeps
+               # its positional signatures; going keyword-only is breaking
     "PLR2004", # Magic value used in comparison
     "PLC0415", # import should be at top-level (allow contextual imports)
     "PERF203", # try-except in loop (acceptable for cleanup code)

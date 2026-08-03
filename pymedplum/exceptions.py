@@ -4,6 +4,7 @@ These exceptions map to HTTP status codes and common error scenarios,
 enabling targeted exception handling and clearer debugging.
 """
 
+from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -304,6 +305,64 @@ class PreconditionFailedError(MedplumError):
     pass
 
 
+class MissingVersionIdError(MedplumError):
+    """A write required ``meta.versionId`` and the resource has none.
+
+    Raised by ``update_resource(..., if_match="required")`` (and helpers
+    built on it, like ``update_with_retry``) when the resource carries no
+    ``meta.versionId`` to guard the write with. The alternative — silently
+    sending no ``If-Match`` header — would degrade to an unguarded
+    last-write-wins PUT, which is exactly what ``"required"`` exists to
+    prevent.
+
+    Recovery:
+    - Read the resource from the server first (reads return
+      ``meta.versionId``) and update that copy
+    - Or pass an explicit ``if_match='W/"<versionId>"'``
+    """
+
+    pass
+
+
+class BundleEntryError(MedplumError):
+    """One or more batch/transaction response entries failed.
+
+    Raised by :meth:`pymedplum.FHIRBundle.raise_for_entry_errors`.
+    Medplum ``type: transaction`` bundles are **not atomic on failure** —
+    some entries may have committed while others failed — so per-entry
+    inspection is mandatory, and this exception carries every failed
+    entry for the caller to compensate against.
+
+    The string representation carries only entry indices and status
+    codes. Server ``OperationOutcome`` payloads (which can echo
+    caller-supplied values — PHI risk) stay on the ``entries`` attribute.
+
+    Attributes:
+        entries: The failed :class:`~pymedplum.bundle.BundleEntryResult`
+            items, in bundle order.
+    """
+
+    def __init__(self, entries: Sequence[Any]) -> None:
+        self.entries = list(entries)
+        summary = ", ".join(
+            f"entry {e.index}: HTTP {e.status_code}" for e in self.entries
+        )
+        super().__init__(
+            f"{len(self.entries)} bundle entr"
+            f"{'y' if len(self.entries) == 1 else 'ies'} failed ({summary})"
+        )
+
+    def sanitize_for_logging(self) -> dict[str, object]:
+        """PHI-free structured representation (indices and statuses only)."""
+        return {
+            "type": type(self).__name__,
+            "failed_count": len(self.entries),
+            "entries": [
+                {"index": e.index, "status_code": e.status_code} for e in self.entries
+            ],
+        }
+
+
 class NetworkError(MedplumError):
     """Network communication error.
 
@@ -312,13 +371,39 @@ class NetworkError(MedplumError):
     - DNS resolution failure
     - Network unreachable
 
+    ``possibly_committed`` distinguishes the two outcomes a transport
+    failure can hide, aggregated across every wire attempt of the
+    request: ``False`` means no attempt ever went out (connect-phase
+    failures only — DNS, TCP connect, pool wait), so a write can be
+    retried blindly. ``True`` means at least one attempt was sent
+    before failing (read timeout, dropped connection) or drew an
+    ambiguous gateway status (502/503/504), so the origin may have
+    committed the write — re-read state before retrying anything
+    non-idempotent.
+
     Recovery:
     - Check internet connection
     - Verify Medplum base URL
-    - Check firewall/proxy settings
+    - If ``possibly_committed`` and the request was a write: re-read
+      the resource before compensating or retrying
     """
 
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        possibly_committed: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.possibly_committed = possibly_committed
+
+    def sanitize_for_logging(self) -> dict[str, object]:
+        """PHI-free structured representation including commit ambiguity."""
+        return {
+            "type": type(self).__name__,
+            "status_code": self.status_code,
+            "possibly_committed": self.possibly_committed,
+        }
 
 
 class InsecureTransportError(MedplumError):

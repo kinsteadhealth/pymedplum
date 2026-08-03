@@ -6,9 +6,9 @@ import secrets
 import uuid
 import warnings
 from contextvars import ContextVar
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 from urllib.parse import parse_qsl, urlparse
 
 import httpx
@@ -23,7 +23,12 @@ from ._constants import (
     OBO_HEADER,
 )
 from ._retry import RETRYABLE_STATUS_CODES, parse_retry_after_429
-from ._security import assert_same_origin, validate_base_url
+from ._security import (
+    assert_same_origin,
+    validate_as_fhir_class,
+    validate_base_url,
+)
+from .bundle import BundleEntryResult
 from .exceptions import (
     AuthenticationError,
     AuthorizationError,
@@ -31,6 +36,7 @@ from .exceptions import (
     ConflictError,
     GoneError,
     MedplumError,
+    MissingVersionIdError,
     NetworkError,
     NotFoundError,
     OperationOutcomeError,
@@ -63,36 +69,61 @@ _hooks_logger = logging.getLogger("pymedplum.hooks")
 _auth_logger = logging.getLogger("pymedplum.auth")
 
 
+def _read_version_id(resource: dict[str, Any] | BaseModel) -> str | None:
+    """Read ``meta.versionId`` off a resource dict or Pydantic model."""
+    meta = (
+        resource.get("meta")
+        if isinstance(resource, dict)
+        else getattr(resource, "meta", None)
+    )
+    version_id: str | None = None
+    if isinstance(meta, dict):
+        version_id = meta.get("versionId")
+    elif meta is not None:
+        # Generated Meta models declare ``version_id`` with alias
+        # "versionId"; Pydantic v2 exposes the field name, not the
+        # alias, so check both.
+        version_id = getattr(meta, "version_id", None) or getattr(
+            meta, "versionId", None
+        )
+    return version_id or None
+
+
 def _resolve_if_match(
     resource: dict[str, Any] | BaseModel, if_match: bool | str
 ) -> str | None:
     """Compute the If-Match header value for ``update_resource``.
 
-    - ``str``: treat as an explicit ETag; return verbatim.
+    - ``"required"``: like ``True``, but raise
+      :class:`~pymedplum.exceptions.MissingVersionIdError` instead of
+      silently sending no header when the resource has no
+      ``meta.versionId`` — never write unguarded.
+    - any other ``str``: treat as an explicit ETag; return verbatim.
     - ``False``: opt out, no header.
     - ``True``: read ``meta.versionId`` off the resource and wrap as
       ``W/"<versionId>"``; return ``None`` if no versionId is present.
     """
+    if if_match == "required":
+        version_id = _read_version_id(resource)
+        if not version_id:
+            resource_type = (
+                resource.get("resourceType")
+                if isinstance(resource, dict)
+                else getattr(resource, "resource_type", None)
+            )
+            raise MissingVersionIdError(
+                f"{resource_type or 'Resource'} has no meta.versionId; "
+                'if_match="required" refuses to write without optimistic '
+                "concurrency. Read the resource from the server first, or "
+                "pass an explicit if_match ETag."
+            )
+        return f'W/"{version_id}"'
     if isinstance(if_match, str):
         return if_match
     if if_match is False:
         return None
     if if_match is True:
-        meta = (
-            resource.get("meta")
-            if isinstance(resource, dict)
-            else getattr(resource, "meta", None)
-        )
-        version_id: str | None = None
-        if isinstance(meta, dict):
-            version_id = meta.get("versionId")
-        elif meta is not None:
-            # Generated Meta models declare ``version_id`` with alias
-            # "versionId"; Pydantic v2 exposes the field name, not the
-            # alias, so check both.
-            version_id = getattr(meta, "version_id", None) or getattr(
-                meta, "versionId", None
-            )
+        version_id = _read_version_id(resource)
         if version_id:
             return f'W/"{version_id}"'
         return None
@@ -311,6 +342,69 @@ class _AttemptTracker:
         )
 
 
+_ModelT = TypeVar("_ModelT", bound=BaseModel)
+
+
+def _parse_operation_response(
+    response: dict[str, Any], as_fhir: type[_ModelT], operation_name: str
+) -> _ModelT:
+    """Parse an operation response into a typed model — direct case only.
+
+    ``as_fhir`` matches the ``as_fhir`` convention on reads: the
+    response body must *be* the requested resource. A ``Parameters`` or
+    ``Bundle`` wrapper is surfaced as an error with pointers to the
+    explicit unwrapping helpers — no magic unwrapping.
+    """
+    validate_as_fhir_class(as_fhir)
+    response_type = response.get("resourceType")
+    if response_type != as_fhir.__name__:
+        raise MedplumError(
+            f"Operation ${operation_name} returned "
+            f"{response_type or 'no resourceType'}, expected "
+            f"{as_fhir.__name__}. as_fhir handles direct resource "
+            "responses only; unwrap a Parameters response with "
+            "parameters_to_dict/get_parameter_resource, or a Bundle "
+            "with FHIRBundle."
+        )
+    return as_fhir(**response)
+
+
+def _classify_batch_chunk(
+    results: list[BundleEntryResult],
+    *,
+    chunk_len: int,
+    offset: int,
+    created: list[BundleEntryResult],
+    existed: list[BundleEntryResult],
+    failed: list[BundleEntryResult],
+) -> None:
+    """Rebase one chunk's entry indices and classify conditional-create outcomes.
+
+    ``201`` -> created, ``200`` -> existed, anything else -> failed. A
+    response with fewer entries than the chunk sent marks the missing
+    tail as failed — a partial response must never read as a smaller
+    success.
+    """
+    for i in range(chunk_len):
+        if i < len(results):
+            result = replace(results[i], index=offset + i)
+        else:
+            result = BundleEntryResult(
+                index=offset + i,
+                status_code=None,
+                ok=False,
+                resource_id=None,
+                resource=None,
+                outcome=None,
+            )
+        if result.status_code == 201:
+            created.append(result)
+        elif result.status_code == 200:
+            existed.append(result)
+        else:
+            failed.append(result)
+
+
 def _stamp_bundle_accounts(
     data: dict[str, Any],
     accounts: str | list[str],
@@ -370,23 +464,38 @@ def _merge_params_into_url(url: str, params: Any) -> str:
     return str(httpx.URL(url).copy_merge_params(params))
 
 
+def _has_header(headers: dict[str, str] | None, name: str) -> bool:
+    """Case-insensitively check whether a caller header dict carries ``name``.
+
+    HTTP header names are case-insensitive on the wire, but a plain dict
+    merge is not — without this check a caller's lowercase ``if-match``
+    and an SDK-computed ``If-Match`` would BOTH be sent (httpx joins
+    them into one combined value), instead of the documented
+    explicit-header-wins precedence.
+    """
+    lowered = name.lower()
+    return any(k.lower() == lowered for k in (headers or {}))
+
+
 _IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "PUT", "DELETE", "OPTIONS"})
 
-# 502/504 can be emitted by a gateway *after* the origin committed a write
-# (slow create, LB idle timeout), so replaying a non-idempotent POST risks a
-# duplicate. 503 and 429 are rejections *before* processing (no healthy
-# upstream / rate-limit), so they are replay-safe for every method.
-_AMBIGUOUS_COMMIT_STATUS = frozenset({502, 504})
+# 502/503/504 can be emitted *after* the origin committed a write: a gateway
+# 502/504 on a slow create or LB idle timeout, and a 503 from a draining pod
+# during a rolling deploy that already processed the request. Replaying a
+# non-idempotent POST on any of them risks a duplicate. Only 429 is a
+# rejection provably *before* processing (rate-limited at the front door),
+# so it alone is replay-safe for every method.
+_AMBIGUOUS_COMMIT_STATUS = frozenset({502, 503, 504})
 
 
 def _is_replay_safe(method: str, headers: dict[str, str] | None) -> bool:
     """Return True if re-sending this request cannot duplicate a write.
 
-    A 502/504 can arrive from a load balancer *after* the origin server
-    committed the write, so replaying a bare POST risks creating a
-    duplicate resource. Idempotent methods are always safe; a POST is
-    safe only when it carries ``If-None-Exist`` (FHIR conditional
-    create), which makes the replay a no-op server-side.
+    A 502/503/504 can arrive *after* the origin server committed the
+    write, so replaying a bare POST risks creating a duplicate resource.
+    Idempotent methods are always safe; a POST is safe only when it
+    carries ``If-None-Exist`` (FHIR conditional create), which makes the
+    replay a no-op server-side.
     """
     if method.upper() in _IDEMPOTENT_METHODS:
         return True
@@ -412,22 +521,42 @@ def _backoff_with_jitter(attempt: int) -> float:
     return backoff + jitter
 
 
+def _request_never_sent(exc: httpx.TransportError) -> bool:
+    """True when the failure provably happened before the request went out.
+
+    Connection never established (``ConnectError`` / ``ConnectTimeout``)
+    or the pool wait timed out (``PoolTimeout``) — the origin cannot have
+    processed anything.
+    """
+    return isinstance(
+        exc, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
+    )
+
+
 def _is_transport_retryable(
-    exc: httpx.TransportError, method: str, headers: dict[str, str] | None
+    exc: httpx.TransportError,
+    method: str,
+    headers: dict[str, str] | None,
+    *,
+    replay_safe: bool | None = None,
 ) -> bool:
     """Decide whether a transport-level failure is safe to retry.
 
-    Pre-send failures — connection never established (``ConnectError`` /
-    ``ConnectTimeout``) or the pool wait timed out (``PoolTimeout``) — mean
-    the request never reached the server, so they are safe to retry for ANY
-    method. Ambiguous failures (the request was sent, then the read timed
+    Pre-send failures (:func:`_request_never_sent`) mean the request never
+    reached the server, so they are safe to retry for ANY method.
+    Ambiguous failures (the request was sent, then the read timed
     out, the connection dropped, or a protocol error occurred — e.g. a
     stale keepalive connection reset during an upstream deploy) may have
     been processed and committed, so they are retried only for replay-safe
-    requests — the same rule the 502/504 gate uses.
+    requests — the same rule the 502/503/504 gate uses. ``replay_safe``
+    overrides the method/header inference for requests the caller knows
+    are semantically idempotent (e.g. a batch bundle of conditional
+    creates).
     """
-    if isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)):
+    if _request_never_sent(exc):
         return True
+    if replay_safe is not None:
+        return replay_safe
     return _is_replay_safe(method, headers)
 
 
@@ -436,7 +565,9 @@ def _transport_budget_exceeded(attempt: int) -> bool:
     return attempt >= 2
 
 
-def _wrap_transport_error(exc: httpx.TransportError, attempts: int) -> NetworkError:
+def _wrap_transport_error(
+    exc: httpx.TransportError, attempts: int, *, possibly_committed: bool
+) -> NetworkError:
     """Wrap a raw httpx transport failure as ``NetworkError``.
 
     The SDK never lets a raw httpx exception escape to callers: wrapping in
@@ -444,9 +575,17 @@ def _wrap_transport_error(exc: httpx.TransportError, attempts: int) -> NetworkEr
     network faults alongside other SDK errors and map them to a retryable
     status (e.g. 503) instead of a 500. The message carries only the
     exception type — never ``str(exc)`` — to keep URLs/details out of logs.
+
+    ``possibly_committed`` must be aggregated by the retry loop across
+    EVERY wire attempt, not derived from the final exception alone: an
+    earlier attempt that was sent and then timed out may have committed
+    even when the last attempt died before sending (connect failure).
+    ``False`` therefore means no attempt ever reached the origin — the
+    caller-facing signal for the read-before-retry rule.
     """
     return NetworkError(
-        f"Network error after {attempts} attempt(s): {type(exc).__name__}"
+        f"Network error after {attempts} attempt(s): {type(exc).__name__}",
+        possibly_committed=possibly_committed,
     )
 
 
@@ -457,16 +596,20 @@ def _retry_delay(
     method: str,
     headers: dict[str, str] | None,
     max_retry_delay_seconds: float = 60.0,
+    replay_safe: bool | None = None,
 ) -> float | None:
     """Return delay seconds for a retryable response, or ``None`` if terminal.
 
     429 consults ``parse_retry_after_429`` and applies to every method —
-    a rate-limit reject happens before the server processes the request.
-    503 likewise retries for every method (no healthy upstream → not
-    processed). Only the ambiguous-commit 502/504 are gated on
-    :func:`_is_replay_safe` (no replaying non-idempotent POSTs). Retries
-    use exponential backoff with jitter, capped at 2.0s — the historical
-    SDK policy.
+    the assumption (documented, not server-guaranteed) is that a
+    rate-limit reject happens at the front door, before the server
+    processes the request. The ambiguous-commit statuses 502/503/504 are
+    gated on :func:`_is_replay_safe` (no replaying non-idempotent POSTs):
+    a gateway 502/504 — or a 503 from a draining pod mid-deploy — can
+    arrive *after* the origin committed the write. ``replay_safe``
+    overrides the method/header inference when the caller knows the
+    request is semantically idempotent. Retries use exponential backoff
+    with jitter, capped at 2.0s — the historical SDK policy.
     """
     status = response.status_code
     if status == 429:
@@ -474,8 +617,14 @@ def _retry_delay(
             parse_retry_after_429(response, max_delay_seconds=max_retry_delay_seconds)
         )
     if status in RETRYABLE_STATUS_CODES:
-        if status in _AMBIGUOUS_COMMIT_STATUS and not _is_replay_safe(method, headers):
-            return None
+        if status in _AMBIGUOUS_COMMIT_STATUS:
+            safe = (
+                replay_safe
+                if replay_safe is not None
+                else _is_replay_safe(method, headers)
+            )
+            if not safe:
+                return None
         return _backoff_with_jitter(attempt)
     return None
 

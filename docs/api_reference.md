@@ -171,6 +171,37 @@ resource = client.create_resource_if_none_exist(
 )
 ```
 
+#### `conditional_create_batch(entries, *, chunk_size=50, accounts=None, on_behalf_of=None) -> BatchCreateResult`
+
+Idempotently create many resources via chunked `type: batch` bundles of
+conditional-create (`ifNoneExist`) POST entries.
+
+**Parameters**:
+- `entries` (Sequence[tuple[dict | Model, str]]): `(resource, if_none_exist)` pairs. Each query goes through the same sanitization as `create_resource_if_none_exist` and must be a unique business key for the resource — a `200` match binds you to whatever already matched it.
+- `chunk_size` (int): Max entries per batch bundle (default 50)
+- `accounts` (str | list[str], optional): Account references stamped on every entry's `meta.accounts`
+- `on_behalf_of` (str | None, keyword-only): Per-call OBO override
+
+**Returns**: `BatchCreateResult` with three lists of `BundleEntryResult` — `created` (201), `existed` (200 — the create was a no-op; treat as *found*, not created), and `failed` (anything else — collected, never raised). Entry `index` values refer to positions in `entries`, across chunks. `result.ok` is `True` when nothing failed.
+
+**Replay safety**: conditional creates are the one POST shape a replay cannot duplicate, so these batch requests are marked replay-safe — ambiguous 5xx/transport failures retry, and re-invoking the whole call after an error converges (committed entries classify as `existed`).
+
+**Example**:
+```python
+result = client.conditional_create_batch(
+    [
+        (patient_a, "identifier=http://hospital.org/mrn|1"),
+        (patient_b, "identifier=http://hospital.org/mrn|2"),
+    ],
+)
+for entry in result.created:
+    print(f"created {entry.resource_id}")
+for entry in result.failed:
+    print(f"entry {entry.index} failed: HTTP {entry.status_code}")
+```
+
+See [Conditional Create](advanced/conditional_create.md#bulk-conditional-creates).
+
 #### `read_resource(resource_type, resource_id, as_fhir=None, *, headers=None, on_behalf_of=None) -> dict | Model`
 
 Read a FHIR resource by type and ID.
@@ -235,15 +266,17 @@ Update an existing FHIR resource (requires id).
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 - `on_behalf_of` (str | None, keyword-only): Per-call OBO override. See [On-Behalf-Of](advanced/on_behalf_of.md).
 - `if_match` (bool | str, keyword-only, default `True`): Optimistic-concurrency control.
-  - `True` (default): auto-attach `If-Match: W/"<versionId>"` from `resource.meta.versionId` if present. If the resource has no versionId, no header is attached.
+  - `True` (default): auto-attach `If-Match: W/"<versionId>"` from `resource.meta.versionId` if present. If the resource has no versionId, **no header is attached** (an unguarded write).
+  - `"required"`: like `True`, but raise `MissingVersionIdError` instead of silently writing unguarded when the resource has no versionId.
   - `False`: opt out of If-Match entirely (last-write-wins behavior).
-  - `str`: sent verbatim as the `If-Match` header value.
+  - any other `str`: sent verbatim as the `If-Match` header value.
 
 **Returns**: dict or Pydantic model instance - The updated resource
 
 **Raises**:
 - `ValueError`: If resource lacks resourceType or id
 - `TypeError`: If `if_match` is neither `bool` nor `str`
+- `MissingVersionIdError`: If `if_match="required"` and the resource has no `meta.versionId`
 - `PreconditionFailedError`: If the attached `If-Match` version doesn't match the server's current resource version
 
 **Example**:
@@ -254,6 +287,9 @@ from pymedplum.fhir import Patient
 patient = client.read_resource("Patient", "123", as_fhir=Patient)
 patient.active = False
 updated = client.update_resource(patient)
+
+# Strict: never write unguarded.
+updated = client.update_resource(patient, if_match="required")
 
 # Opt out for last-write-wins semantics.
 updated = client.update_resource(patient, if_match=False)
@@ -269,7 +305,43 @@ except PreconditionFailedError:
     # re-apply changes, then retry
 ```
 
-#### `patch_resource(resource_type, resource_id, operations, *, headers=None, as_fhir=None, on_behalf_of=None) -> dict | Model`
+#### `update_with_retry(resource_type, resource_id, mutator, *, max_retries=1, force=False, on_behalf_of=None) -> UpdateResult`
+
+Read-modify-write with optimistic concurrency and 412 retry: read the
+resource, run `mutator` on it, write back with `If-Match` from the
+read's `meta.versionId`; on `PreconditionFailedError` (a concurrent
+writer won the race) re-read and re-run the mutator against fresh
+state, up to `max_retries` times, then let the final 412 propagate.
+
+**Parameters**:
+- `resource_type` (str): FHIR resource type
+- `resource_id` (str): Resource ID
+- `mutator` (Callable[[dict], dict | None]): The change to apply. Receives the resource as read (mutate in place or return a new dict; `None` keeps the input). May run more than once — keep it a pure function of its input. Must not alter `resourceType`/`id`.
+- `max_retries` (int): 412 re-read+retry attempts before raising (default 1 — two write attempts total)
+- `force` (bool): Write even when the mutated state equals the remote (version bump)
+- `on_behalf_of` (str | None, keyword-only): Per-call OBO override for the reads and the write
+
+**Returns**: `UpdateResult` — `wrote` (whether a PUT was sent; `False` means the state was already as desired and the write was skipped), `version_id` (post-call versionId), and `resource` (the final state).
+
+**Raises**:
+- `PreconditionFailedError`: After `max_retries + 1` consecutive 412s
+- `MissingVersionIdError`: If a write is needed but the read surfaced no `meta.versionId` (the write is never unguarded)
+- `ValueError`: If the mutator changed `resourceType`/`id`, or `max_retries < 0`
+
+**Example**:
+```python
+def deactivate(patient: dict) -> dict:
+    patient["active"] = False
+    return patient
+
+result = client.update_with_retry("Patient", "123", deactivate)
+if result.wrote:
+    print(f"now at version {result.version_id}")
+```
+
+See [CRUD & Concurrency](advanced/crud.md#read-modify-write-with-retry-update_with_retry).
+
+#### `patch_resource(resource_type, resource_id, operations, *, headers=None, as_fhir=None, on_behalf_of=None, if_match=None) -> dict | Model`
 
 Apply JSON Patch operations to a resource.
 
@@ -277,9 +349,10 @@ Apply JSON Patch operations to a resource.
 - `resource_type` (str): FHIR resource type
 - `resource_id` (str): Resource ID
 - `operations` (list[PatchOperation]): JSON Patch operations
-- `headers` (dict[str, str], optional): Additional HTTP headers for the request (e.g., `If-Match` for optimistic locking)
+- `headers` (dict[str, str], optional): Additional HTTP headers for the request. An explicit `If-Match` in `headers` always wins over the `if_match` keyword.
 - `as_fhir` (Type[Model], optional): Pydantic model class to return for typed response
 - `on_behalf_of` (str | None, keyword-only): Per-call OBO override. See [On-Behalf-Of](advanced/on_behalf_of.md).
+- `if_match` (str | None, keyword-only): Explicit ETag sent as the `If-Match` header (e.g. `'W/"3"'`) for optimistic locking. Unlike `update_resource` there is no resource to read a versionId from, so only the explicit-string form exists.
 
 **Returns**: dict or Pydantic model instance - The patched resource
 
@@ -307,7 +380,7 @@ patient = client.read_resource("Patient", "123")
 version = patient["meta"]["versionId"]
 patched = client.patch_resource(
     "Patient", "123", operations,
-    headers={"If-Match": f'W/"{version}"'},
+    if_match=f'W/"{version}"',
     as_fhir=Patient
 )
 ```
@@ -508,15 +581,41 @@ Execute a FHIR batch bundle. Each entry is executed independently; failures in o
 
 **Returns**: dict - Bundle of type `batch-response`
 
-#### `execute_transaction(bundle, *, on_behalf_of=None) -> dict`
+#### `execute_transaction(bundle, *, accounts=None, on_behalf_of=None) -> dict`
 
-Execute a FHIR transaction bundle atomically. All operations succeed or fail together. Use `urn:uuid:` placeholders to reference resources created within the bundle.
+Execute a FHIR transaction bundle. Use `urn:uuid:` placeholders to reference resources created within the bundle.
+
+**Do not assume atomicity on failure**: Medplum transaction bundles have been observed to commit some entries while others fail (verify per server version). Inspect the response per entry — see [Inspecting batch/transaction responses](#inspecting-batchtransaction-responses-fhirbundle) — and compensate rather than trusting an all-or-nothing rollback.
 
 **Parameters**:
-- `bundle` (dict | Pydantic model): Bundle with `type="transaction"` (coerced if missing)
+- `bundle` (dict | Pydantic model): Bundle with `type="transaction"` (coerced if missing; the caller's dict is never mutated)
+- `accounts` (str | list[str], optional): Account references to set on each bundle entry's `meta.accounts` — same semantics as `execute_batch`
 - `on_behalf_of` (str, optional): ProjectMembership reference to act on behalf of for this call. See [On-Behalf-Of](advanced/on_behalf_of.md).
 
 **Returns**: dict - Bundle of type `transaction-response`
+
+#### Inspecting batch/transaction responses (`FHIRBundle`)
+
+A 2xx on the outer request proves nothing about the entries. Wrap the
+response in `FHIRBundle` and use the entry-inspection API:
+
+- `entry_results() -> list[BundleEntryResult]` — one record per entry: `index`, parsed `status_code`, `ok` (2xx), `resource_id` (from `response.location` with `/_history/<v>` stripped, falling back to `resource.id`), `resource`, and `outcome`.
+- `failures() -> list[BundleEntryResult]` — the non-2xx entries.
+- `partition() -> (successes, failures)`.
+- `raise_for_entry_errors() -> None` — raises `BundleEntryError` (carrying the failed entries) when any entry failed. Because transactions are not atomic on failure, catching it is a compensation point: successful entries have already committed.
+
+```python
+from pymedplum import BundleEntryError, FHIRBundle
+
+response = FHIRBundle(client.execute_transaction(bundle))
+try:
+    response.raise_for_entry_errors()
+except BundleEntryError as exc:
+    for failed in exc.entries:
+        print(failed.index, failed.status_code, failed.outcome)
+```
+
+See [Transactions & Batch Bundles](advanced/bundles.md#inspecting-batchtransaction-responses).
 
 ### GraphQL
 
@@ -1484,13 +1583,17 @@ The full public exception tree, all re-exported at
 | `AuthenticationError` | 401 Unauthorized, or credentials-flow failure. |
 | `AuthorizationError` | 403 Forbidden. |
 | `NotFoundError` | 404 Not Found. |
+| `GoneError` | 410 Gone — the resource was deleted. Subclasses `NotFoundError`, so existing `except NotFoundError` handlers still catch it; order `except GoneError` first to distinguish "deleted" from "never existed". |
+| `ConflictError` | 409 Conflict — the request lost a race with a concurrent operation (e.g. a `$book` slot race). Re-read and retry against fresh state. |
 | `BadRequestError` | 400 Bad Request. |
 | `PreconditionFailedError` | 412 Precondition Failed (If-Match / If-None-Exist mismatch). |
+| `MissingVersionIdError` | `if_match="required"` (or `update_with_retry`) needed `meta.versionId` and the resource has none — the write is refused rather than sent unguarded. |
+| `BundleEntryError` | `FHIRBundle.raise_for_entry_errors()` found failed batch/transaction entries. `exc.entries` holds the failed `BundleEntryResult`s; the string form carries only indices and status codes. |
 | `RateLimitError` | 429 Too Many Requests. |
 | `ServerError` | 5xx. String form omits the response body; access `exc.response` for the raw body, or `exc.sanitize_for_logging()` for a safe dict. |
 | `OperationOutcomeError` | FHIR OperationOutcome returned with non-success issues. String form omits `diagnostics` / `details.text`; access `exc.outcome` or `exc.sanitize_for_logging()`. |
 | `ValidationError` | Resource validation failure (surfaced from 400s that carry OperationOutcome). |
-| `NetworkError` | Connection/timeout/DNS failure. |
+| `NetworkError` | Connection/timeout/DNS failure. `exc.possibly_committed` is aggregated across every wire attempt: `True` when any attempt was sent before failing or drew an ambiguous 502/503/504 (the origin may have committed — re-read before retrying a write), `False` when no attempt ever went out (connect-phase failures only). |
 | `InsecureTransportError` | Constructor received a non-`https://` URL without `allow_insecure_http=True` and without a loopback host. |
 | `UnsafeRedirectError` | Follow-up URL (pagination, async job polling, `if_none_exist` absolute URL) is outside the configured origin. |
 | `TokenRefreshCooldownError` | Token refresh attempted during the cooldown window after a prior refresh failure. Has `retry_after: float` (seconds). |

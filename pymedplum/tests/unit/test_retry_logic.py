@@ -192,19 +192,33 @@ def test_post_create_not_replayed_on_502(mock_client):
         assert route.call_count == 1
 
 
-def test_post_create_retried_on_503(mock_client):
-    """503 means no healthy upstream took the request (not processed), so
-    a bare POST is replay-safe and keeps the retry."""
+def test_post_create_not_replayed_on_503(mock_client):
+    """503 is ambiguous like 502/504 — a draining pod mid-deploy can emit
+    it after committing the write, so a bare POST must not be replayed."""
     with respx.mock:
         route = respx.post("https://api.test.medplum.com/fhir/R4/Patient")
+        route.mock(return_value=httpx.Response(503, text="Service Unavailable"))
+
+        with pytest.raises(ServerError) as exc_info:
+            mock_client.create_resource({"resourceType": "Patient"})
+
+        assert exc_info.value.status_code == 503
+        assert route.call_count == 1
+
+
+def test_get_retried_on_503(mock_client):
+    """Idempotent methods keep the 503 retry — only non-replay-safe
+    writes went terminal when 503 joined the ambiguous-commit set."""
+    with respx.mock:
+        route = respx.get("https://api.test.medplum.com/fhir/R4/Patient/p1")
         route.mock(
             side_effect=[
                 httpx.Response(503, text="Service Unavailable"),
-                httpx.Response(201, json={"resourceType": "Patient", "id": "p1"}),
+                httpx.Response(200, json={"resourceType": "Patient", "id": "p1"}),
             ]
         )
 
-        result = mock_client.create_resource({"resourceType": "Patient"})
+        result = mock_client.read_resource("Patient", "p1")
         assert result["id"] == "p1"
         assert route.call_count == 2
 

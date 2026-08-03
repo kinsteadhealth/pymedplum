@@ -11,6 +11,7 @@ import httpx
 
 from ._auth import AsyncTokenManager, TokenSource
 from ._base import (
+    _AMBIGUOUS_COMMIT_STATUS,
     MAX_WIRE_ATTEMPTS,
     AsyncOnBehalfOfContext,
     BaseClient,
@@ -19,9 +20,13 @@ from ._base import (
     _backoff_with_jitter,
     _bearer_from_headers,
     _build_timeout,
+    _classify_batch_chunk,
     _finalize_response,
+    _has_header,
     _is_transport_retryable,
     _merge_params_into_url,
+    _parse_operation_response,
+    _request_never_sent,
     _resolve_if_match,
     _retry_budget_exceeded,
     _retry_delay,
@@ -50,15 +55,17 @@ from ._security import (
 from .access import (
     MergeResult,
     _normalize_project_membership_id,
+    _stable_dump,
     build_merged_access,
     merged_equals_remote,
     normalize_access_entry,
     partition_access,
     validate_managed_access,
 )
-from .bundle import FHIRBundle
+from .bundle import BatchCreateResult, BundleEntryResult, FHIRBundle
 from .exceptions import (
     MedplumError,
+    MissingVersionIdError,
     PreconditionFailedError,
     TokenRefreshCooldownError,
 )
@@ -71,9 +78,10 @@ from .hooks import (
     PreparedRequest,
     _parse_fhir_url,
 )
+from .types import UpdateResult
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Callable, Sequence
 
     from .fhir.operationoutcome import OperationOutcome
     from .fhir.projectmembership import ProjectMembershipAccess
@@ -179,6 +187,7 @@ class AsyncMedplumClient(BaseClient):
         *,
         on_behalf_of: str | None = ...,
         raw: Literal[False] = ...,
+        replay_safe: bool | None = ...,
         **kwargs: Any,
     ) -> dict[str, Any]: ...
 
@@ -190,6 +199,7 @@ class AsyncMedplumClient(BaseClient):
         *,
         on_behalf_of: str | None = ...,
         raw: Literal[True],
+        replay_safe: bool | None = ...,
         **kwargs: Any,
     ) -> httpx.Response: ...
 
@@ -200,6 +210,7 @@ class AsyncMedplumClient(BaseClient):
         *,
         on_behalf_of: str | None = None,
         raw: bool = False,
+        replay_safe: bool | None = None,
         **kwargs: Any,
     ) -> dict[str, Any] | httpx.Response:
         """Make async HTTP request with retry logic.
@@ -209,6 +220,11 @@ class AsyncMedplumClient(BaseClient):
         binary/non-JSON endpoints like ``download_binary`` and ``export_ccda``.
         Error responses still flow through :func:`_raise_or_json` and raise.
         The ``on_request_complete`` hook fires exactly once regardless.
+
+        ``replay_safe`` overrides the retry policy's method/header
+        inference for requests the caller knows are semantically
+        idempotent (e.g. a batch bundle of conditional creates); leave
+        ``None`` to infer.
         """
         await self._ensure_authenticated()
         final_url = _merge_params_into_url(url, kwargs.pop("params", None))
@@ -236,6 +252,7 @@ class AsyncMedplumClient(BaseClient):
                 tracker,
                 on_behalf_of=on_behalf_of,
                 kwargs=kwargs,
+                replay_safe=replay_safe,
             )
             tracker.final_status_code = response.status_code
             return _finalize_response(
@@ -311,11 +328,16 @@ class AsyncMedplumClient(BaseClient):
         *,
         on_behalf_of: str | None,
         kwargs: dict[str, Any],
+        replay_safe: bool | None = None,
     ) -> httpx.Response:
         """Drive the transient-failure retry loop and the 401-refresh branch."""
         _, _, _, path_template = _parse_fhir_url(
             urlparse(prepared.url).path, self.fhir_url_path
         )
+        # Aggregated across attempts: True once any attempt was sent
+        # before failing or drew an ambiguous status — the final
+        # exception alone can hide an earlier maybe-committed send.
+        possibly_committed = False
         for attempt in range(MAX_WIRE_ATTEMPTS):
             wire_obo = self._resolve_on_behalf_of(on_behalf_of)
             headers = self._finalize_headers_for_wire(base_non_auth_headers, wire_obo)
@@ -339,8 +361,10 @@ class AsyncMedplumClient(BaseClient):
                         return response
                     response = refreshed
             except httpx.TransportError as exc:
+                if not _request_never_sent(exc):
+                    possibly_committed = True
                 if _is_transport_retryable(
-                    exc, prepared.method, prepared.headers
+                    exc, prepared.method, prepared.headers, replay_safe=replay_safe
                 ) and not _transport_budget_exceeded(attempt):
                     # Retrying, not failing — clear the recorded failure so
                     # the completion event reflects the eventual outcome.
@@ -357,15 +381,20 @@ class AsyncMedplumClient(BaseClient):
                 # tracker, so on_request_complete hooks observe the SDK's
                 # NetworkError (not a URL-bearing raw httpx exception). The
                 # raw cause is preserved via __cause__ for deep inspection.
-                wrapped = _wrap_transport_error(exc, attempt + 1)
+                wrapped = _wrap_transport_error(
+                    exc, attempt + 1, possibly_committed=possibly_committed
+                )
                 tracker.final_exception = wrapped
                 raise wrapped from exc
+            if response.status_code in _AMBIGUOUS_COMMIT_STATUS:
+                possibly_committed = True
             delay = _retry_delay(
                 response,
                 attempt,
                 method=prepared.method,
                 headers=prepared.headers,
                 max_retry_delay_seconds=self.max_retry_delay_seconds,
+                replay_safe=replay_safe,
             )
             if delay is not None and not _retry_budget_exceeded(
                 response.status_code, attempt
@@ -619,6 +648,109 @@ class AsyncMedplumClient(BaseClient):
 
         return response
 
+    async def conditional_create_batch(
+        self,
+        entries: Sequence[tuple[dict[str, Any] | Any, str]],
+        *,
+        chunk_size: int = 50,
+        accounts: str | list[str] | None = None,
+        on_behalf_of: str | None = None,
+    ) -> BatchCreateResult:
+        """Idempotently create many resources via batched conditional creates.
+
+        Builds ``type: batch`` bundles of POST entries carrying
+        ``ifNoneExist`` (FHIR conditional create), chunked by
+        ``chunk_size``, and classifies every entry's response:
+        ``201 Created`` -> created, ``200 OK`` -> an existing resource
+        matched the query (the create was a no-op — treat it as *found*,
+        not created), anything else -> failed. Failures are collected on
+        the result, never raised — the caller decides how to react.
+
+        Replay-safe by construction: a conditional create is the one
+        POST shape a replay cannot duplicate (the retry is a no-op
+        server-side), so the SDK marks these batch requests replay-safe
+        and a mid-batch network error or ambiguous 5xx retries safely.
+        For the same reason, re-invoking the whole call after a raised
+        transport error is safe — chunks that already committed
+        classify as ``existed`` on the second pass.
+
+        Args:
+            entries: ``(resource, if_none_exist)`` pairs — the resource
+                (dict or Pydantic model) and its conditional-create
+                search query (e.g. ``"identifier=http://example.org|1"``).
+                The query is the correctness boundary: it must be a
+                unique business key for the resource, or a ``200`` may
+                bind you to a different entity's record.
+            chunk_size: Max entries per batch bundle (default 50).
+            accounts: Account references stamped on every entry's
+                ``meta.accounts`` (e.g. ``"Organization/abc"`` or a list).
+            on_behalf_of: Per-call OBO override. ``None`` uses the
+                ambient client OBO; empty string clears it for this call.
+
+        Returns:
+            :class:`~pymedplum.bundle.BatchCreateResult` with
+            ``created`` / ``existed`` / ``failed`` entry lists; entry
+            ``index`` values refer to positions in ``entries``.
+
+        Raises:
+            ValueError: For an empty query, a resource without
+                ``resourceType``, or ``chunk_size < 1``.
+            NetworkError: When a chunk's request failed even after
+                replay-safe retries. Earlier chunks have committed;
+                re-invoke the whole call to converge.
+        """
+        if chunk_size < 1:
+            raise ValueError("chunk_size must be >= 1")
+
+        bundle_entries: list[dict[str, Any]] = []
+        for resource, if_none_exist in entries:
+            data = to_fhir_json(resource)
+            if accounts is not None:
+                data = self._apply_accounts(data, accounts)
+            resource_type = data.get("resourceType")
+            if not resource_type:
+                raise ValueError("Resource must have resourceType")
+            validate_resource_type(resource_type)
+            bundle_entries.append(
+                {
+                    "resource": data,
+                    "request": {
+                        "method": "POST",
+                        "url": resource_type,
+                        "ifNoneExist": sanitize_if_none_exist(
+                            if_none_exist, self.base_url
+                        ),
+                    },
+                }
+            )
+
+        created: list[BundleEntryResult] = []
+        existed: list[BundleEntryResult] = []
+        failed: list[BundleEntryResult] = []
+        for offset in range(0, len(bundle_entries), chunk_size):
+            chunk = bundle_entries[offset : offset + chunk_size]
+            response = await self._request(
+                "POST",
+                self.fhir_base_url,
+                json={
+                    "resourceType": "Bundle",
+                    "type": "batch",
+                    "entry": chunk,
+                },
+                on_behalf_of=on_behalf_of,
+                replay_safe=True,
+            )
+            _classify_batch_chunk(
+                FHIRBundle(response).entry_results(),
+                chunk_len=len(chunk),
+                offset=offset,
+                created=created,
+                existed=existed,
+                failed=failed,
+            )
+
+        return BatchCreateResult(created=created, existed=existed, failed=failed)
+
     @overload
     async def read_resource(
         self,
@@ -805,8 +937,13 @@ class AsyncMedplumClient(BaseClient):
                 ambient client OBO; empty string clears it for this call.
             if_match: Optimistic-concurrency control. ``True`` (default)
                 auto-attaches ``If-Match: W/"<versionId>"`` from
-                ``resource.meta.versionId`` if present. ``False`` opts
-                out. A string is sent verbatim as the ``If-Match`` value.
+                ``resource.meta.versionId`` if present — but silently
+                sends no header when the resource has no versionId.
+                ``"required"`` closes that gap: it raises
+                :class:`~pymedplum.exceptions.MissingVersionIdError`
+                instead of ever writing unguarded. ``False`` opts out.
+                Any other string is sent verbatim as the ``If-Match``
+                value.
 
         Returns:
             Typed resource if as_fhir provided, else dict
@@ -816,6 +953,9 @@ class AsyncMedplumClient(BaseClient):
             patient = await client.read_resource("Patient", "123")
             patient["active"] = True
             updated = await client.update_resource(patient)
+
+            # Never write unguarded — raise if versionId is missing.
+            updated = await client.update_resource(patient, if_match="required")
         """
         data = to_fhir_json(resource)
 
@@ -830,10 +970,11 @@ class AsyncMedplumClient(BaseClient):
         validate_resource_type(resource_type)
         validate_resource_id(resource_id)
 
-        resolved_if_match = _resolve_if_match(data, if_match)
         merged_headers: dict[str, str] = {}
-        if resolved_if_match is not None:
-            merged_headers["If-Match"] = resolved_if_match
+        if not _has_header(headers, "If-Match"):
+            resolved_if_match = _resolve_if_match(data, if_match)
+            if resolved_if_match is not None:
+                merged_headers["If-Match"] = resolved_if_match
         if headers:
             merged_headers.update(headers)
 
@@ -851,6 +992,140 @@ class AsyncMedplumClient(BaseClient):
 
         return response
 
+    async def update_with_retry(
+        self,
+        resource_type: str,
+        resource_id: str,
+        mutator: Callable[[dict[str, Any]], dict[str, Any] | None],
+        *,
+        max_retries: int = 1,
+        force: bool = False,
+        on_behalf_of: str | None = None,
+    ) -> UpdateResult:
+        """Read-modify-write with optimistic concurrency and 412 retry.
+
+        The concurrency-safe way to make a targeted change to a resource
+        another writer might touch: read the current state, run
+        ``mutator`` on it, write back with ``If-Match`` from the read's
+        ``meta.versionId``, and on 412 (a concurrent writer won the
+        race) re-read and re-run ``mutator`` against fresh state, up to
+        ``max_retries`` times, before letting the final
+        :class:`~pymedplum.exceptions.PreconditionFailedError` propagate.
+
+        ``mutator`` receives the resource as read (a dict it may mutate
+        in place) and returns the new state — or ``None`` to keep the
+        (possibly in-place-mutated) input. When the resulting state is
+        byte-equal to what was read, the PUT is skipped and
+        ``UpdateResult.wrote`` is ``False``; ``force=True`` writes
+        regardless (version bump). Because ``mutator`` may run more than
+        once, it must be a pure function of its input — no side effects
+        that can't repeat. It is called synchronously — do the reads
+        your mutation depends on before starting the loop.
+
+        The write is never unguarded: a read that surfaces no
+        ``meta.versionId`` raises
+        :class:`~pymedplum.exceptions.MissingVersionIdError` rather than
+        degrading to last-write-wins.
+
+        Args:
+            resource_type: FHIR resource type (e.g., "Patient").
+            resource_id: Resource ID.
+            mutator: ``dict -> dict | None`` — the change to apply.
+                Must not alter ``resourceType`` or ``id``.
+            max_retries: Number of 412 re-read+retry attempts before
+                raising. Default 1 (two write attempts total).
+            force: Write even when the mutated state equals the remote.
+            on_behalf_of: Per-call OBO override for both the reads and
+                the write. ``None`` uses the ambient client OBO; empty
+                string clears it.
+
+        Returns:
+            :class:`~pymedplum.types.UpdateResult` with whether a write
+            happened, the resulting ``versionId``, and the final state.
+
+        Raises:
+            PreconditionFailedError: After ``max_retries + 1``
+                consecutive 412s.
+            MissingVersionIdError: When the read returns no
+                ``meta.versionId`` and a write is needed.
+            ValueError: If the mutator changed ``resourceType``/``id``
+                or ``max_retries`` is negative.
+
+        Example:
+            def deactivate(patient: dict) -> dict:
+                patient["active"] = False
+                return patient
+
+            result = await client.update_with_retry(
+                "Patient", "123", deactivate
+            )
+            if result.wrote:
+                print(f"now at version {result.version_id}")
+        """
+        validate_resource_type(resource_type)
+        validate_resource_id(resource_id)
+        if max_retries < 0:
+            raise ValueError("max_retries must be >= 0")
+
+        attempt = 0
+        while True:
+            current = await self.read_resource(
+                resource_type, resource_id, on_behalf_of=on_behalf_of
+            )
+            version_id = current.get("meta", {}).get("versionId")
+            before = _stable_dump(current)
+            candidate = mutator(current)
+            new_state = current if candidate is None else candidate
+            if (
+                new_state.get("resourceType") != resource_type
+                or new_state.get("id") != resource_id
+            ):
+                raise ValueError(
+                    "mutator must not change resourceType or id "
+                    f"(got {new_state.get('resourceType')}/"
+                    f"{new_state.get('id')}, expected "
+                    f"{resource_type}/{resource_id})"
+                )
+            if not force and _stable_dump(new_state) == before:
+                return UpdateResult(
+                    wrote=False,
+                    version_id=version_id if isinstance(version_id, str) else "",
+                    resource=new_state,
+                )
+
+            if not isinstance(version_id, str) or not version_id:
+                raise MissingVersionIdError(
+                    f"{resource_type}/{resource_id} read returned no "
+                    "meta.versionId; refusing to write without optimistic "
+                    "concurrency"
+                )
+            try:
+                updated = await self.update_resource(
+                    new_state,
+                    if_match=f'W/"{version_id}"',
+                    on_behalf_of=on_behalf_of,
+                )
+            except PreconditionFailedError:
+                if attempt >= max_retries:
+                    raise
+                attempt += 1
+                continue
+
+            new_version = updated.get("meta", {}).get("versionId")
+            resource_after: dict[str, Any] = updated
+            if not isinstance(new_version, str) or not new_version:
+                # Some servers return 204 / empty body on update. Re-read
+                # to surface the post-write state and versionId.
+                resource_after = await self.read_resource(
+                    resource_type, resource_id, on_behalf_of=on_behalf_of
+                )
+                new_version = resource_after.get("meta", {}).get("versionId")
+            return UpdateResult(
+                wrote=True,
+                version_id=new_version if isinstance(new_version, str) else "",
+                resource=resource_after,
+            )
+
     @overload
     async def patch_resource(
         self,
@@ -861,6 +1136,7 @@ class AsyncMedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         as_fhir: type[ResourceT],
         on_behalf_of: str | None = None,
+        if_match: str | None = None,
     ) -> ResourceT:
         pass
 
@@ -874,6 +1150,7 @@ class AsyncMedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         as_fhir: None = None,
         on_behalf_of: str | None = None,
+        if_match: str | None = None,
     ) -> dict[str, Any]:
         pass
 
@@ -886,6 +1163,7 @@ class AsyncMedplumClient(BaseClient):
         headers: dict[str, str] | None = None,
         as_fhir: type[ResourceT] | None = None,
         on_behalf_of: str | None = None,
+        if_match: str | None = None,
     ) -> ResourceT | dict[str, Any]:
         """Apply JSON Patch operations to a resource.
 
@@ -893,10 +1171,16 @@ class AsyncMedplumClient(BaseClient):
             resource_type: FHIR resource type (e.g., "Patient")
             resource_id: Resource ID
             operations: List of JSON Patch operations
-            headers: Optional HTTP headers (e.g., If-Match for optimistic locking)
+            headers: Optional HTTP headers. An explicit ``If-Match`` here
+                always wins over the ``if_match`` keyword.
             as_fhir: Optional FHIR resource class for typed response
             on_behalf_of: Per-call OBO override. ``None`` uses the
                 ambient client OBO; empty string clears it for this call.
+            if_match: Optional explicit ETag sent as the ``If-Match``
+                header (e.g. ``'W/"3"'``), for optimistic locking. Unlike
+                ``update_resource`` there is no resource to read a
+                versionId from, so only the explicit-string form exists —
+                carry the version from your read.
 
         Returns:
             Typed resource if as_fhir provided, else dict
@@ -905,6 +1189,15 @@ class AsyncMedplumClient(BaseClient):
             # Patch and get as dict
             operations = [{"op": "replace", "path": "/active", "value": False}]
             patched = await client.patch_resource("Patient", "123", operations)
+
+            # With optimistic locking from a prior read
+            patient = await client.read_resource("Patient", "123")
+            patched = await client.patch_resource(
+                "Patient",
+                "123",
+                operations,
+                if_match=f'W/"{patient["meta"]["versionId"]}"',
+            )
 
             # Type-safe patching with Pydantic models
             from pymedplum.fhir import Patient
@@ -915,6 +1208,8 @@ class AsyncMedplumClient(BaseClient):
         validate_resource_type(resource_type)
         validate_resource_id(resource_id)
         patch_headers = {"Content-Type": "application/json-patch+json"}
+        if if_match is not None and not _has_header(headers, "If-Match"):
+            patch_headers["If-Match"] = if_match
         if headers:
             patch_headers.update(headers)
 
@@ -1672,22 +1967,17 @@ class AsyncMedplumClient(BaseClient):
 
         ``mutator`` receives the current managed slice (as a list of
         normalized FHIR JSON dicts) and returns the new managed slice.
-        It is re-invoked against fresh state on every retry, so
-        concurrent writes by other callers are preserved.
+        Implemented on :meth:`update_with_retry`, so it is re-invoked
+        against fresh state on every retry and concurrent writes by
+        other callers are preserved.
         """
         bare_id = _normalize_project_membership_id(membership_id)
         if not managed_policy_ids:
             raise ValueError("managed_policy_ids must not be empty")
-        if max_retries < 0:
-            raise ValueError("max_retries must be >= 0")
 
-        # Membership administration runs as the calling credential, never
-        # as an OBO target — clear any ambient/default OBO for these calls.
-        attempt = 0
-        while True:
-            membership = await self.read_resource(
-                "ProjectMembership", bare_id, on_behalf_of=""
-            )
+        counts = {"managed": 0, "untouched": 0}
+
+        def resource_mutator(membership: dict[str, Any]) -> dict[str, Any] | None:
             version_id = membership.get("meta", {}).get("versionId")
             if not isinstance(version_id, str) or not version_id:
                 raise ValueError(
@@ -1724,38 +2014,33 @@ class AsyncMedplumClient(BaseClient):
                     "intended (e.g. admin memberships)."
                 )
 
-            if not force and merged_equals_remote(merged, current_access):
-                return MergeResult(
-                    updated=False,
-                    version_id=version_id,
-                    managed_count=len(new_managed),
-                    untouched_count=len(untouched),
-                )
+            counts["managed"] = len(new_managed)
+            counts["untouched"] = len(untouched)
 
-            membership["access"] = merged
-            try:
-                updated = await self.update_resource(membership, on_behalf_of="")
-            except PreconditionFailedError:
-                if attempt >= max_retries:
-                    raise
-                attempt += 1
-                continue
+            if merged_equals_remote(merged, current_access):
+                # Signal no-op without touching the resource: writing the
+                # (semantically equal) merged list back could still change
+                # the byte shape (e.g. materializing an absent "access"
+                # key as []), which would defeat the skip.
+                return None
+            return {**membership, "access": merged}
 
-            new_version = updated.get("meta", {}).get("versionId")
-            if not isinstance(new_version, str) or not new_version:
-                # Some servers return 204 / empty body on update. Re-read
-                # to surface the post-write versionId.
-                refreshed = await self.read_resource(
-                    "ProjectMembership", bare_id, on_behalf_of=""
-                )
-                new_version = refreshed.get("meta", {}).get("versionId") or ""
-
-            return MergeResult(
-                updated=True,
-                version_id=new_version,
-                managed_count=len(new_managed),
-                untouched_count=len(untouched),
-            )
+        # Membership administration runs as the calling credential, never
+        # as an OBO target — clear any ambient/default OBO for these calls.
+        result = await self.update_with_retry(
+            "ProjectMembership",
+            bare_id,
+            resource_mutator,
+            max_retries=max_retries,
+            force=force,
+            on_behalf_of="",
+        )
+        return MergeResult(
+            updated=result.wrote,
+            version_id=result.version_id,
+            managed_count=counts["managed"],
+            untouched_count=counts["untouched"],
+        )
 
     async def get(self, path: str, **kwargs: Any) -> dict[str, Any]:
         """GET from any Medplum endpoint (not just FHIR).
@@ -2359,15 +2644,27 @@ class AsyncMedplumClient(BaseClient):
         self,
         bundle: dict[str, Any] | Any,
         *,
+        accounts: str | list[str] | None = None,
         on_behalf_of: str | None = None,
     ) -> dict[str, Any]:
-        """Execute a transaction bundle atomically.
+        """Execute a transaction bundle.
 
-        All operations in a transaction bundle succeed or fail together.
-        Use placeholder IDs (urn:uuid:xxx) to reference resources within the bundle.
+        Use placeholder IDs (urn:uuid:xxx) to reference resources within
+        the bundle.
+
+        Warning:
+            Do not assume atomicity on failure. Medplum transaction
+            bundles have been observed to commit some entries while
+            others fail (verify per server version) — inspect the
+            response with :meth:`pymedplum.FHIRBundle.entry_results` /
+            :meth:`~pymedplum.FHIRBundle.raise_for_entry_errors` and
+            compensate rather than trusting an all-or-nothing rollback.
 
         Args:
             bundle: Bundle resource with type="transaction" or dict with entries
+            accounts: Account references to set on each bundle entry's
+                meta.accounts (e.g., "Organization/abc" or a list) —
+                same semantics as ``execute_batch``
             on_behalf_of: Optional ProjectMembership ID to act on behalf
                 of for this request (overrides any context-bound value)
 
@@ -2393,8 +2690,13 @@ class AsyncMedplumClient(BaseClient):
         """
         bundle_data = to_fhir_json(bundle)
 
+        if accounts is not None:
+            bundle_data = _stamp_bundle_accounts(
+                bundle_data, accounts, self._apply_accounts
+            )
+
         if bundle_data.get("type") != "transaction":
-            bundle_data["type"] = "transaction"
+            bundle_data = {**bundle_data, "type": "transaction"}
 
         return await self._request(
             "POST",
@@ -2587,6 +2889,7 @@ class AsyncMedplumClient(BaseClient):
             headers={"Content-Type": content_type},
         )
 
+    @overload
     async def execute_operation(
         self,
         resource_type: str,
@@ -2598,7 +2901,39 @@ class AsyncMedplumClient(BaseClient):
         method: Literal["GET", "POST"] = "POST",
         wrap_params: bool = False,
         on_behalf_of: str | None = None,
+        as_fhir: type[ResourceT],
+    ) -> ResourceT:
+        pass
+
+    @overload
+    async def execute_operation(
+        self,
+        resource_type: str,
+        operation: str,
+        resource_id: str | None = None,
+        params: dict[str, Any] | Any | None = None,
+        *,
+        headers: dict[str, str] | None = None,
+        method: Literal["GET", "POST"] = "POST",
+        wrap_params: bool = False,
+        on_behalf_of: str | None = None,
+        as_fhir: None = None,
     ) -> dict[str, Any]:
+        pass
+
+    async def execute_operation(
+        self,
+        resource_type: str,
+        operation: str,
+        resource_id: str | None = None,
+        params: dict[str, Any] | Any | None = None,
+        *,
+        headers: dict[str, str] | None = None,
+        method: Literal["GET", "POST"] = "POST",
+        wrap_params: bool = False,
+        on_behalf_of: str | None = None,
+        as_fhir: type[ResourceT] | None = None,
+    ) -> ResourceT | dict[str, Any]:
         """Execute a FHIR operation (standard or custom).
 
         Supports both type-level operations (e.g., Patient/$match) and
@@ -2615,9 +2950,16 @@ class AsyncMedplumClient(BaseClient):
                 auto-wrap it into a Parameters resource for POST requests
             on_behalf_of: Per-call OBO override. ``None`` uses the
                 ambient client OBO; empty string clears it for this call.
+            as_fhir: Optional FHIR resource class to parse the response
+                into. Handles the direct case only — the operation must
+                return that resource itself. A ``Parameters`` or
+                ``Bundle`` wrapping the payload raises; unwrap those
+                explicitly with ``parameters_to_dict`` /
+                ``get_parameter_resource`` or ``FHIRBundle``.
 
         Returns:
-            Operation response (typically Parameters or resource-specific)
+            Operation response (typically Parameters or resource-specific),
+            parsed into ``as_fhir`` when provided
 
         Note:
             Many FHIR operations accept both GET (with query params) and POST (with
@@ -2669,17 +3011,13 @@ class AsyncMedplumClient(BaseClient):
 
         if method == "GET":
             # Convert params to query string
-            if params:
-                query_params = self._build_query_params(params)
-                return await self._request(
-                    "GET",
-                    url,
-                    params=query_params,
-                    headers=headers,
-                    on_behalf_of=on_behalf_of,
-                )
-            return await self._request(
-                "GET", url, headers=headers, on_behalf_of=on_behalf_of
+            query_params = self._build_query_params(params) if params else None
+            response = await self._request(
+                "GET",
+                url,
+                params=query_params,
+                headers=headers,
+                on_behalf_of=on_behalf_of,
             )
         else:
             # POST with body
@@ -2694,13 +3032,17 @@ class AsyncMedplumClient(BaseClient):
                 ):
                     body = dict_to_parameters(body)
 
-            return await self._request(
+            response = await self._request(
                 "POST",
                 url,
                 json=body,
                 headers=headers,
                 on_behalf_of=on_behalf_of,
             )
+
+        if as_fhir:
+            return _parse_operation_response(response, as_fhir, operation_name)
+        return response
 
     async def deploy_bot(
         self,
