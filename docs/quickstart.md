@@ -74,6 +74,10 @@ patient.active = False
 # Default: If-Match derived from meta.versionId.
 updated = client.update_resource(patient)
 
+# Strict: raise MissingVersionIdError if there is no versionId,
+# instead of silently writing without an If-Match guard.
+updated = client.update_resource(patient, if_match="required")
+
 # Opt out for last-write-wins behavior.
 updated = client.update_resource(patient, if_match=False)
 
@@ -83,7 +87,9 @@ updated = client.update_resource(patient, if_match='W/"5"')
 
 If the server's current version has moved on, the default path raises
 `PreconditionFailedError` rather than silently overwriting a newer
-revision.
+revision. For the full read-modify-write loop with automatic 412
+retry, see
+[`update_with_retry`](advanced/crud.md#read-modify-write-with-retry-update_with_retry).
 
 ## Searching for Resources
 The recommended way to search is to use the `search_resource_pages` iterator, which handles pagination for you. You can get results as dicts or as typed Pydantic models.

@@ -104,11 +104,25 @@ plain `ThreadPoolExecutor.submit` does not propagate. See
 ## Retry and throttling
 
 The client retries transient failures with capped exponential backoff.
-Two invariants worth knowing:
+Three invariants worth knowing:
 
+- **Replay safety gates ambiguous failures.** A `502`, `503`, or `504`
+  — and any transport failure after the request was sent (read timeout,
+  dropped connection) — can arrive *after* the origin committed a
+  write, so those are retried only for replay-safe requests: idempotent
+  methods, or a `POST` carrying a real `If-None-Exist` query (FHIR
+  conditional create, where the replay is a server-side no-op). A bare
+  `POST` is never replayed on them. Connect-phase failures (DNS, TCP
+  connect, pool wait) provably never reached the server and retry for
+  every method. When a `NetworkError` surfaces, its
+  `possibly_committed` attribute says which side of that line the
+  failure fell on — `True` means re-read state before retrying any
+  non-idempotent write.
 - **429 handling** parses `Retry-After` (both seconds and HTTP-date
   forms) and respects the server-supplied delay, capped by
-  `MAX_RETRY_DELAY_SECONDS` to avoid pathological pauses.
+  `MAX_RETRY_DELAY_SECONDS` to avoid pathological pauses. 429 retries
+  every method — the assumption is that a rate-limit rejection happens
+  at the front door, before the server processes the request.
 - **Token-refresh cooldown.** If an OAuth refresh fails, the client
   enters a cooldown window (default 1 second, configurable with
   `failed_refresh_cooldown=`). Additional calls that would trigger a

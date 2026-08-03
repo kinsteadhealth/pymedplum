@@ -12,10 +12,23 @@ If you like the experience of the official [Medplum TypeScript SDK](https://gith
 - **Typed models (Pydantic v2)**: Auto-generated FHIR models with IDE autocomplete.
 - **CRUD + patching**: Create/read/update/delete + JSON Patch.
   `update_resource` auto-attaches `If-Match` from `meta.versionId` by
-  default (opt-out available).
+  default (opt-out available; `if_match="required"` refuses to write
+  unguarded), and `update_with_retry` wraps the whole
+  read-modify-write loop with 412 retry.
 - **Real-world search**: `_include`, `_revinclude`, chaining, modifiers, paging.
-- **FHIR operations**: `execute_operation` + terminology helpers + C-CDA export.
-- **Bundles**: Transactions (atomic) and batch bundles (independent).
+- **FHIR operations**: `execute_operation` (with typed `as_fhir`
+  responses) + `Parameters` readers + terminology helpers + C-CDA export.
+- **Bundles**: Transactions and batch bundles, per-entry response
+  inspection (`entry_results` / `raise_for_entry_errors` — Medplum
+  transactions are **not** atomic on failure), and idempotent bulk
+  creation via `conditional_create_batch`.
+- **Extensions**: `get_extension` / `set_extension` / friends for FHIR
+  extension handling on dicts and models, plus Medplum's
+  service-type-reference convention for Slot/Schedule tagging.
+- **Replay-safe retries**: ambiguous statuses (502/503/504) and
+  sent-then-failed transport errors never replay a bare POST — only
+  idempotent requests and conditional creates retry.
+  `NetworkError.possibly_committed` tells you when to read-before-retry.
 - **Binary + DocumentReference**: Upload/download and clinical document linking.
 - **GraphQL**: GraphQL query execution.
 - **On-behalf-of (OBO)**: Per-client isolation via `ContextVar`.

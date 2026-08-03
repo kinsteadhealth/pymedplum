@@ -75,3 +75,57 @@ except PreconditionFailedError:
     print("Search criteria matched multiple resources")
 ```
 
+## Bulk conditional creates
+
+`conditional_create_batch` creates many resources idempotently in one
+call: it builds `type: batch` bundles of POST entries carrying
+`ifNoneExist`, chunked (default 50 per bundle), and classifies every
+entry's response.
+
+```python
+entries = [
+    (
+        {"resourceType": "Patient", "identifier": [
+            {"system": "http://example.org/mrn", "value": str(n)}
+        ]},
+        f"identifier=http://example.org/mrn|{n}",
+    )
+    for n in range(200)
+]
+
+result = client.conditional_create_batch(entries, chunk_size=50)
+
+for created in result.created:      # 201 — newly created
+    print(created.index, created.resource_id)
+for existed in result.existed:      # 200 — an existing resource matched
+    print(existed.index, existed.resource_id)
+for failed in result.failed:        # anything else — collected, not raised
+    print(failed.index, failed.status_code, failed.outcome)
+```
+
+Entry `index` values refer to positions in your original `entries`
+sequence, across all chunks. `accounts=` stamps `meta.accounts` on
+every entry's resource; `on_behalf_of=` applies per call.
+
+Two properties worth knowing:
+
+- **Replay-safe by construction.** A conditional create is the one POST
+  shape a replay cannot duplicate — the retry is a server-side no-op —
+  so the SDK marks these batch requests replay-safe: an ambiguous 5xx
+  or mid-batch network failure retries safely, and re-invoking the
+  whole call after an error converges (already-committed entries
+  classify as `existed` on the second pass).
+- **The query is the correctness boundary.** A `200 existed` returns
+  *whatever already matched the query* — use a globally unique business
+  key you own, and treat a match as **found, not created**: verify
+  identity before attaching local state.
+
+## Retry-safety note
+
+The retry policy replays a `POST` on ambiguous statuses (502/503/504)
+**only** when it carries a real `If-None-Exist` query — a bare
+`create_resource` POST is never replayed there, because those statuses
+can arrive after the origin already committed the write. When a create
+must be safe under retry, conditional create is the tool, not the
+status class.
+

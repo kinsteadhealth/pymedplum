@@ -62,6 +62,53 @@ result = client.execute_operation(
 )
 ```
 
+### Typed operation responses (`as_fhir`)
+
+When an operation returns a resource directly, `as_fhir=` parses it
+into a typed model — the same convention as reads:
+
+```python
+from pymedplum.fhir import Bundle
+
+bundle = client.execute_operation(
+    "Patient",
+    "everything",
+    resource_id="patient-123",
+    as_fhir=Bundle,
+)
+print(bundle.type)  # "searchset"
+```
+
+`as_fhir` handles the **direct case only**. If the response is a
+`Parameters` or `Bundle` *wrapping* your payload, the call raises
+`MedplumError` — unwrap explicitly with the helpers below (no magic).
+
+### Reading `Parameters` responses
+
+Many operations answer with a `Parameters` resource. Three helpers
+invert `dict_to_parameters` for the read direction:
+
+```python
+from pymedplum import get_parameter, get_parameter_resource, parameters_to_dict
+
+result = client.execute_operation(
+    "CodeSystem",
+    "lookup",
+    params={"code": "8867-4", "system": "http://loinc.org"},
+    method="GET",
+)
+
+parameters_to_dict(result)
+# {"name": "LOINC", "display": "Heart rate", ...}
+
+get_parameter(result, "display")            # "Heart rate"
+get_parameter_resource(result, "resource")  # first entry carrying a resource
+```
+
+`parameters_to_dict` extracts each entry's `resource`, nested `part`
+(recursed into a dict), or first `value[x]`; a name appearing more than
+once collects its values into a list.
+
 ## Multi-tenant accounts (`$set-accounts`)
 
 In multi-tenant MSO (Management Services Organization) setups, Medplum uses `meta.accounts` to assign resources to accounts — typically Organizations — which drive compartment-based access control via AccessPolicies.

@@ -417,15 +417,16 @@ def test_retry_delay_429_and_5xx_and_terminal():
     assert _retry_delay(r200, attempt=0, method="GET", headers=None) is None
 
 
-def test_retry_delay_gates_502_504_on_idempotency():
-    """502/504 must not replay a bare POST — they can arrive after the
-    origin committed the write, so a retry creates a duplicate resource."""
+def test_retry_delay_gates_502_503_504_on_idempotency():
+    """502/503/504 must not replay a bare POST — a gateway 502/504, or a
+    503 from a draining pod mid-deploy, can arrive after the origin
+    committed the write, so a retry creates a duplicate resource."""
     import httpx
 
     from pymedplum._base import _retry_delay
 
     req = httpx.Request("POST", "https://example.test/")
-    for status in (502, 504):
+    for status in (502, 503, 504):
         resp = httpx.Response(status, request=req)
         assert _retry_delay(resp, attempt=0, method="POST", headers=None) is None
         assert _retry_delay(resp, attempt=0, method="PATCH", headers=None) is None
@@ -444,18 +445,39 @@ def test_retry_delay_gates_502_504_on_idempotency():
         )
 
 
-def test_retry_delay_503_and_429_retry_every_method():
-    """503 (no healthy upstream) and 429 (rate limit) are rejected before
-    processing, so a bare POST is replay-safe for both."""
+def test_retry_delay_429_retries_every_method():
+    """429 (rate limit) is rejected at the front door before processing,
+    so a bare POST is replay-safe for it — unlike 503, which a draining
+    pod can emit after committing (see the 502/503/504 gate test)."""
     import httpx
 
     from pymedplum._base import _retry_delay
 
     req = httpx.Request("POST", "https://example.test/")
-    for status in (503, 429):
+    resp = httpx.Response(429, request=req)
+    assert _retry_delay(resp, attempt=0, method="POST", headers=None) is not None
+    assert _retry_delay(resp, attempt=0, method="PATCH", headers=None) is not None
+
+
+def test_retry_delay_replay_safe_override():
+    """An explicit replay_safe overrides the method/header inference —
+    True lets a semantically idempotent bare POST retry an ambiguous
+    status; False pins even an idempotent method terminal."""
+    import httpx
+
+    from pymedplum._base import _retry_delay
+
+    req = httpx.Request("POST", "https://example.test/")
+    for status in (502, 503, 504):
         resp = httpx.Response(status, request=req)
-        assert _retry_delay(resp, attempt=0, method="POST", headers=None) is not None
-        assert _retry_delay(resp, attempt=0, method="PATCH", headers=None) is not None
+        assert (
+            _retry_delay(resp, attempt=0, method="POST", headers=None, replay_safe=True)
+            is not None
+        )
+        assert (
+            _retry_delay(resp, attempt=0, method="GET", headers=None, replay_safe=False)
+            is None
+        )
 
 
 def test_is_replay_safe_requires_nonempty_if_none_exist():

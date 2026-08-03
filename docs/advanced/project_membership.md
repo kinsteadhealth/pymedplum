@@ -37,6 +37,13 @@ All three share the same contract:
    sent and `result.updated` is `False`. Calling these helpers from
    a retry loop or a recovery script is therefore cheap.
 
+The read / mutate / `If-Match` write / 412-retry loop underneath is
+the public
+[`update_with_retry`](crud.md#read-modify-write-with-retry-update_with_retry)
+primitive — these helpers layer the access-slice partitioning and
+safety checks on top of it. Reach for `update_with_retry` directly
+when you need the same concurrency contract for any other resource.
+
 ## Calling merge
 
 The realistic shape is "user belongs to N tenants" — pass one entry
